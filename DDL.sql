@@ -99,7 +99,7 @@ CREATE TABLE favorite
 CREATE TABLE transaction
 (
   id         INT                           NOT NULL AUTO_INCREMENT COMMENT '거래 PK',
-  status     ENUM('COMPLETED','CANCELLED') NULL     DEFAULT 'COMPLETED' COMMENT '거래 상태',
+  status     ENUM('PENDING','IN_PROGRESS','COMPLETED','CANCELLED') NULL     DEFAULT 'PENDING' COMMENT '거래 상태',
   created_at DATETIME                      NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '거래 완료날짜',
   updated_at DATETIME                      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '거래 수정날짜',
   product_id INT                           NOT NULL COMMENT '상품 PK',
