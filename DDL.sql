@@ -39,6 +39,7 @@ CREATE TABLE user
 
   profile_img    VARCHAR(100) NOT NULL DEFAULT 'default_img.png' COMMENT '유저 프로필 이미지',
   PRIMARY KEY (id)
+  UNIQUE KEY unique_provider (provider, provider_id)
 ) COMMENT '유저 테이블';
 
 -- address 테이블
