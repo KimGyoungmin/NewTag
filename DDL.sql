@@ -15,18 +15,29 @@ CREATE USER IF NOT EXISTS 'developer'@'%' IDENTIFIED BY 'P!ssw0rd';
 -- user 테이블
 CREATE TABLE user
 (
-  id          INT          NOT NULL AUTO_INCREMENT COMMENT '유저 PK',
-  name        VARCHAR(20)  NOT NULL COMMENT '유저 이름',
-  nick        VARCHAR(50)  NOT NULL UNIQUE COMMENT '유저 아이디',
-  password    VARCHAR(200) NOT NULL COMMENT '유저 비밀번호',
-  email       VARCHAR(200) NOT NULL UNIQUE COMMENT '유저 이메일',
-  phone       VARCHAR(50)  NOT NULL COMMENT '유저 연락처',
-  birth       DATE         NOT NULL COMMENT '유저 생년월일',
-  trust       DOUBLE       NOT NULL DEFAULT 0.0 COMMENT '유저 신뢰점수',
-  is_delete   BOOLEAN      NOT NULL DEFAULT FALSE COMMENT '유저 소프트삭제',
-  created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '유저 생성날짜',
-  updated_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '유저 수정날짜',
-  profile_img VARCHAR(100) NOT NULL DEFAULT 'default_img.png' COMMENT '유저 프로필 이미지',
+  id             INT          NOT NULL AUTO_INCREMENT COMMENT '유저 PK',
+  name           VARCHAR(20)  NOT NULL COMMENT '유저 이름',
+  nick           VARCHAR(50)  NOT NULL UNIQUE COMMENT '유저 아이디',
+  password       VARCHAR(200)     NULL COMMENT '유저 비밀번호',
+  email          VARCHAR(200) NOT NULL UNIQUE COMMENT '유저 이메일',
+  phone          VARCHAR(50)      NULL COMMENT '유저 연락처',
+  birth          DATE             NULL COMMENT '유저 생년월일',
+  -- 소셜 로그인 관련
+  provider       VARCHAR(20)      NULL COMMENT '소셜 로그인 제공자 (LOCAL, GOOGLE, KAKAO, NAVER)',
+  provider_id    VARCHAR(100)     NULL COMMENT '소셜 로그인 제공자 고유 ID',
+  -- 인증 관련
+  email_verified BOOLEAN      NOT NULL DEFAULT FALSE COMMENT '이메일 인증 여부',
+  phone_verified BOOLEAN      NOT NULL DEFAULT FALSE COMMENT '휴대폰 인증 여부',
+  -- 권한 및 상태
+  role           ENUM('USER', 'ADMIN') NOT NULL DEFAULT 'USER' COMMENT '사용자 권한',
+  is_delete      BOOLEAN      NOT NULL DEFAULT FALSE COMMENT '유저 소프트삭제',
+  trust          DOUBLE       NOT NULL DEFAULT 0.0 COMMENT '유저 신뢰점수',
+  -- 날짜 관련
+  last_login_at  DATETIME         NULL COMMENT '마지막 로그인 시간',
+  created_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '유저 생성날짜',
+  updated_at     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '유저 수정날짜',
+
+  profile_img    VARCHAR(100) NOT NULL DEFAULT 'default_img.png' COMMENT '유저 프로필 이미지',
   PRIMARY KEY (id)
 ) COMMENT '유저 테이블';
 
@@ -70,6 +81,8 @@ CREATE TABLE product
   category_id INT                                   NOT NULL COMMENT '카테고리 PK',
   PRIMARY KEY (id)
 ) COMMENT '상품 테이블';
+
+
 
 -- p_img 테이블
 CREATE TABLE p_img
@@ -192,3 +205,5 @@ CREATE INDEX idx_review_writer ON review(writer_id);
 CREATE INDEX idx_review_target ON review(target_id);
 CREATE INDEX idx_transaction_buyer ON transaction(buyer_id);
 CREATE INDEX idx_transaction_seller ON transaction(seller_id);
+CREATE INDEX idx_user_provider ON user(provider, provider_id);
+CREATE INDEX idx_user_email ON user(email);
