@@ -1,4 +1,4 @@
-package com.goldenRun.controller;
+package com.goldenRun.NewTag.controller;
 
 import java.util.Map;
 
@@ -9,18 +9,18 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.goldenRun.entity.User;
-import com.goldenRun.service.UserService;
+import com.goldenRun.NewTag.entity.User;
+import com.goldenRun.NewTag.service.UserService;
 
 @RestController
 public class UserController {
-	
+
 	@Autowired
 	private UserService service;
-	
+
 	@PostMapping("/login")
 	public ResponseEntity<Map<String, Object>> login(@RequestBody User loginUser) {
-	   
+
 	    return service.login(loginUser);
 	}
 	@PostMapping("/signup")
