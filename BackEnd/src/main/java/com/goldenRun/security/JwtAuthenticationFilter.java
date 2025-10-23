@@ -6,37 +6,35 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.GenericFilterBean;
-import org.springframework.web.filter.OncePerRequestFilter;
-
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-
 import java.io.IOException;
 
 @Component
 @RequiredArgsConstructor
-public class JwtAuthenticationFilter extends OncePerRequestFilter {
+public class JwtAuthenticationFilter extends GenericFilterBean {
 
 	
     private final JwtTokenProvider jwtTokenProvider;
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
-            throws ServletException, IOException {
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+            throws IOException, ServletException {
+        // HTTP 요청 헤더에서 토큰을 추출
+        String token = resolveToken((HttpServletRequest) request);
 
-        String token = resolveToken(request);
-
+        // 토큰 유효성 검증
         if (token != null && jwtTokenProvider.validateToken(token)) {
+            // 토큰이 유효하면 인증 객체를 생성
             Authentication auth = jwtTokenProvider.getAuthentication(token);
+            // SecurityContextHolder에 인증 객체를 설정하여 인증 상태로 만듬
             SecurityContextHolder.getContext().setAuthentication(auth);
         }
-
-        filterChain.doFilter(request, response);
+        chain.doFilter(request, response);
     }
 
     // HTTP 헤더에서 "Authorization: Bearer <token>" 형식으로 토큰 추출

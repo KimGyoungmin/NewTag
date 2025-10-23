@@ -10,14 +10,14 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.goldenRun.security.JwtTokenProvider;
-import com.goldenRun.Repository.BoardRepository;
+import com.goldenRun.Repository.UserRepository;
 import com.goldenRun.entity.User;
 
 @Service
-public class BoardService {
+public class UserService {
 	
 	@Autowired
-	private BoardRepository repository;
+	private UserRepository repository;
 	
 	@Autowired
 	private PasswordEncoder encoder;

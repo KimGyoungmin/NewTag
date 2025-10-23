@@ -10,13 +10,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.goldenRun.entity.User;
-import com.goldenRun.service.BoardService;
+import com.goldenRun.service.UserService;
 
 @RestController
-public class BoardController {
+public class UserController {
 	
 	@Autowired
-	private BoardService service;
+	private UserService service;
 	
 	@PostMapping("/login")
 	public ResponseEntity<Map<String, Object>> login(@RequestBody User loginUser) {

@@ -4,12 +4,26 @@ import java.time.LocalDate;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import lombok.Builder;
 import lombok.Data;
 
 
+@Table(
+	    name = "user",
+	    uniqueConstraints = {
+	        @UniqueConstraint(columnNames = {"nick"}),
+	        @UniqueConstraint(columnNames = {"provider", "provider_id"}),
+	        @UniqueConstraint(columnNames = {"email"})
+	    }
+	)
+@Builder
 @Data
 @Entity
 public class User {
@@ -36,5 +50,24 @@ public class User {
     private LocalDate birth;  
     
     
-    private Double trust;
+    
+    
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20, nullable = false)
+    @Builder.Default
+    private Provider provider = Provider.LOCAL;
+
+    @Column(name = "provider_id", length = 100)
+    private String providerId;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 10)
+    @Builder.Default
+    private Role role = Role.USER;
+
+    @Builder.Default
+    private boolean isDelete = false;
+    
+    @Builder.Default
+    private Double trust = 0.0;
 }

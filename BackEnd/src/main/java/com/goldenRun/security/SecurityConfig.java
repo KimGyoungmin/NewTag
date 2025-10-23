@@ -1,6 +1,5 @@
 package com.goldenRun.security;
 
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -27,12 +26,22 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-            .authorizeHttpRequests(authorize -> authorize 
+            // 1. HTTP Basic, CSRF, 세션 관리 설정
+            .httpBasic(basic -> basic.disable()) // httpBasic().disable()
+            .csrf(csrf -> csrf.disable())       // csrf().disable()
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            
+            
+            .authorizeHttpRequests(auth -> auth
+                
                 .requestMatchers("/api/auth/**", "/login", "/join").permitAll()
+                
                 .anyRequest().authenticated()
             )
+            
+            // 3. JWT 필터 추가
             .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-        
+            
         return http.build();
     }
     @Bean
