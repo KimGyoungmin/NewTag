@@ -1,6 +1,10 @@
-package com.goldenRun.entity;
+package com.goldenRun.NewTag.entity;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -11,8 +15,10 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
 
 
 @Table(
@@ -25,6 +31,8 @@ import lombok.Data;
 	)
 @Builder
 @Data
+@NoArgsConstructor
+@AllArgsConstructor
 @Entity
 public class User {
 	
@@ -67,7 +75,21 @@ public class User {
 
     @Builder.Default
     private boolean isDelete = false;
-    
+
     @Builder.Default
     private Double trust = 0.0;
+
+    @Column(name = "profile_img", length = 500)
+    private String profileImg;
+
+    @Column(name = "last_login_at")
+    private LocalDateTime lastLoginAt;
+
+    @CreationTimestamp
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @UpdateTimestamp
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
 }

@@ -1,4 +1,4 @@
-package com.goldenRun.service;
+package com.goldenRun.NewTag.service;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -9,9 +9,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
-import com.goldenRun.security.JwtTokenProvider;
-import com.goldenRun.Repository.UserRepository;
-import com.goldenRun.entity.User;
+import com.goldenRun.NewTag.Repository.UserRepository;
+import com.goldenRun.NewTag.entity.User;
+import com.goldenRun.NewTag.security.JwtTokenProvider;
 
 @Service
 public class UserService {
