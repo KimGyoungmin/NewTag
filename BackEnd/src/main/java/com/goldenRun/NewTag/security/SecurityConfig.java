@@ -44,7 +44,7 @@ public class SecurityConfig {
                 // CORS preflight 요청 (OPTIONS) 모두 허용
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // 공개 엔드포인트
-                .requestMatchers("/api/auth/**", "/api/health", "/api/test", "/login", "/join", "/signup", "/emailMatch", "/idMatch").permitAll()
+                .requestMatchers("/api/auth/**", "/api/health", "/api/test", "/api/encode-password", "/api/v1/login", "/api/v1/signup", "/api/v1/emailMatch", "/api/v1/idMatch").permitAll()
                 // 나머지는 인증 필요
                 .anyRequest().authenticated()
             )
