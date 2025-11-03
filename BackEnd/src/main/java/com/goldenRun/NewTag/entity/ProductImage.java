@@ -18,12 +18,12 @@ public class ProductImage {
 
     @Column(nullable=false) private Boolean is_main;
 
-    @Column(nullable=false) private LocalDateTime created_at;
-    @Column(nullable=false) private LocalDateTime updated_at;
+    @Column(nullable=false) private LocalDateTime createdAt;
+    @Column(nullable=false) private LocalDateTime updatedAt;
 
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name="product_id", nullable=false)
     private Product product;
 
-    @PrePersist void prePersist(){ created_at = updated_at = LocalDateTime.now(); if (is_main==null) is_main=false; }
-    @PreUpdate void preUpdate(){ updated_at = LocalDateTime.now(); }
+    @PrePersist void prePersist(){ createdAt = updatedAt = LocalDateTime.now(); if (is_main==null) is_main=false; }
+    @PreUpdate void preUpdate(){ updatedAt = LocalDateTime.now(); }
 }

@@ -28,9 +28,9 @@ public class Review {
     private String content;
 
     @Column(nullable = false)
-    private LocalDateTime created_at;
+    private LocalDateTime createdAt;
     @Column(nullable = false)
-    private LocalDateTime updated_at;
+    private LocalDateTime updatedAt;
 
     @Column(name = "transaction_id", nullable = false)
     private Integer transactionId;
@@ -45,11 +45,11 @@ public class Review {
 
     @PrePersist
     void prePersist() {
-        created_at = updated_at = LocalDateTime.now();
+        createdAt = updatedAt = LocalDateTime.now();
     }
 
     @PreUpdate
     void preUpdate() {
-        updated_at = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
     }
 }

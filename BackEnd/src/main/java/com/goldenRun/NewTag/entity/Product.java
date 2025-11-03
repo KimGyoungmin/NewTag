@@ -41,8 +41,8 @@ public class Product {
     @Column(nullable=false) private Integer view_count;
     @Column(nullable=false) private Boolean is_delete;
 
-    @Column(nullable=false) private LocalDateTime created_at;
-    @Column(nullable=false) private LocalDateTime updated_at;
+    @Column(nullable=false) private LocalDateTime createdAt;
+    @Column(nullable=false) private LocalDateTime updatedAt;
 
     @ManyToOne(fetch = FetchType.LAZY) @JoinColumn(name="seller_id", nullable=false)
     private User seller;
@@ -57,10 +57,10 @@ public class Product {
     public void increaseView(){ this.view_count = (this.view_count == null ? 1 : this.view_count + 1); }
 
     @PrePersist void prePersist(){
-        created_at = updated_at = LocalDateTime.now();
+        createdAt = updatedAt = LocalDateTime.now();
         if (status == null) status = ProductStatus.ON_SELL;
         if (view_count == null) view_count = 0;
         if (is_delete == null) is_delete = false;
     }
-    @PreUpdate void preUpdate(){ updated_at = LocalDateTime.now(); }
+    @PreUpdate void preUpdate(){ updatedAt = LocalDateTime.now(); }
 }

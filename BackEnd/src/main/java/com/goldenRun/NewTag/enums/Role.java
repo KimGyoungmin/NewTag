@@ -1,4 +1,4 @@
-package com.goldenRun.NewTag.entity;
+package com.goldenRun.NewTag.enums;
 
 public enum Role {
 	USER,
