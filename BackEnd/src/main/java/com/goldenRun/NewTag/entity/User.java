@@ -2,9 +2,13 @@ package com.goldenRun.NewTag.entity;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+
+import com.goldenRun.NewTag.enums.Provider;
+import com.goldenRun.NewTag.enums.Role;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -13,27 +17,37 @@ import jakarta.persistence.Enumerated;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import jakarta.validation.constraints.AssertTrue;
+import jakarta.persistence.Index;
+import jakarta.persistence.CascadeType;
+import java.util.List;
+import lombok.*;
 
 
 @Table(
-	    name = "user",
-	    uniqueConstraints = {
-	        @UniqueConstraint(columnNames = {"nick"}),
-	        @UniqueConstraint(columnNames = {"provider", "provider_id"}),
-	        @UniqueConstraint(columnNames = {"email"})
-	    }
-	)
+    name = "`user`",
+    uniqueConstraints = {
+        @UniqueConstraint(name = "unique_nick", columnNames = "nick"),
+        @UniqueConstraint(name = "unique_provider_account", columnNames = {"provider", "provider_id"}),
+        @UniqueConstraint(name = "unique_email", columnNames = "email")
+    },
+    indexes = {
+        @Index(name = "idx_user_email", columnList = "email"),
+        @Index(name = "idx_user_provider", columnList = "provider,provider_id"),
+        @Index(name = "idx_user_is_delete", columnList = "is_delete"),
+        @Index(name = "idx_user_created_at", columnList = "created_at")
+    }
+)
+
 @Builder
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
+
 public class User {
 	
 	@Id
@@ -68,6 +82,16 @@ public class User {
     @Column(name = "provider_id", length = 100)
     private String providerId;
     
+     @Column(name = "email_verified", nullable = false)
+     @Builder.Default
+    private boolean emailVerified = false;
+
+    @Column(name = "phone_verified", nullable = false)
+    @Builder.Default
+    private boolean phoneVerified = false;
+
+
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 10)
     @Builder.Default
@@ -80,7 +104,8 @@ public class User {
     private Double trust = 0.0;
 
     @Column(name = "profile_img", length = 500)
-    private String profileImg;
+    @Builder.Default
+    private String profileImg = "default_img.png";
 
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
@@ -92,4 +117,19 @@ public class User {
     @UpdateTimestamp
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+
+     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+     @Builder.Default
+    private List<Address> addresses = new ArrayList<>();
+
+      @AssertTrue(message = "Invalid auth combination for provider/password/providerId")
+    public boolean isAuthCombinationValid() {
+        if (provider == Provider.LOCAL) {
+            return password != null && !password.isBlank() && providerId == null;
+        } else {
+            return providerId != null && !providerId.isBlank() && (password == null || password.isBlank());
+        }
+    }
+
 }
