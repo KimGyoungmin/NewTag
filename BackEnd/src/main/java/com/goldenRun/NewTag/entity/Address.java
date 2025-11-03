@@ -10,9 +10,9 @@ import java.math.BigDecimal;
        indexes = { @Index(name = "idx_address_user", columnList = "user_id") })
 
 public class Address {
+    @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-        @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
 
     @Column(name = "location_nm", length = 100, nullable = false)
     private String locationNm;

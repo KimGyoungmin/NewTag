@@ -82,13 +82,13 @@ public class User {
     @Column(name = "provider_id", length = 100)
     private String providerId;
     
-     @Column(name = "email_verified", nullable = false)
-     @Builder.Default
-    private boolean emailVerified = false;
+    //  @Column(name = "email_verified", nullable = false)
+    //  @Builder.Default
+    // private boolean emailVerified = false;
 
-    @Column(name = "phone_verified", nullable = false)
-    @Builder.Default
-    private boolean phoneVerified = false;
+    // @Column(name = "phone_verified", nullable = false)
+    // @Builder.Default
+    // private boolean phoneVerified = false;
 
 
 

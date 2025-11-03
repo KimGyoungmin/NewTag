@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 
 public class ProductImage {
     @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Integer id;
+    private Long id;
 
     @Column(name="p_img", nullable=false, length=100)
     private String path; // 파일명 또는 URL
