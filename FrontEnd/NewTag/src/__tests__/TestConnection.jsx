@@ -5,7 +5,7 @@ function TestConnection() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const API_BASE_URL = 'http://localhost:8081'// 백엔드 포트에 맞게 수정하세요
+  const API_BASE_URL = 'http://localhost:8080'; // 백엔드 포트에 맞게 수정하세요
 
   const testConnection = async () => {
     setLoading(true);
