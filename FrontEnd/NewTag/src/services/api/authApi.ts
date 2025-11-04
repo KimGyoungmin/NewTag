@@ -4,19 +4,20 @@ import { STORAGE_KEYS } from '../../constants';
 
 export const authApi = {
   // 회원가입
-  signup: async (data: SignupRequest): Promise<User> => {
-    const response = await apiClient.post<ApiResponse<User>>('/api/auth/signup', data);
-    return response.data.data!;
+  signup: async (data: SignupRequest): Promise<{ success: boolean; message: string }> => {
+    const response = await apiClient.post<{ success: boolean; message: string }>('/api/v1/signup', data);
+    return response.data;
   },
 
   // 로그인
   login: async (data: LoginRequest): Promise<LoginResponse> => {
-    const response = await apiClient.post<ApiResponse<LoginResponse>>('/api/auth/login', data);
-    const loginData = response.data.data!;
+    const response = await apiClient.post<LoginResponse>('/api/v1/login', data);
+    const loginData = response.data;
 
     // 토큰 저장
-    localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, loginData.token);
-    localStorage.setItem(STORAGE_KEYS.USER_INFO, JSON.stringify(loginData.user));
+    if (loginData.success && loginData.token) {
+      localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, loginData.token);
+    }
 
     return loginData;
   },
@@ -41,14 +42,16 @@ export const authApi = {
 
   // 이메일 중복 확인
   checkEmailDuplicate: async (email: string): Promise<boolean> => {
-    const response = await apiClient.get<ApiResponse<{ isDuplicate: boolean }>>(`/api/auth/check-email?email=${email}`);
-    return response.data.data!.isDuplicate;
+    const response = await apiClient.get<{ success: boolean; message: string }>(`/api/v1/emailMatch?email=${email}`);
+    // success: false면 중복(사용중), true면 사용가능
+    return !response.data.success;
   },
 
   // 닉네임 중복 확인
   checkNickDuplicate: async (nick: string): Promise<boolean> => {
-    const response = await apiClient.get<ApiResponse<{ isDuplicate: boolean }>>(`/api/auth/check-nick?nick=${nick}`);
-    return response.data.data!.isDuplicate;
+    const response = await apiClient.get<{ success: boolean; message: string }>(`/api/v1/idMatch?nick=${nick}`);
+    // success: false면 중복(사용중), true면 사용가능
+    return !response.data.success;
   },
 
   // 소셜 로그인 (Google)

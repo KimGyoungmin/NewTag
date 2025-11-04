@@ -64,7 +64,6 @@ public class UserService {
 	    }else {
 	    	response.put("success", true);
 	        response.put("message", "사용가능한 아이디입니다.");
-	        response.put("message", "사용가능한 이메일입니다.");
 	        return ResponseEntity.ok(response);
 	    }
 		 
