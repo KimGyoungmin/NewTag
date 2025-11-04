@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.goldenRun.NewTag.entity.User;
@@ -30,11 +31,11 @@ public class UserController {
 		return service.signup(request);
 	}
 	@GetMapping("/emailMatch")
-	public ResponseEntity<?> emailMatch(@RequestBody String email){
+	public ResponseEntity<?> emailMatch(@RequestParam String email){
 		return service.emailMatch(email);
 	}
 	@GetMapping("/idMatch")
-	public ResponseEntity<?> idMatch(@RequestBody String nick){
+	public ResponseEntity<?> idMatch(@RequestParam String nick){
 		return service.idMatch(nick);
 	}
 }

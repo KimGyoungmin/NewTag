@@ -187,14 +187,15 @@ export interface SignupRequest {
 
 // 로그인 요청
 export interface LoginRequest {
-  email: string;
+  nick: string;  // 백엔드는 nick 기반 로그인
   password: string;
 }
 
-// 로그인 응답
+// 로그인 응답 (백엔드 응답 형식에 맞춤)
 export interface LoginResponse {
+  success: boolean;
+  message: string;
   token: string;
-  user: User;
 }
 
 // 상품 등록 요청
