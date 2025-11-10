@@ -16,11 +16,11 @@ export function CategoryFilter({ selected, onSelect }: CategoryFilterProps) {
 
   const categories = [
     { id: 'all', label: '전체', icon: Grid3x3 },
-    { id: 'electronics', label: '전자기기', icon: Smartphone },
-    { id: 'furniture', label: '가구/인테리어', icon: Sofa },
-    { id: 'fashion', label: '의류/잡화', icon: ShoppingBag },
-    { id: 'sports', label: '스포츠/레저', icon: Dumbbell },
-    { id: 'books', label: '도서', icon: BookOpen },
+    { id: '1', label: '전자기기', icon: Smartphone },
+    { id: '2', label: '가구/인테리어', icon: Sofa },
+    { id: '3', label: '의류잡화', icon: ShoppingBag },
+    { id: '4', label: '스포츠/레저', icon: Dumbbell },
+    { id: '5', label: '도서', icon: BookOpen },
   ];
 
   const handleMouseDown = (e: React.MouseEvent) => {
