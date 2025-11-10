@@ -18,10 +18,9 @@ export const productsApi = {
     page?: number;
     size?: number;
     categoryId?: number;
-    status?: string;
-    keyword?: string;
-  }): Promise<PaginatedResponse<Product>> => {
-    const response = await api.get<PaginatedResponse<Product>>('/products', { params });
+    sortBy?: string;
+  }): Promise<any> => {
+    const response = await api.get('/products', { params });
     return response.data;
   },
 
@@ -96,11 +95,37 @@ export const productsApi = {
   },
 
   /**
-   * 상품 검색
+   * 상품 검색 (검색 로그 자동 저장)
    */
-  searchProducts: async (keyword: string): Promise<Product[]> => {
-    const response = await api.get<Product[]>('/products/search', {
-      params: { keyword },
+  searchProducts: async (
+    keyword: string,
+    userId?: number,
+    deviceType?: string,
+    page: number = 0,
+    size: number = 20
+  ): Promise<any> => {
+    const response = await api.get('/products/search', {
+      params: { keyword, userId, deviceType, page, size },
+    });
+    return response.data;
+  },
+
+  /**
+   * 인기 검색어 조회
+   */
+  getPopularKeywords: async (limit: number = 10): Promise<string[]> => {
+    const response = await api.get<string[]>('/products/search/popular', {
+      params: { limit },
+    });
+    return response.data;
+  },
+
+  /**
+   * 최근 검색어 조회
+   */
+  getRecentKeywords: async (userId: number, limit: number = 10): Promise<string[]> => {
+    const response = await api.get<string[]>('/products/search/recent', {
+      params: { userId, limit },
     });
     return response.data;
   },
