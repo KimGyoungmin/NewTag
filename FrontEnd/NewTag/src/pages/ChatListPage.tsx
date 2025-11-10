@@ -1,23 +1,89 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { ChatListItem } from "../components/ChatListItem";
 import { Input } from "../components/ui/input";
-import { getAllChats } from "../utils/localStorage";
+import { chatService } from "../services/firebase/chatService";
+import { authApi } from "../services/api/authApi";
+import type { ChatRoom, User } from "../types";
 
 interface ChatListPageProps {
   onNavigate: (page: string, chatId?: string) => void;
 }
 
 export function ChatListPage({ onNavigate }: ChatListPageProps) {
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [rooms, setRooms] = useState<ChatRoom[]>([]);
 
-  // localStorage에서 실제 채팅 데이터 가져오기
-  const chats = getAllChats();
+  useEffect(() => {
+    let unsubscribe: (() => void) | null = null;
 
-  const filteredChats = chats.filter(chat =>
-    chat.userName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    chat.lastMessage.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+    const run = async () => {
+      try {
+        const me = await authApi.getCurrentUser();
+        setCurrentUser(me);
+        unsubscribe = chatService.subscribeToChatRooms(me.id, (list) => {
+          setRooms(list);
+        });
+      } catch (e) {
+        console.error("Failed to load current user or subscribe rooms", e);
+      }
+    };
+    run();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, []);
+
+  const items = useMemo(() => {
+    if (!currentUser) return [] as Array<{
+      id: string;
+      userName: string;
+      userImage: string;
+      productImage: string;
+      lastMessage: string;
+      lastMessageTime: string;
+      unreadCount: number;
+    }>;
+
+    return rooms.map((room) => {
+      const isSeller = currentUser.id === room.sellerId;
+      const peerNick = isSeller ? room.buyerNick : room.sellerNick;
+      const peerImg = isSeller ? room.buyerProfileImg : room.sellerProfileImg;
+      const lastAt = room.lastMessageAt ? formatRelativeTime(room.lastMessageAt) : "";
+      return {
+        id: room.id,
+        userName: peerNick || "",
+        userImage: peerImg || "",
+        productImage: room.productImage,
+        lastMessage: room.lastMessage || "",
+        lastMessageTime: lastAt,
+        unreadCount: 0,
+      };
+    });
+  }, [rooms, currentUser]);
+
+  const filteredChats = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter((chat) =>
+      chat.userName.toLowerCase().includes(q) ||
+      chat.lastMessage.toLowerCase().includes(q)
+    );
+  }, [items, searchQuery]);
+
+  function formatRelativeTime(date: Date): string {
+    const now = Date.now();
+    const diff = Math.max(0, now - date.getTime());
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return "방금 전";
+    if (m < 60) return `${m}분 전`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}시간 전`;
+    const d = Math.floor(h / 24);
+    return `${d}일 전`;
+  }
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-8">
@@ -28,7 +94,7 @@ export function ChatListPage({ onNavigate }: ChatListPageProps) {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
               type="text"
-              placeholder="채팅방 검색"
+              placeholder="채팅 검색"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 bg-secondary border-0"
@@ -42,8 +108,14 @@ export function ChatListPage({ onNavigate }: ChatListPageProps) {
         {filteredChats.map((chat) => (
           <ChatListItem
             key={chat.id}
-            {...chat}
-            onClick={() => onNavigate('chatroom', chat.id)}
+            id={chat.id}
+            userName={chat.userName}
+            userImage={chat.userImage}
+            productImage={chat.productImage}
+            lastMessage={chat.lastMessage}
+            lastMessageTime={chat.lastMessageTime}
+            unreadCount={chat.unreadCount}
+            onClick={() => onNavigate("chatroom", chat.id)}
           />
         ))}
       </div>
