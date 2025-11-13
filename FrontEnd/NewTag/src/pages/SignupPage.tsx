@@ -1,5 +1,6 @@
 import { useState } from "react";
-import { Mail, Lock, Eye, EyeOff, User, Phone, ChevronLeft, AtSign, Calendar } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, User, Phone, ChevronLeft, AtSign, Calendar, AlertTriangle } from "lucide-react";
+import axios from "axios";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
@@ -9,6 +10,19 @@ import { Checkbox } from "../components/ui/checkbox";
 interface SignupPageProps {
   onNavigate: (page: string) => void;
 }
+
+const API_URL = "http://localhost:8081/api/v1"; 
+
+// 비밀번호 유효성 검사 함수 (최소 8자, 영문, 숫자, 특수문자 포함)
+const validatePassword = (password: string): string | null => {
+  if (password.length < 8) {
+    return "비밀번호는 최소 8자 이상이어야 합니다.";
+  }
+  if (!/[A-Za-z]/.test(password) || !/[0-9]/.test(password) || !/[^A-Za-z0-9]/.test(password)) {
+    return "비밀번호는 영문, 숫자, 특수문자를 모두 포함해야 합니다.";
+  }
+  return null;
+};
 
 export function SignupPage({ onNavigate }: SignupPageProps) {
   const [formData, setFormData] = useState({
@@ -28,9 +42,13 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
     privacy: false,
     marketing: false,
   });
+  // API 통신을 위한 상태 변수 추가
+  const [isLoading, setIsLoading] = useState(false); 
+  const [error, setError] = useState<string | null>(null);
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    setError(null); // 입력 시 에러 메시지 초기화
   };
 
   const handleAgreementChange = (field: string, checked: boolean) => {
@@ -43,35 +61,82 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
       });
     } else {
       const newAgreements = { ...agreements, [field]: checked };
+      // 전체 동의 상태를 나머지 체크박스에 따라 업데이트
       newAgreements.all =
         newAgreements.terms && newAgreements.privacy && newAgreements.marketing;
       setAgreements(newAgreements);
     }
   };
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
+    
+    // --- 1. 클라이언트 측 필수 유효성 검사 ---
 
     if (!agreements.terms || !agreements.privacy) {
-      alert("필수 약관에 동의해주세요.");
+      setError("필수 약관(이용약관, 개인정보 처리방침)에 동의해야 합니다.");
       return;
     }
 
     if (formData.password !== formData.passwordConfirm) {
-      alert("비밀번호가 일치하지 않습니다.");
+      setError("비밀번호와 비밀번호 확인이 일치하지 않습니다.");
       return;
     }
+    
+    const passwordError = validatePassword(formData.password);
+    if (passwordError) {
+        setError(passwordError);
+        return;
+    }
 
-    // 실제로는 API 호출하여 회원가입 처리
-    console.log("Signup:", formData, agreements);
-    // 회원가입 성공 후 로그인 페이지로 이동
-    onNavigate("login");
+    // --- 2. API 호출 ---
+    setIsLoading(true);
+
+    // 전송할 데이터에서 비밀번호 확인 필드 제외
+    const { passwordConfirm, ...dataToSubmit } = formData;
+    
+    // 백엔드 요청 본문 준비 (약관 동의 포함)
+    const requestBody = {
+        ...dataToSubmit,
+        // 선택 약관 동의 여부 추가
+        marketingAgreement: agreements.marketing,
+        // (필수 약관은 백엔드에서 체크한다고 가정)
+    };
+
+    try {
+      // 실제 백엔드 API 호출: POST /api/v1/signup
+      const response = await axios.post(`${API_URL}/signup`, requestBody);
+
+      if (response.status === 201 || response.status === 200) {
+        console.log("Signup Success:", response.data);
+        // 회원가입 성공 후 로그인 페이지로 이동
+        onNavigate("login");
+      } else {
+        // 예상치 못한 성공 응답 (200대 코드가 아니면서 에러도 아닌 경우)
+        setError("회원가입 요청에 응답했지만, 처리 과정에 오류가 발생했습니다.");
+      }
+      
+    } catch (err) {
+      console.error("Signup failed:", err);
+      
+      if (axios.isAxiosError(err) && err.response) {
+        // 백엔드에서 보낸 구체적인 오류 메시지 (예: 이메일 중복, 닉네임 중복)
+        const message = err.response.data.message || "회원가입에 실패했습니다. 입력 정보를 확인해주세요.";
+        setError(message);
+      } else {
+        setError("네트워크 오류 또는 서버 접속에 실패했습니다.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSocialSignup = (provider: string) => {
     console.log("Social signup:", provider);
-    // 실제로는 소셜 회원가입 API 호출
-    onNavigate("home");
+    // 실제로는 백엔드의 OAuth2 리다이렉트 URL로 이동합니다.
+    window.location.href = `${API_URL.replace('/api/v1', '')}/oauth2/authorization/${provider.toLowerCase()}`;
+    // onNavigate("home"); // 실제 리다이렉트가 발생하므로 주석 처리
   };
 
   return (
@@ -117,6 +182,7 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
                   onChange={(e) => handleInputChange("name", e.target.value)}
                   className="pl-10"
                   required
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -129,12 +195,14 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
                 <Input
                   id="nickname"
                   type="text"
-                  placeholder="닉네임을 입력하세요"
+                  placeholder="닉네임을 입력하세요 (중복 확인 필요)"
                   value={formData.nickname}
                   onChange={(e) => handleInputChange("nickname", e.target.value)}
                   className="pl-10"
                   required
+                  disabled={isLoading}
                 />
+                {/* 닉네임 중복확인 버튼을 추가하는 것도 좋습니다. */}
               </div>
             </div>
 
@@ -151,6 +219,7 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
                   onChange={(e) => handleInputChange("email", e.target.value)}
                   className="pl-10"
                   required
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -163,11 +232,12 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
                 <Input
                   id="phone"
                   type="tel"
-                  placeholder="010-1234-5678"
+                  placeholder="010-1234-5678 (자동 하이픈 입력 기능 추가 필요)"
                   value={formData.phone}
                   onChange={(e) => handleInputChange("phone", e.target.value)}
                   className="pl-10"
                   required
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -184,6 +254,7 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
                   onChange={(e) => handleInputChange("birthdate", e.target.value)}
                   className="pl-10"
                   required
+                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -196,12 +267,13 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="8자 이상 입력하세요"
+                  placeholder="영문, 숫자, 특수문자 포함 8자 이상"
                   value={formData.password}
                   onChange={(e) => handleInputChange("password", e.target.value)}
                   className="pl-10 pr-10"
                   required
                   minLength={8}
+                  disabled={isLoading}
                 />
                 <button
                   type="button"
@@ -232,6 +304,7 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
                   }
                   className="pl-10 pr-10"
                   required
+                  disabled={isLoading}
                 />
                 <button
                   type="button"
@@ -245,6 +318,13 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
                   )}
                 </button>
               </div>
+              {/* 에러 메시지 표시 영역 */}
+              {error && (
+                <div className="flex items-center text-sm text-red-600 bg-red-50 p-3 rounded-lg mt-3">
+                  <AlertTriangle className="h-4 w-4 mr-2 flex-shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
             </div>
 
             {/* Agreements */}
@@ -253,28 +333,30 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
                 <Checkbox
                   id="all"
                   checked={agreements.all}
-                  onCheckedChange={(checked) =>
+                  onCheckedChange={(checked: boolean | 'indeterminate') => 
                     handleAgreementChange("all", checked as boolean)
                   }
+                  disabled={isLoading}
                 />
-                <Label htmlFor="all" className="cursor-pointer">
+                <Label htmlFor="all" className="cursor-pointer font-bold text-base text-teal-700">
                   전체 동의
                 </Label>
               </div>
 
               <Separator />
 
-              <div className="space-y-2">
+              <div className="space-y-2 ml-4">
                 <div className="flex items-center gap-2">
                   <Checkbox
                     id="terms"
                     checked={agreements.terms}
-                    onCheckedChange={(checked) =>
+                    onCheckedChange={(checked: boolean | 'indeterminate') => 
                       handleAgreementChange("terms", checked as boolean)
                     }
+                    disabled={isLoading}
                   />
                   <Label htmlFor="terms" className="text-sm cursor-pointer">
-                    (필수) 이용약관 동의
+                    (필수) 이용약관 동의 <span className="text-teal-500 hover:underline cursor-pointer ml-1 text-xs">[보기]</span>
                   </Label>
                 </div>
 
@@ -282,12 +364,13 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
                   <Checkbox
                     id="privacy"
                     checked={agreements.privacy}
-                    onCheckedChange={(checked) =>
+                    onCheckedChange={(checked: boolean | 'indeterminate') => 
                       handleAgreementChange("privacy", checked as boolean)
                     }
+                    disabled={isLoading}
                   />
                   <Label htmlFor="privacy" className="text-sm cursor-pointer">
-                    (필수) 개인정보 처리방침 동의
+                    (필수) 개인정보 처리방침 동의 <span className="text-teal-500 hover:underline cursor-pointer ml-1 text-xs">[보기]</span>
                   </Label>
                 </div>
 
@@ -295,9 +378,10 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
                   <Checkbox
                     id="marketing"
                     checked={agreements.marketing}
-                    onCheckedChange={(checked) =>
+                    onCheckedChange={(checked: boolean | 'indeterminate') => 
                       handleAgreementChange("marketing", checked as boolean)
                     }
+                    disabled={isLoading}
                   />
                   <Label htmlFor="marketing" className="text-sm cursor-pointer">
                     (선택) 마케팅 정보 수신 동의
@@ -311,8 +395,9 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
               type="submit"
               className="w-full bg-teal-500 hover:bg-teal-600 text-white"
               size="lg"
+              disabled={isLoading || !agreements.terms || !agreements.privacy} // 필수 약관 미동의 시 비활성화
             >
-              가입하기
+              {isLoading ? '가입 처리 중...' : '가입하기'}
             </Button>
           </form>
 
@@ -331,6 +416,7 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
               className="w-full"
               size="lg"
               onClick={() => handleSocialSignup("kakao")}
+              disabled={isLoading}
             >
               <div className="flex items-center gap-2">
                 <div className="w-5 h-5 bg-yellow-400 rounded-full" />
@@ -344,6 +430,7 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
               className="w-full"
               size="lg"
               onClick={() => handleSocialSignup("naver")}
+              disabled={isLoading}
             >
               <div className="flex items-center gap-2">
                 <div className="w-5 h-5 bg-green-500 rounded-full" />
@@ -357,6 +444,7 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
               className="w-full"
               size="lg"
               onClick={() => handleSocialSignup("google")}
+              disabled={isLoading}
             >
               <div className="flex items-center gap-2">
                 <div className="w-5 h-5 border-2 rounded-full flex items-center justify-center text-xs">
@@ -375,6 +463,7 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
             <button
               onClick={() => onNavigate("login")}
               className="text-teal-600 hover:text-teal-700"
+              disabled={isLoading}
             >
               로그인
             </button>
