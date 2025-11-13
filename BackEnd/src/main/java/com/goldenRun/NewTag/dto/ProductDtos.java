@@ -67,7 +67,7 @@ public class ProductDtos {
         private Long favoriteCount;
         private String timeAgo;
 
-        private List<String> images; // 모든 이미지(메인 우선 정렬)
+        private List<String> images; // 모든 이미지
         private String mainImage;
 
         // 판매자 박스

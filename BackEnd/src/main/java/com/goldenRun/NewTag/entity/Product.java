@@ -4,7 +4,6 @@ import com.goldenRun.NewTag.enums.ProductStatus;
 import jakarta.persistence.*;
 import lombok.*;
 
-import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,19 +24,19 @@ import java.util.List;
 
 public class Product {
      @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Integer id;
 
     @Column(nullable=false) private Double price;
     @Column(nullable=false, length=100) private String title;
-    @Lob @Column(nullable=false, columnDefinition = "TEXT") private String content;
+    @Lob @Column(nullable=false) private String content;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable=false, columnDefinition = "ENUM('ON_SELL','SOLD_OUT','RESERVED') default 'ON_SELL'")
     private ProductStatus status;
 
     @Column(nullable=false, length=100) private String location_nm;
-    @Column(nullable=false, precision = 10, scale = 7) private BigDecimal latitude;
-    @Column(nullable=false, precision = 10, scale = 7) private BigDecimal longitude;
+    @Column(nullable=false, precision = 10, scale = 7) private Double latitude;
+    @Column(nullable=false, precision = 10, scale = 7) private Double longitude;
 
     @Column(nullable=false) private Integer view_count;
     @Column(nullable=false) private Boolean is_delete;

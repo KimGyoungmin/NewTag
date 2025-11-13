@@ -2,6 +2,7 @@ package com.goldenRun.NewTag.service;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -26,29 +27,33 @@ public class UserService {
 	private JwtTokenProvider jwtTokenProvider;
 
 	public ResponseEntity<Map<String, Object>> login(User loginUser) {
+	    // 1. Optional을 사용하여 User 객체를 조회합니다.
+	    Optional<User> userOptional = repository.findByEmail(loginUser.getEmail());
+	    
+	    // 2. 사용자가 존재하지 않거나 비밀번호가 일치하지 않을 때 처리
+	    if (userOptional.isEmpty() || 
+	        !encoder.matches(loginUser.getPassword(), userOptional.get().getPassword())) {
+	        
+	        // 닉네임이 없거나 비밀번호 불일치 시
+	        Map<String, Object> response = new HashMap<>();
+	        response.put("success", false);
+	        response.put("message", "아이디 또는 비밀번호가 올바르지 않습니다.");
+	        
+	        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
+	    }
+	    
+	    // 3. User 객체 가져오기
+	    User user = userOptional.get();
+	    
+	    // 4. 인증 성공 하면 토큰 생성
+	    String token = jwtTokenProvider.createToken(user.getNick());
 
-	 	User user = repository.findByNick(loginUser.getNick());
-
-
-		if (user != null && encoder.matches(loginUser.getPassword(), user.getPassword())) {
-		
-            
-			// 3. 인증 성공 시, 주입받은 인스턴스를 사용하여 토큰을 생성합니다.
-            String token = jwtTokenProvider.createToken(user.getNick());
-
-            // 4. 성공 응답에 토큰을 담아 반환합니다.
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "로그인 성공!");
-            response.put("token", token);
-            return ResponseEntity.ok(response);
-        } else {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", "아이디 또는 비밀번호가 올바르지 않습니다.");
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(response);
-        }
-		
+	    // 5. 성공 시 성공 응답 반환
+	    Map<String, Object> response = new HashMap<>();
+	    response.put("success", true);
+	    response.put("message", "로그인 성공!");
+	    response.put("token", token);
+	    return ResponseEntity.ok(response);
 	}
 	
 	

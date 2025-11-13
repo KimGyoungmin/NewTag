@@ -16,24 +16,24 @@ import java.time.LocalDateTime;
                 @Index(name = "idx_review_writer", columnList = "writer_id"),
                 @Index(name = "idx_review_target", columnList = "target_id")
         })
+
 public class Review {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Integer id;
 
-    
-    private Integer rating;
-
-    @Lob @Column(nullable=false, columnDefinition = "TEXT") private String content;
+    @Column(nullable = false)
+    private Integer rating; // 1~5
+    @Lob
+    private String content;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
     @Column(nullable = false)
     private LocalDateTime updatedAt;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "transaction_id", nullable = false)
-    private Transaction transaction;
+    @Column(name = "transaction_id", nullable = false)
+    private Integer transactionId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "writer_id", nullable = false)

@@ -9,6 +9,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import com.goldenRun.NewTag.enums.Provider;
 import com.goldenRun.NewTag.enums.Role;
+import com.goldenRun.NewTag.enums.UserGrade;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -82,13 +83,13 @@ public class User {
     @Column(name = "provider_id", length = 100)
     private String providerId;
     
-    //  @Column(name = "email_verified", nullable = false)
-    //  @Builder.Default
-    // private boolean emailVerified = false;
+     @Column(name = "email_verified", nullable = false)
+     @Builder.Default
+    private boolean emailVerified = false;
 
-    // @Column(name = "phone_verified", nullable = false)
-    // @Builder.Default
-    // private boolean phoneVerified = false;
+    @Column(name = "phone_verified", nullable = false)
+    @Builder.Default
+    private boolean phoneVerified = false;
 
 
 
@@ -131,5 +132,8 @@ public class User {
             return providerId != null && !providerId.isBlank() && (password == null || password.isBlank());
         }
     }
+      
+      @Enumerated(EnumType.STRING) 
+      private UserGrade grade;
 
 }

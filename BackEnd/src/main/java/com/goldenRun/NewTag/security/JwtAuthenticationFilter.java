@@ -24,17 +24,8 @@ public class JwtAuthenticationFilter extends GenericFilterBean {
     @Override
     public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
             throws IOException, ServletException {
-
-        HttpServletRequest httpRequest = (HttpServletRequest) request;
-
-        // CORS preflight 요청(OPTIONS)은 토큰 검증 없이 통과
-        if ("OPTIONS".equalsIgnoreCase(httpRequest.getMethod())) {
-            chain.doFilter(request, response);
-            return;
-        }
-
         // HTTP 요청 헤더에서 토큰을 추출
-        String token = resolveToken(httpRequest);
+        String token = resolveToken((HttpServletRequest) request);
 
         // 토큰 유효성 검증
         if (token != null && jwtTokenProvider.validateToken(token)) {

@@ -19,7 +19,7 @@ import java.time.LocalDateTime;
 public class Favorite {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private Integer id;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
