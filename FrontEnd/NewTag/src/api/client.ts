@@ -1,7 +1,12 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 
 // API Base URL (환경 변수에서 가져오기)
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8081/api/v1';
+const DEFAULT_SERVER_URL = 'http://localhost:8081';
+const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || DEFAULT_SERVER_URL;
+const normalizedBaseUrl = rawBaseUrl.replace(/\/$/, '');
+const API_BASE_URL = normalizedBaseUrl.includes('/api')
+  ? normalizedBaseUrl
+  : `${normalizedBaseUrl}/api/v1`;
 
 /**
  * Axios 인스턴스 생성
@@ -14,6 +19,8 @@ const apiClient: AxiosInstance = axios.create({
   },
   withCredentials: true, // 쿠키 포함
 });
+
+/* 테스트 주석 */
 
 /**
  * 요청 인터셉터 - 인증 토큰 자동 추가

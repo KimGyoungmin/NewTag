@@ -1,38 +1,92 @@
 import { useState } from "react";
-import { Mail, Lock, Eye, EyeOff, Shield } from "lucide-react";
+import { AtSign, Lock, Eye, EyeOff, Shield, Loader2 } from "lucide-react";
+import { isAxiosError } from "axios";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Separator } from "../components/ui/separator";
+import { authApi } from "../api/auth";
+import { toast } from "sonner";
 
 interface LoginPageProps {
   onNavigate: (page: string) => void;
 }
 
 export function LoginPage({ onNavigate }: LoginPageProps) {
-  const [email, setEmail] = useState("");
+  const [nick, setNick] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const getErrorMessage = (error: unknown) => {
+    if (isAxiosError(error)) {
+      return (
+        error.response?.data?.message ||
+        "로그인 중 문제가 발생했어요. 다시 시도해 주세요."
+      );
+    }
+
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return "로그인 중 문제가 발생했어요. 다시 시도해 주세요.";
+  };
+
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // 실제로는 API 호출하여 로그인 처리
-    console.log("Login:", { email, password });
-    // 로그인 성공 후 홈으로 이동
-    onNavigate("home");
+    setErrorMessage(null);
+
+    const trimmedNick = nick.trim();
+    if (!trimmedNick) {
+      setErrorMessage("닉네임을 입력해 주세요.");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      const response = await authApi.login({
+        nick: trimmedNick,
+        password,
+      });
+
+      if (response.success) {
+        toast.success("로그인에 성공했어요!");
+        onNavigate("home");
+      } else {
+        const message = response.message || "로그인에 실패했어요.";
+        setErrorMessage(message);
+        toast.error(message);
+      }
+    } catch (error) {
+      const message = getErrorMessage(error);
+      setErrorMessage(message);
+      toast.error(message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleSocialLogin = (provider: string) => {
+
     console.log("Social login:", provider);
-    // 실제로는 소셜 로그인 API 호출
-    onNavigate("home");
+
+    toast.info("?? ???? ?? ?? ????.");
+
   };
 
+
+
   const handleAdminMode = () => {
+
     console.log("Admin mode activated");
-    // 관리자 모드로 바로 홈으로 이동
-    onNavigate("home");
+
+    toast.info("??? ??? ?? ????.");
+
   };
+
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 to-white flex items-center justify-center p-4">
@@ -48,19 +102,20 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
           <h2 className="text-2xl mb-6 text-center">로그인</h2>
 
           <form onSubmit={handleLogin} className="space-y-4">
-            {/* Email Input */}
+            {/* Nickname Input */}
             <div className="space-y-2">
-              <Label htmlFor="email">이메일</Label>
+              <Label htmlFor="nick">닉네임</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
-                  id="email"
-                  type="email"
-                  placeholder="example@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  id="nick"
+                  type="text"
+                  placeholder="닉네임 또는 아이디"
+                  value={nick}
+                  onChange={(e) => setNick(e.target.value)}
                   className="pl-10"
                   required
+                  autoComplete="username"
                 />
               </div>
             </div>
@@ -73,11 +128,12 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="비밀번호를 입력하세요"
+                  placeholder="비밀번호를 입력해 주세요"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10 pr-10"
                   required
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
@@ -104,13 +160,25 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
               </button>
             </div>
 
+            {errorMessage && (
+              <p className="text-sm text-red-500 text-center">{errorMessage}</p>
+            )}
+
             {/* Login Button */}
             <Button
               type="submit"
               className="w-full bg-teal-500 hover:bg-teal-600 text-white"
               size="lg"
+              disabled={isLoading}
             >
-              로그인
+              {isLoading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  로그인 중...
+                </span>
+              ) : (
+                "로그인"
+              )}
             </Button>
           </form>
 

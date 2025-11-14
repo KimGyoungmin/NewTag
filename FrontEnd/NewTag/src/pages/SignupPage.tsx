@@ -1,10 +1,14 @@
 import { useState } from "react";
-import { Mail, Lock, Eye, EyeOff, User, Phone, ChevronLeft, AtSign, Calendar } from "lucide-react";
+import { Mail, Lock, Eye, EyeOff, User, Phone, ChevronLeft, AtSign, Calendar, Loader2 } from "lucide-react";
+import { isAxiosError } from "axios";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Label } from "../components/ui/label";
 import { Separator } from "../components/ui/separator";
 import { Checkbox } from "../components/ui/checkbox";
+import { authApi } from "../api/auth";
+import type { SignupRequest } from "../types";
+import { toast } from "sonner";
 
 interface SignupPageProps {
   onNavigate: (page: string) => void;
@@ -28,6 +32,23 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
     privacy: false,
     marketing: false,
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const getErrorMessage = (error: unknown) => {
+    if (isAxiosError(error)) {
+      return (
+        error.response?.data?.message ||
+        "회원가입 중 문제가 발생했어요. 다시 시도해 주세요."
+      );
+    }
+
+    if (error instanceof Error) {
+      return error.message;
+    }
+
+    return "회원가입 중 문제가 발생했어요. 다시 시도해 주세요.";
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -49,30 +70,113 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
     }
   };
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
+
     e.preventDefault();
 
+    setErrorMessage(null);
+
+
+
     if (!agreements.terms || !agreements.privacy) {
-      alert("필수 약관에 동의해주세요.");
+
+      toast.error("?? ??? ??? ???.");
+
       return;
+
     }
+
+
 
     if (formData.password !== formData.passwordConfirm) {
-      alert("비밀번호가 일치하지 않습니다.");
+
+      toast.error("????? ???? ????.");
+
       return;
+
     }
 
-    // 실제로는 API 호출하여 회원가입 처리
-    console.log("Signup:", formData, agreements);
-    // 회원가입 성공 후 로그인 페이지로 이동
-    onNavigate("login");
+
+
+    const payload: SignupRequest = {
+
+      name: formData.name.trim(),
+
+      nick: formData.nickname.trim(),
+
+      email: formData.email.trim(),
+
+      password: formData.password,
+
+      phone: formData.phone.trim() || undefined,
+
+      birth: formData.birthdate || undefined,
+
+    };
+
+
+
+    if (!payload.nick) {
+
+      setErrorMessage("???? ??? ???.");
+
+      return;
+
+    }
+
+
+
+    try {
+
+      setIsSubmitting(true);
+
+      const response = await authApi.signup(payload);
+
+
+
+      if (response.success) {
+
+        toast.success("????? ??????! ???? ???.");
+
+        onNavigate("login");
+
+      } else {
+
+        const message = response.message || "????? ??????.";
+
+        setErrorMessage(message);
+
+        toast.error(message);
+
+      }
+
+    } catch (error) {
+
+      const message = getErrorMessage(error);
+
+      setErrorMessage(message);
+
+      toast.error(message);
+
+    } finally {
+
+      setIsSubmitting(false);
+
+    }
+
   };
 
+
+
   const handleSocialSignup = (provider: string) => {
+
     console.log("Social signup:", provider);
-    // 실제로는 소셜 회원가입 API 호출
-    onNavigate("home");
+
+    toast.info("?? ????? ?? ?? ????.");
+
   };
+
+
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 to-white">
@@ -306,13 +410,25 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
               </div>
             </div>
 
+            {errorMessage && (
+              <p className="text-sm text-red-500 text-center">{errorMessage}</p>
+            )}
+
             {/* Signup Button */}
             <Button
               type="submit"
               className="w-full bg-teal-500 hover:bg-teal-600 text-white"
               size="lg"
+              disabled={isSubmitting}
             >
-              가입하기
+              {isSubmitting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  가입 중...
+                </span>
+              ) : (
+                "가입하기"
+              )}
             </Button>
           </form>
 
