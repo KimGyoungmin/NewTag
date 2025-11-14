@@ -1,6 +1,9 @@
 import { api } from './client';
 import type { LoginRequest, LoginResponse, SignupRequest, User, ApiResponse } from '../types';
 
+const TOKEN_STORAGE_KEY = 'auth_token';
+const USER_STORAGE_KEY = 'user';
+
 /**
  * 인증 관련 API
  */
@@ -10,7 +13,14 @@ export const authApi = {
    */
   login: async (credentials: LoginRequest): Promise<LoginResponse> => {
     const response = await api.post<LoginResponse>('/login', credentials);
-    return response.data;
+    const loginData = response.data;
+
+    if (loginData.success && loginData.token) {
+      localStorage.setItem(TOKEN_STORAGE_KEY, loginData.token);
+      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify({ nick: credentials.nick }));
+    }
+
+    return loginData;
   },
 
   /**
@@ -45,15 +55,15 @@ export const authApi = {
    * 로그아웃
    */
   logout: () => {
-    localStorage.removeItem('auth_token');
-    localStorage.removeItem('user');
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(USER_STORAGE_KEY);
   },
 
   /**
    * 현재 로그인 사용자 정보 가져오기
    */
   getCurrentUser: (): User | null => {
-    const userJson = localStorage.getItem('user');
+    const userJson = localStorage.getItem(USER_STORAGE_KEY);
     return userJson ? JSON.parse(userJson) : null;
   },
 
@@ -61,6 +71,6 @@ export const authApi = {
    * 로그인 상태 확인
    */
   isAuthenticated: (): boolean => {
-    return !!localStorage.getItem('auth_token');
+    return !!localStorage.getItem(TOKEN_STORAGE_KEY);
   },
 };
