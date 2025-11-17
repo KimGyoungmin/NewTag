@@ -1,5 +1,6 @@
 import { api } from './client';
 import type { LoginRequest, LoginResponse, SignupRequest, User, ApiResponse } from '../types';
+import { STORAGE_KEYS } from '../constants';
 
 const TOKEN_STORAGE_KEY = 'auth_token';
 const USER_STORAGE_KEY = 'user';
@@ -17,6 +18,7 @@ export const authApi = {
 
     if (loginData.success && loginData.token) {
       localStorage.setItem(TOKEN_STORAGE_KEY, loginData.token);
+      localStorage.setItem(STORAGE_KEYS.ACCESS_TOKEN, loginData.token);
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify({ nick: credentials.nick }));
 
       // Dispatch custom event to notify Header component
@@ -59,6 +61,7 @@ export const authApi = {
    */
   logout: () => {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
     localStorage.removeItem(USER_STORAGE_KEY);
 
     // Dispatch custom event to notify Header component

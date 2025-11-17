@@ -97,12 +97,26 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
   const handleSend = async () => {
     const text = message.trim();
     if (!text || !currentUser) return;
+
+    // Optimistic update so 메시지가 바로 보이도록 한다.
+    const optimistic: ChatMessage = {
+      id: `temp-${Date.now()}`,
+      chatRoomId: chatId,
+      senderId: currentUser.id,
+      senderNick: currentUser.nick,
+      senderProfileImg: currentUser.profileImg || "",
+      message: text,
+      createdAt: new Date(),
+      isRead: false,
+    };
+    setMessages((prev) => [...prev, optimistic]);
+
     try {
       await chatService.sendMessage(
         chatId,
         currentUser.id,
         currentUser.nick,
-        currentUser.profileImg,
+        currentUser.profileImg || "",
         text
       );
       setMessage("");

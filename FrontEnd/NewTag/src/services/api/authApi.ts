@@ -36,7 +36,8 @@ export const authApi = {
 
   // 현재 사용자 정보 조회
   getCurrentUser: async (): Promise<User> => {
-    const response = await apiClient.get<ApiResponse<User>>('/api/auth/me');
+    // baseURL already includes /api/v1, so avoid duplicating /api
+    const response = await apiClient.get<ApiResponse<User>>('/auth/me');
     return response.data.data!;
   },
 
