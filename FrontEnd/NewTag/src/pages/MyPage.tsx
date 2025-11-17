@@ -31,9 +31,9 @@ import {
   SelectValue,
 } from "../components/ui/select";
 import { useState, useEffect } from "react";
-import { 
-  getUserProfile, 
-  setUserProfile, 
+import {
+  getUserProfile,
+  setUserProfile,
   getFavorites,
   getProductStatus,
   setProductStatus,
@@ -47,6 +47,8 @@ import {
   isProductHidden,
   getSaleHistory,
 } from "../utils/localStorage";
+import { authApi } from "../api/auth";
+import { toast } from "sonner";
 
 interface MyPageProps {
   onNavigate: (page: string, productId?: string) => void;
@@ -62,6 +64,7 @@ export function MyPage({ onNavigate }: MyPageProps) {
   const [favoriteIds, setFavoriteIds] = useState<string[]>(getFavorites());
   const [productStatuses, setProductStatuses] = useState<Record<string, ProductStatus>>({});
   const [dateFilter, setDateFilter] = useState<'all' | '1month' | '3months' | '6months' | '1year'>('all');
+  const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
   // Load product statuses on mount
   useEffect(() => {
@@ -95,6 +98,13 @@ export function MyPage({ onNavigate }: MyPageProps) {
     setProductToDelete(null);
     // Force re-render
     setProductStatuses(prev => ({ ...prev }));
+  };
+
+  const handleLogoutConfirm = () => {
+    authApi.logout();
+    toast.success("로그아웃되었습니다.");
+    setShowLogoutDialog(false);
+    onNavigate('login');
   };
 
   // Mock data
@@ -461,7 +471,11 @@ export function MyPage({ onNavigate }: MyPageProps) {
             </div>
 
             <div className="px-4 py-8 text-center">
-              <Button variant="outline" className="text-destructive hover:bg-destructive/10">
+              <Button
+                variant="outline"
+                className="text-destructive hover:bg-destructive/10"
+                onClick={() => setShowLogoutDialog(true)}
+              >
                 로그아웃
               </Button>
             </div>
@@ -509,6 +523,26 @@ export function MyPage({ onNavigate }: MyPageProps) {
         sellerName="판매자"
         sellerImage="https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=200"
       />
+
+      {/* Logout Confirmation Dialog */}
+      <AlertDialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>로그아웃</AlertDialogTitle>
+            <AlertDialogDescription>
+              정말 로그아웃하시겠습니까?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowLogoutDialog(false)}>
+              취소
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleLogoutConfirm}>
+              확인
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

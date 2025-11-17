@@ -73,6 +73,7 @@ export interface Product {
   images?: ProductImage[];
   isFavorite?: boolean;
   favoriteCount?: number;
+  likedByMe?: boolean; // 현재 사용자가 찜했는지 여부
 }
 
 // Product Image 타입

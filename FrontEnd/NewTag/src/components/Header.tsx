@@ -3,12 +3,13 @@ import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { useState, useEffect, useRef } from "react";
 import { Badge } from "./ui/badge";
-import { 
-  getRecentSearches, 
-  addRecentSearch, 
-  removeRecentSearch, 
-  clearRecentSearches 
+import {
+  getRecentSearches,
+  addRecentSearch,
+  removeRecentSearch,
+  clearRecentSearches
 } from "../utils/localStorage";
+import { authApi } from "../api/auth";
 
 interface HeaderProps {
   onSearchClick?: () => void;
@@ -23,11 +24,32 @@ export function Header({ onSearchClick, onSearch, onLogoClick, onLoginClick }: H
   const [showAllRecent, setShowAllRecent] = useState(false);
   const [isScrolling, setIsScrolling] = useState(false);
   const [isHeaderScrolled, setIsHeaderScrolled] = useState(false);
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout>();
 
   // Initialize recent searches from local storage
   const [recentSearches, setRecentSearches] = useState<string[]>(getRecentSearches());
+
+  // Check login status on mount and when localStorage changes
+  useEffect(() => {
+    const checkAuthStatus = () => {
+      setIsLoggedIn(authApi.isAuthenticated());
+    };
+
+    checkAuthStatus();
+
+    // Listen for storage changes (logout from another tab, etc.)
+    window.addEventListener('storage', checkAuthStatus);
+
+    // Custom event for login/logout in same tab
+    window.addEventListener('auth-change', checkAuthStatus);
+
+    return () => {
+      window.removeEventListener('storage', checkAuthStatus);
+      window.removeEventListener('auth-change', checkAuthStatus);
+    };
+  }, []);
 
   // Activate search and focus input
   const handleSearchActivate = () => {
@@ -133,16 +155,18 @@ export function Header({ onSearchClick, onSearch, onLogoClick, onLoginClick }: H
           : 'bg-[#5eead4]'
       }`}>
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          {/* Left - Login Button */}
+          {/* Left - Login Button (only show when not logged in) */}
           <div className="flex items-center w-auto md:w-auto">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onLoginClick}
-              className="text-white hover:bg-white/20 text-xs md:text-sm"
-            >
-              로그인
-            </Button>
+            {!isLoggedIn && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onLoginClick}
+                className="text-white hover:bg-white/20 text-xs md:text-sm"
+              >
+                로그인
+              </Button>
+            )}
           </div>
 
           {/* Center - Logo and Title */}

@@ -25,6 +25,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final SearchLogService searchLogService;
     private final ReviewService reviewService;
+    private final FavoriteService favoriteService;
 
     /**
      * 상품 목록 조회 (페이징, 정렬, 필터링)
@@ -123,8 +124,8 @@ public class ProductService {
                 .map(ProductImage::getPath)
                 .orElse("p_default_img.png");
 
-        // Favorite count는 추후 Favorite 엔티티 연결 시 구현
-        long favoriteCount = 0L;
+        // Favorite count 조회
+        long favoriteCount = favoriteService.getFavoriteCount(product.getId());
 
         return ProductDtos.ListItem.builder()
                 .id(product.getId().intValue())
@@ -160,9 +161,9 @@ public class ProductService {
 
         String mainImage = sortedImages.isEmpty() ? "p_default_img.png" : sortedImages.get(0).getPath();
 
-        // Favorite count와 likedByMe는 추후 구현
-        long favoriteCount = 0L;
-        boolean likedByMe = false;
+        // Favorite count와 likedByMe 조회
+        long favoriteCount = favoriteService.getFavoriteCount(product.getId());
+        boolean likedByMe = currentUserId != null && favoriteService.isFavorite(product.getId(), currentUserId);
 
         // 판매자 평점 정보 (ReviewService 연동)
         Long sellerId = product.getSeller().getId();
