@@ -12,7 +12,6 @@ import { ChatListPage } from "./pages/ChatListPage";
 import { ChatPage } from "./pages/ChatPage";
 import { MyPage } from "./pages/MyPage";
 import { SellerProfilePage } from "./pages/SellerProfilePage";
-import { SearchPage } from "./pages/SearchPage";
 import { ResellPage } from "./pages/ResellPage";
 import { ResellDetailPage } from "./pages/ResellDetailPage";
 import { LoginPage } from "./pages/LoginPage";
@@ -45,7 +44,7 @@ export default function App() {
   const [selectedSellerId, setSelectedSellerId] = useState<string>("");
 
   /** 검색어 */
-  const [selectedSearchQuery, setSelectedSearchQuery] = useState<string>("");
+  const [searchQuery, setSearchQuery] = useState<string>("");
 
   /** 상품 등록 타입 선택 Dialog 표시 여부 */
   const [showRegisterDialog, setShowRegisterDialog] = useState(false);
@@ -105,12 +104,11 @@ export default function App() {
   };
 
   /**
-   * 검색 실행
-   * @param query 검색어
+   * 검색어 초기화 및 홈으로 이동
    */
-  const handleSearch = (query: string) => {
-    setSelectedSearchQuery(query);
-    setCurrentPage("search");
+  const handleClearSearch = () => {
+    setSearchQuery("");
+    setCurrentPage("home");
   };
 
   /**
@@ -142,7 +140,13 @@ export default function App() {
 
       // 메인 페이지
       case "home":
-        return <HomePage onNavigate={handleNavigate} />;
+        return (
+          <HomePage
+            onNavigate={handleNavigate}
+            searchQuery={searchQuery}
+            onClearSearch={handleClearSearch}
+          />
+        );
 
       // 리셀 페이지
       case "resell":
@@ -197,16 +201,6 @@ export default function App() {
           />
         );
 
-      // 검색 페이지
-      case "search":
-        return (
-          <SearchPage
-            onNavigate={handleNavigate}
-            initialQuery={selectedSearchQuery}
-            isResellMode={false}
-          />
-        );
-
       default:
         return <HomePage onNavigate={handleNavigate} />;
     }
@@ -220,7 +214,6 @@ export default function App() {
   const showHeader =
     currentPage !== "chatroom" &&
     currentPage !== "seller-profile" &&
-    currentPage !== "search" &&
     currentPage !== "resell-detail" &&
     currentPage !== "product-edit" &&
     currentPage !== "login" &&
@@ -243,9 +236,15 @@ export default function App() {
     <div className="min-h-screen bg-background">
       {/* 상단 헤더 (검색바, 로고, 로그인) */}
       {showHeader && (
-        <Header 
-          onSearch={handleSearch} 
-          onLogoClick={() => setCurrentPage("home")} 
+        <Header
+          onSearch={(query) => {
+            setSearchQuery(query);
+            setCurrentPage("home");
+          }}
+          onLogoClick={() => {
+            setSearchQuery("");
+            setCurrentPage("home");
+          }}
           onLoginClick={() => setCurrentPage("login")}
         />
       )}
@@ -257,7 +256,13 @@ export default function App() {
       {showBottomNav && (
         <BottomNav
           currentPage={currentPage}
-          onNavigate={handleNavigate}
+          onNavigate={(page) => {
+            // 홈 버튼 클릭 시 검색어 초기화
+            if (page === "home") {
+              setSearchQuery("");
+            }
+            handleNavigate(page);
+          }}
         />
       )}
 

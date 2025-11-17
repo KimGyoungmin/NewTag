@@ -15,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Service
@@ -45,7 +46,15 @@ public class ProductService {
             products = productRepository.findAllNotDeleted(pageable);
         }
 
-        return products.map(this::convertToListItem);
+        // 모든 상품의 ID를 수집
+        List<Long> productIds = products.getContent().stream()
+                .map(Product::getId)
+                .collect(Collectors.toList());
+
+        // 한 번의 쿼리로 모든 상품의 찜 개수 조회 (N+1 문제 해결)
+        Map<Long, Long> favoriteCountMap = favoriteService.getFavoriteCounts(productIds);
+
+        return products.map(product -> convertToListItem(product, favoriteCountMap));
     }
 
     /**
@@ -72,7 +81,16 @@ public class ProductService {
     public Page<ProductDtos.ListItem> getProductsBySeller(Long sellerId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Page<Product> products = productRepository.findBySellerNotDeleted(sellerId, pageable);
-        return products.map(this::convertToListItem);
+
+        // 모든 상품의 ID를 수집
+        List<Long> productIds = products.getContent().stream()
+                .map(Product::getId)
+                .collect(Collectors.toList());
+
+        // 한 번의 쿼리로 모든 상품의 찜 개수 조회 (N+1 문제 해결)
+        Map<Long, Long> favoriteCountMap = favoriteService.getFavoriteCounts(productIds);
+
+        return products.map(product -> convertToListItem(product, favoriteCountMap));
     }
 
     /**
@@ -94,7 +112,15 @@ public class ProductService {
             searchLogService.logSearch(userId, keyword, (int) products.getTotalElements(), deviceType);
         }
 
-        return products.map(this::convertToListItem);
+        // 모든 상품의 ID를 수집
+        List<Long> productIds = products.getContent().stream()
+                .map(Product::getId)
+                .collect(Collectors.toList());
+
+        // 한 번의 쿼리로 모든 상품의 찜 개수 조회 (N+1 문제 해결)
+        Map<Long, Long> favoriteCountMap = favoriteService.getFavoriteCounts(productIds);
+
+        return products.map(product -> convertToListItem(product, favoriteCountMap));
     }
 
     // ============================================
@@ -115,7 +141,33 @@ public class ProductService {
     }
 
     /**
-     * Product -> ListItem 변환
+     * Product -> ListItem 변환 (Map을 사용한 최적화 버전)
+     */
+    private ProductDtos.ListItem convertToListItem(Product product, Map<Long, Long> favoriteCountMap) {
+        String mainImage = product.getImages().stream()
+                .filter(img -> img.getIs_main())
+                .findFirst()
+                .map(ProductImage::getPath)
+                .orElse("p_default_img.png");
+
+        // Map에서 Favorite count 조회 (이미 한 번에 가져온 데이터)
+        long favoriteCount = favoriteCountMap.getOrDefault(product.getId(), 0L);
+
+        return ProductDtos.ListItem.builder()
+                .id(product.getId().intValue())
+                .mainImage(mainImage)
+                .title(product.getTitle())
+                .price(product.getPrice().doubleValue())
+                .locationNm(product.getLocation_nm())
+                .createdAt(product.getCreatedAt())
+                .viewCount(product.getView_count())
+                .favoriteCount(favoriteCount)
+                .timeAgo(getTimeAgo(product.getCreatedAt()))
+                .build();
+    }
+
+    /**
+     * Product -> ListItem 변환 (기존 버전 - 하위 호환성)
      */
     private ProductDtos.ListItem convertToListItem(Product product) {
         String mainImage = product.getImages().stream()

@@ -29,6 +29,12 @@ public interface FavoriteRepository extends JpaRepository<Favorite, Long> {
     long countByProductId(Long productId);
 
     /**
+     * 여러 상품의 찜 개수를 한 번에 조회 (N+1 문제 해결)
+     */
+    @Query("SELECT f.product.id, COUNT(f) FROM Favorite f WHERE f.product.id IN :productIds GROUP BY f.product.id")
+    java.util.List<Object[]> countByProductIds(@Param("productIds") java.util.List<Long> productIds);
+
+    /**
      * 특정 사용자가 찜한 상품 목록 조회
      */
     @Query("SELECT f.product.id FROM Favorite f WHERE f.user.id = :userId")
