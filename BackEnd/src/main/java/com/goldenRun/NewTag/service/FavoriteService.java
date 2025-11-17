@@ -11,6 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @Service
@@ -86,5 +89,32 @@ public class FavoriteService {
      */
     public Set<Long> getFavoriteProductIds(Long userId) {
         return favoriteRepository.findProductIdsByUserId(userId);
+    }
+
+    /**
+     * 여러 상품의 찜 개수를 한 번에 조회 (N+1 문제 해결)
+     * @param productIds 조회할 상품 ID 목록
+     * @return Map<상품ID, 찜개수>
+     */
+    public Map<Long, Long> getFavoriteCounts(List<Long> productIds) {
+        if (productIds == null || productIds.isEmpty()) {
+            return new HashMap<>();
+        }
+
+        List<Object[]> results = favoriteRepository.countByProductIds(productIds);
+        Map<Long, Long> countMap = new HashMap<>();
+
+        for (Object[] result : results) {
+            Long productId = (Long) result[0];
+            Long count = (Long) result[1];
+            countMap.put(productId, count);
+        }
+
+        // 찜이 없는 상품은 0으로 설정
+        for (Long productId : productIds) {
+            countMap.putIfAbsent(productId, 0L);
+        }
+
+        return countMap;
     }
 }
