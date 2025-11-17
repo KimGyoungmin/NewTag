@@ -52,6 +52,8 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/api/v1/products", "/api/v1/products/**").permitAll()
                 // 리뷰 조회 공개 API (로그인 없이 조회 가능)
                 .requestMatchers(HttpMethod.GET, "/api/v1/reviews/**").permitAll()
+                // 찜하기 API 임시 공개 (개발용 - 나중에 인증 필요로 변경)
+                .requestMatchers("/api/v1/favorites/**").permitAll()
                 // 나머지는 인증 필요
                 .anyRequest().authenticated()
             )
@@ -78,16 +80,8 @@ public class SecurityConfig {
             "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
         ));
 
-        // 허용할 헤더
-        configuration.setAllowedHeaders(Arrays.asList(
-            "Authorization",
-            "Content-Type",
-            "X-Requested-With",
-            "Accept",
-            "Origin",
-            "Access-Control-Request-Method",
-            "Access-Control-Request-Headers"
-        ));
+        // 허용할 헤더 (모든 헤더 허용)
+        configuration.addAllowedHeader("*");
 
         // 인증 정보 포함 허용 (쿠키, Authorization 헤더 등)
         configuration.setAllowCredentials(true);

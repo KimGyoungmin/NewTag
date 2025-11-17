@@ -18,6 +18,9 @@ export const authApi = {
     if (loginData.success && loginData.token) {
       localStorage.setItem(TOKEN_STORAGE_KEY, loginData.token);
       localStorage.setItem(USER_STORAGE_KEY, JSON.stringify({ nick: credentials.nick }));
+
+      // Dispatch custom event to notify Header component
+      window.dispatchEvent(new Event('auth-change'));
     }
 
     return loginData;
@@ -57,6 +60,9 @@ export const authApi = {
   logout: () => {
     localStorage.removeItem(TOKEN_STORAGE_KEY);
     localStorage.removeItem(USER_STORAGE_KEY);
+
+    // Dispatch custom event to notify Header component
+    window.dispatchEvent(new Event('auth-change'));
   },
 
   /**

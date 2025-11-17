@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Header } from "./components/Header";
 import { BottomNav } from "./components/BottomNav";
 import { RegisterTypeDialog } from "./components/RegisterTypeDialog";
@@ -17,6 +17,7 @@ import { ResellPage } from "./pages/ResellPage";
 import { ResellDetailPage } from "./pages/ResellDetailPage";
 import { LoginPage } from "./pages/LoginPage";
 import { SignupPage } from "./pages/SignupPage";
+import { authApi } from "./api/auth";
 
 /**
  * NewTag 메인 애플리케이션 컴포넌트
@@ -30,24 +31,42 @@ export default function App() {
   // ============================================
   // 상태 관리
   // ============================================
-  
+
   /** 현재 표시 중인 페이지 */
-  const [currentPage, setCurrentPage] = useState<string>("home");
-  
+  const [currentPage, setCurrentPage] = useState<string>("login");
+
   /** 선택된 상품 ID (상세/수정 페이지용) */
   const [selectedProductId, setSelectedProductId] = useState<string>("");
-  
+
   /** 선택된 채팅방 ID */
   const [selectedChatId, setSelectedChatId] = useState<string>("");
-  
+
   /** 선택된 판매자 ID */
   const [selectedSellerId, setSelectedSellerId] = useState<string>("");
-  
+
   /** 검색어 */
   const [selectedSearchQuery, setSelectedSearchQuery] = useState<string>("");
-  
+
   /** 상품 등록 타입 선택 Dialog 표시 여부 */
   const [showRegisterDialog, setShowRegisterDialog] = useState(false);
+
+  // ============================================
+  // 초기 로드 - 로그인 상태 확인
+  // ============================================
+
+  useEffect(() => {
+    // 이미 로그인되어 있으면 홈으로 이동
+    const isLoggedIn = authApi.isAuthenticated();
+    console.log('[App] 초기 로드 - 로그인 상태:', isLoggedIn);
+    console.log('[App] localStorage auth_token:', localStorage.getItem('auth_token'));
+
+    if (isLoggedIn) {
+      console.log('[App] 로그인되어 있음 - home으로 이동');
+      setCurrentPage("home");
+    } else {
+      console.log('[App] 로그인 안됨 - login 페이지 유지');
+    }
+  }, []);
 
   // ============================================
   // 네비게이션 핸들러

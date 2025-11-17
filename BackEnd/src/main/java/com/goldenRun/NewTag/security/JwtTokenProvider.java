@@ -92,8 +92,12 @@ public class JwtTokenProvider {
 	                .build()
 	                .parseClaimsJws(token);
 
-	        return !claims.getBody().getExpiration().before(new Date());
+	        boolean isValid = !claims.getBody().getExpiration().before(new Date());
+	        System.out.println("[JWT] Token validation result: " + isValid);
+	        return isValid;
 	    } catch (Exception e) {
+	        System.out.println("[JWT] Token validation failed: " + e.getMessage());
+	        e.printStackTrace();
 	        return false;
 	    }
 	}

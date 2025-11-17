@@ -35,9 +35,9 @@ public class Product {
     @Column(nullable=false, columnDefinition = "ENUM('ON_SELL','SOLD_OUT','RESERVED') default 'ON_SELL'")
     private ProductStatus status;
 
-    @Column(nullable=false, length=100) private String location_nm;
-    @Column(nullable=false, precision = 10, scale = 7) private BigDecimal latitude;
-    @Column(nullable=false, precision = 10, scale = 7) private BigDecimal longitude;
+    @Column(length=100) private String location_nm;
+    @Column(precision = 10, scale = 7) private BigDecimal latitude;
+    @Column(precision = 10, scale = 7) private BigDecimal longitude;
 
     @Column(nullable=false) private Integer view_count;
     @Column(nullable=false) private Boolean is_delete;

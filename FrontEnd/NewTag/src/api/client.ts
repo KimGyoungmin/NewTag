@@ -1,7 +1,7 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 
 // API Base URL (환경 변수에서 가져오기)
-const DEFAULT_SERVER_URL = 'http://localhost:8081';
+const DEFAULT_SERVER_URL = 'http://localhost:8081/';
 const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || DEFAULT_SERVER_URL;
 const normalizedBaseUrl = rawBaseUrl.replace(/\/$/, '');
 const API_BASE_URL = normalizedBaseUrl.includes('/api')
@@ -32,9 +32,13 @@ apiClient.interceptors.request.use(
 
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('[API Request] Token 추가됨:', token.substring(0, 20) + '...');
+    } else {
+      console.log('[API Request] Token 없음');
     }
 
     console.log('[API Request]', config.method?.toUpperCase(), config.url);
+    console.log('[API Request] Headers:', config.headers);
     return config;
   },
   (error) => {

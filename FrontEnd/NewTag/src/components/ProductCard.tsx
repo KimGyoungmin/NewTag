@@ -2,8 +2,10 @@ import { Heart } from "lucide-react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
-import { useState, useEffect } from "react";
-import { isFavorite, toggleFavorite } from "../utils/localStorage";
+import { useState } from "react";
+import { favoriteApi } from "../api/favoriteApi";
+import { authApi } from "../api/auth";
+import { toast } from "sonner";
 
 /**
  * ============================================
@@ -29,33 +31,51 @@ interface ProductCardProps {
   likes: number;
   chatCount: number;
   status?: 'available' | 'reserved' | 'sold';
+  isLikedByMe?: boolean; // 백엔드에서 받은 찜 상태
   onClick?: () => void;
+  onNavigate?: (page: string) => void;
 }
 
-export function ProductCard({ 
+export function ProductCard({
   id,
-  image, 
-  title, 
-  price, 
-  location, 
-  timeAgo, 
+  image,
+  title,
+  price,
+  location,
+  timeAgo,
   likes,
   chatCount,
   status = 'available',
-  onClick 
+  isLikedByMe = false,
+  onClick,
+  onNavigate
 }: ProductCardProps) {
-  const [isLiked, setIsLiked] = useState(false);
+  const [isLiked, setIsLiked] = useState(isLikedByMe);
   const [likeCount, setLikeCount] = useState(likes);
 
-  useEffect(() => {
-    setIsLiked(isFavorite(id));
-  }, [id]);
-
-  const handleLikeClick = (e: React.MouseEvent) => {
+  const handleLikeClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    const newIsLiked = toggleFavorite(id);
-    setIsLiked(newIsLiked);
-    setLikeCount(prev => newIsLiked ? prev + 1 : prev - 1);
+
+    const currentUser = authApi.getCurrentUser();
+    if (!currentUser) {
+      toast.error("로그인이 필요합니다.");
+      if (onNavigate) {
+        onNavigate('login');
+      }
+      return;
+    }
+
+    // TODO: userId를 실제 사용자 ID로 변경 필요
+    const userId = 1;
+
+    try {
+      const response = await favoriteApi.toggleFavorite(Number(id), userId);
+      setIsLiked(response.isFavorited);
+      setLikeCount(response.favoriteCount);
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+      toast.error("찜하기 처리 중 오류가 발생했습니다.");
+    }
   };
 
   return (

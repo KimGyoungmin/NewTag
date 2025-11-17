@@ -10,6 +10,8 @@ import {
   DropdownMenuTrigger,
 } from "../components/ui/dropdown-menu";
 import { productsApi } from "../api/products";
+import { favoriteApi } from "../api/favoriteApi";
+import { authApi } from "../api/auth";
 
 interface HomePageProps {
   onNavigate: (page: string, productId?: string) => void;
@@ -33,6 +35,23 @@ export function HomePage({ onNavigate }: HomePageProps) {
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [favoriteProductIds, setFavoriteProductIds] = useState<Set<number>>(new Set());
+
+  // 찜한 상품 목록 불러오기
+  const fetchFavorites = async () => {
+    const currentUser = authApi.getCurrentUser();
+    if (!currentUser) return;
+
+    // TODO: userId를 실제 사용자 ID로 변경 필요
+    const userId = 1;
+
+    try {
+      const productIds = await favoriteApi.getMyFavoriteProducts(userId);
+      setFavoriteProductIds(new Set(productIds));
+    } catch (err) {
+      console.error('찜 목록 조회 실패:', err);
+    }
+  };
 
   // 상품 목록 불러오기
   const fetchProducts = async () => {
@@ -57,6 +76,14 @@ export function HomePage({ onNavigate }: HomePageProps) {
       setLoading(false);
     }
   };
+
+  // 초기 로드 시 찜 목록 불러오기 (로그인한 경우에만)
+  useEffect(() => {
+    const currentUser = authApi.getCurrentUser();
+    if (currentUser && authApi.isAuthenticated()) {
+      fetchFavorites();
+    }
+  }, []);
 
   // 카테고리 또는 정렬 옵션 변경 시 상품 목록 다시 불러오기
   useEffect(() => {
@@ -146,7 +173,9 @@ export function HomePage({ onNavigate }: HomePageProps) {
                   timeAgo={product.timeAgo}
                   likes={product.favoriteCount}
                   chatCount={product.viewCount}
+                  isLikedByMe={favoriteProductIds.has(product.id)}
                   onClick={() => onNavigate('detail', product.id.toString())}
+                  onNavigate={onNavigate}
                 />
               ))}
             </div>

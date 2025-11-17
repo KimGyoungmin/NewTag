@@ -25,6 +25,8 @@ import {
 } from "../components/ui/alert-dialog";
 import { productApi } from "../api/productApi";
 import { reviewApi } from "../api/reviewApi";
+import { favoriteApi } from "../api/favoriteApi";
+import { authApi } from "../api/auth";
 import { toast } from "sonner";
 import type { Product, ProductStatus, Review } from "../types";
 import { API_BASE_URL } from "../constants";
@@ -46,6 +48,10 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
 
+  // 현재 로그인한 사용자가 상품 소유자인지 확인
+  const currentUser = authApi.getCurrentUser();
+  const isOwner = product?.seller?.nick === currentUser?.nick;
+
   // 상품 데이터 로드
   useEffect(() => {
     const loadProduct = async () => {
@@ -56,7 +62,8 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
         const data = await productApi.getById(Number(productId));
         if (data) {
           setProduct(data);
-          setIsLiked(data.isFavorite || false);
+          // likedByMe 필드 사용 (백엔드에서 제공)
+          setIsLiked(data.likedByMe || false);
 
           // 판매자 리뷰 로드
           if (data.seller?.id) {
@@ -120,10 +127,36 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
   };
 
   // 찜하기 핸들러
-  const handleToggleFavorite = () => {
-    // TODO: API 연동 후 실제 찜하기 기능 구현
-    setIsLiked(!isLiked);
-    toast.success(isLiked ? "찜하기가 취소되었습니다." : "찜 목록에 추가되었습니다.");
+  const handleToggleFavorite = async () => {
+    if (!product) return;
+
+    const currentUser = authApi.getCurrentUser();
+    if (!currentUser) {
+      toast.error("로그인이 필요합니다.");
+      onNavigate('login');
+      return;
+    }
+
+    // TODO: userId를 실제 사용자 ID로 변경 필요 (현재는 임시로 1 사용)
+    const userId = 1;
+
+    try {
+      const response = await favoriteApi.toggleFavorite(product.id, userId);
+      setIsLiked(response.isFavorited);
+
+      // 상품 정보의 favoriteCount도 업데이트
+      if (product) {
+        setProduct({
+          ...product,
+          favoriteCount: response.favoriteCount,
+        });
+      }
+
+      toast.success(response.message || (response.isFavorited ? "찜 목록에 추가되었습니다." : "찜하기가 취소되었습니다."));
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
+      toast.error("찜하기 처리 중 오류가 발생했습니다.");
+    }
   };
 
   // 공유하기 핸들러
@@ -204,37 +237,41 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
   };
 
   // 스와이프 핸들러
-  // const handleTouchStart = (e: React.TouchEvent) => {
-  //   setTouchStart(e.targetTouches[0].clientX);
-  // };
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStart(e.targetTouches[0].clientX);
+  };
 
-  // const handleTouchMove = (e: React.TouchEvent) => {
-  //   setTouchEnd(e.targetTouches[0].clientX);
-  // };
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
 
-  // const handleTouchEnd = () => {
-  //   if (!touchStart || !touchEnd) return;
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
 
-  //   const distance = touchStart - touchEnd;
-  //   const isLeftSwipe = distance > 50;
-  //   const isRightSwipe = distance < -50;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
 
-  //   if (isLeftSwipe && currentImageIndex < displayImages.length - 1) {
-  //     setCurrentImageIndex(currentImageIndex + 1);
-  //   }
-  //   if (isRightSwipe && currentImageIndex > 0) {
-  //     setCurrentImageIndex(currentImageIndex - 1);
-  //   }
+    const images = product?.images && product.images.length > 0
+      ? product.images.map((img: any) => getFullImageUrl(img.pImg || img.pimg))
+      : [getFullImageUrl(undefined)];
 
-  //   // 초기화
-  //   setTouchStart(0);
-  //   setTouchEnd(0);
-  // };
+    if (isLeftSwipe && currentImageIndex < images.length - 1) {
+      setCurrentImageIndex(currentImageIndex + 1);
+    }
+    if (isRightSwipe && currentImageIndex > 0) {
+      setCurrentImageIndex(currentImageIndex - 1);
+    }
 
-  // const displayImages = product?.images && product.images.length > 0
-  //   ? product.images.map((img: any) => getFullImageUrl(img.pImg || img.pimg))
-  //   : [getFullImageUrl(undefined)];
+    // 초기화
+    setTouchStart(0);
+    setTouchEnd(0);
+  };
 
+  // displayImages 배열 생성
+  const displayImages = product?.images && product.images.length > 0
+    ? product.images.map((img: any) => getFullImageUrl(img.pImg || img.pimg))
+    : [getFullImageUrl(undefined)];
 
   // 로딩 상태
   if (loading) {
@@ -275,10 +312,6 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
     );
   }
 
-  const displayImages = product.images && product.images.length > 0
-    ? product.images.map((img: any) => getFullImageUrl(img.pImg || img.pimg))
-    : [getFullImageUrl(undefined)];
-
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-8">
       {/* Header */}
@@ -305,26 +338,32 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleStatusChange('ON_SELL')}>
-                판매중으로 변경
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleStatusChange('RESERVED')}>
-                예약중으로 변경
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleStatusChange('SOLD_OUT')}>
-                판매완료로 변경
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => onNavigate('product-edit', product.id.toString())}>
-                수정
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="text-destructive focus:text-destructive"
-                onClick={() => setShowDeleteDialog(true)}
-              >
-                삭제
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
+              {/* 소유자만 볼 수 있는 메뉴 */}
+              {isOwner && (
+                <>
+                  <DropdownMenuItem onClick={() => handleStatusChange('ON_SELL')}>
+                    판매중으로 변경
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleStatusChange('RESERVED')}>
+                    예약중으로 변경
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleStatusChange('SOLD_OUT')}>
+                    판매완료로 변경
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => onNavigate('product-edit', product.id.toString())}>
+                    수정
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-destructive focus:text-destructive"
+                    onClick={() => setShowDeleteDialog(true)}
+                  >
+                    삭제
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              {/* 모든 사용자가 볼 수 있는 신고하기 */}
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
                 onClick={() => window.open('https://www.police.go.kr/www/security/cyber.jsp', '_blank')}
@@ -338,7 +377,12 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
 
       <div className="md:container md:mx-auto md:max-w-4xl">
         {/* Image Carousel */}
-        <div className="relative aspect-square bg-muted md:rounded-xl md:mt-4 md:overflow-hidden">
+        <div
+          className="relative aspect-square bg-muted md:rounded-xl md:mt-4 md:overflow-hidden"
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
           <ImageWithFallback
             src={displayImages[currentImageIndex]}
             alt={product.title}
