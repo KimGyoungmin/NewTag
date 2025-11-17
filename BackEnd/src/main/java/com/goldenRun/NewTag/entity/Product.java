@@ -27,9 +27,9 @@ public class Product {
      @Id @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable=false) private Double price;
+    @Column(nullable=false, precision = 10, scale = 2) private BigDecimal price;
     @Column(nullable=false, length=100) private String title;
-    @Lob @Column(nullable=false, columnDefinition = "TEXT") private String content;
+    @Column(nullable=false, columnDefinition = "TEXT") private String content;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable=false, columnDefinition = "ENUM('ON_SELL','SOLD_OUT','RESERVED') default 'ON_SELL'")

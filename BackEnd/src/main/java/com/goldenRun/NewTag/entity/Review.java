@@ -21,10 +21,11 @@ public class Review {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    
+    @Column(nullable = false)
     private Integer rating;
 
-    @Lob @Column(nullable=false, columnDefinition = "TEXT") private String content;
+    @Column(columnDefinition = "TEXT")
+    private String content;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;

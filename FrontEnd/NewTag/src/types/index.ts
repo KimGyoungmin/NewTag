@@ -26,6 +26,11 @@ export interface User {
   createdAt: string;
   updatedAt: string;
   profileImg: string;
+
+  // 판매자 평점 정보 (상품 상세에서 사용)
+  sellerRatingAvg?: number;
+  sellerRatingCount?: number;
+  sellerGrade?: string;
 }
 
 // Address 타입
@@ -109,11 +114,11 @@ export interface Transaction {
 // Review 타입
 export interface Review {
   id: number;
-  rating: number; // 0.5 ~ 5.0
+  rating: number; // 1 ~ 5
   content?: string;
   createdAt: string;
   updatedAt: string;
-  transactionId: number;
+  transactionId?: number;
   writerId: number;
   targetId: number;
 
@@ -121,6 +126,21 @@ export interface Review {
   transaction?: Transaction;
   writer?: User;
   target?: User;
+  writerName?: string;
+  writerNick?: string;
+  writerProfileImg?: string;
+  productTitle?: string;
+}
+
+// 평점 요약 타입
+export interface RatingSummary {
+  averageRating: number;
+  totalCount: number;
+  rating5Count: number;
+  rating4Count: number;
+  rating3Count: number;
+  rating2Count: number;
+  rating1Count: number;
 }
 
 // ============================================
