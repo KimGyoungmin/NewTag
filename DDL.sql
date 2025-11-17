@@ -135,7 +135,7 @@ CREATE TABLE transaction
 CREATE TABLE review
 (
   id             BIGINT      NOT NULL AUTO_INCREMENT COMMENT '후기 PK',
-  rating         DECIMAL(2,1) NOT NULL COMMENT '평점 (0.5 ~ 5.0, 0.5 단위)',
+  rating         INT      NOT NULL COMMENT '평점 (1 ~ 5)',
   content        TEXT     NULL COMMENT '후기 내용',
   created_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '후기 생성날짜',
   updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '후기 수정날짜',
@@ -145,9 +145,8 @@ CREATE TABLE review
   PRIMARY KEY (id),
   UNIQUE KEY unique_transaction_writer (transaction_id, writer_id),
 
-  -- CHECK 제약조건으로 0.5 단위 강제
-  CONSTRAINT check_rating_range CHECK (rating >= 0.5 AND rating <= 5.0),
-  CONSTRAINT check_rating_step CHECK (MOD(rating * 10, 5) = 0)
+  -- CHECK 제약조건으로 1-5 범위 강제
+  CONSTRAINT check_rating_range CHECK (rating >= 1 AND rating <= 5)
 
 ) COMMENT '후기 테이블';
 

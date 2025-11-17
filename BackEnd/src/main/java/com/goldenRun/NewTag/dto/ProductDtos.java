@@ -1,5 +1,6 @@
 package com.goldenRun.NewTag.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.goldenRun.NewTag.enums.ProductStatus;
 import lombok.*;
 
@@ -66,17 +67,31 @@ public class ProductDtos {
         private Integer viewCount;
         private Long favoriteCount;
         private String timeAgo;
+        private LocalDateTime createdAt;
+        private Integer categoryId;
 
-        private List<String> images; // 모든 이미지(메인 우선 정렬)
+        private List<ImageResponse> images; // 모든 이미지(메인 우선 정렬)
         private String mainImage;
 
         // 판매자 박스
         private Integer sellerId;
         private String sellerName;
+        private String sellerNick;
         private String sellerProfileImg;
         private double sellerRatingAvg;
         private long sellerRatingCount;
         private String sellerGrade; // 예: Gold/Silver 등
         private boolean likedByMe;
+    }
+
+    @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class ImageResponse {
+        private Integer id;
+        @JsonProperty("pImg")
+        private String pImg;  // 프론트엔드에서 pImg로 접근
+        private Boolean isMain;
+        private LocalDateTime createdAt;
+        private LocalDateTime updatedAt;
+        private Integer productId;
     }
 }

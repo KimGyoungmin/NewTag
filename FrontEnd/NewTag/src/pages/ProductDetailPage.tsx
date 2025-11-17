@@ -1,9 +1,10 @@
-import { useState } from "react";
-import { ChevronLeft, MoreVertical, Heart, MapPin, Clock, Eye } from "lucide-react";
+import { useState, useEffect } from "react";
+import { ChevronLeft, MoreVertical, Heart, MapPin, Eye, Share2, AlertCircle, Star } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Badge } from "../components/ui/badge";
 import { Separator } from "../components/ui/separator";
+import { Skeleton } from "../components/ui/skeleton";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import {
   DropdownMenu,
@@ -22,16 +23,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../components/ui/alert-dialog";
-import { 
-  getProductById,
-  getProductStatus,
-  setProductStatus,
-  deleteProduct,
-  ProductStatus,
-  isFavorite,
-  toggleFavorite,
-  findOrCreateChat,
-} from "../utils/localStorage";
+import { productApi } from "../api/productApi";
+import { reviewApi } from "../api/reviewApi";
+import { toast } from "sonner";
+import type { Product, ProductStatus, Review } from "../types";
+import { API_BASE_URL } from "../constants";
 
 interface ProductDetailPageProps {
   productId: string;
@@ -39,90 +35,269 @@ interface ProductDetailPageProps {
 }
 
 export function ProductDetailPage({ productId, onNavigate }: ProductDetailPageProps) {
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [isLiked, setIsLiked] = useState(isFavorite(productId));
-  const [productStatus, setProductStatusState] = useState<ProductStatus>(getProductStatus(productId));
+  const [isLiked, setIsLiked] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [reviews, setReviews] = useState<Review[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [touchStart, setTouchStart] = useState(0);
+  const [touchEnd, setTouchEnd] = useState(0);
 
-  // 실제 상품 데이터 가져오기
-  const realProduct = getProductById(productId);
+  // 상품 데이터 로드
+  useEffect(() => {
+    const loadProduct = async () => {
+      setLoading(true);
+      setError(null);
+
+      try {
+        const data = await productApi.getById(Number(productId));
+        if (data) {
+          setProduct(data);
+          setIsLiked(data.isFavorite || false);
+
+          // 판매자 리뷰 로드
+          if (data.seller?.id) {
+            loadSellerReviews(data.seller.id);
+          }
+        } else {
+          setError("상품을 찾을 수 없습니다.");
+        }
+      } catch (err) {
+        console.error('Failed to load product:', err);
+        setError("상품을 불러오는데 실패했습니다.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProduct();
+  }, [productId]);
+
+  // 판매자 리뷰 로드
+  const loadSellerReviews = async (sellerId: number) => {
+    setReviewsLoading(true);
+    try {
+      const response = await reviewApi.getUserReviews(sellerId, { page: 0, size: 5 });
+      setReviews(response.content);
+    } catch (err) {
+      console.error('Failed to load reviews:', err);
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
 
   // 상태 변경 핸들러
-  const handleStatusChange = (newStatus: ProductStatus) => {
-    setProductStatus(productId, newStatus);
-    setProductStatusState(newStatus);
+  const handleStatusChange = async (newStatus: ProductStatus) => {
+    if (!product) return;
+
+    try {
+      await productApi.update(product.id, { status: newStatus });
+      setProduct({ ...product, status: newStatus });
+      toast.success("상태가 변경되었습니다.");
+    } catch (error) {
+      toast.error("상태 변경에 실패했습니다.");
+    }
   };
 
   // 삭제 핸들러
-  const handleDelete = () => {
-    deleteProduct(productId);
-    onNavigate('home');
+  const handleDelete = async () => {
+    if (!product) return;
+
+    try {
+      const success = await productApi.delete(product.id);
+      if (success) {
+        toast.success("상품이 삭제되었습니다.");
+        onNavigate('home');
+      } else {
+        toast.error("상품 삭제에 실패했습니다.");
+      }
+    } catch (error) {
+      toast.error("상품 삭제 중 오류가 발생했습니다.");
+    }
   };
 
   // 찜하기 핸들러
   const handleToggleFavorite = () => {
-    toggleFavorite(productId);
+    // TODO: API 연동 후 실제 찜하기 기능 구현
     setIsLiked(!isLiked);
+    toast.success(isLiked ? "찜하기가 취소되었습니다." : "찜 목록에 추가되었습니다.");
   };
 
-  // 기본 판매자 정보
-  const defaultSeller = {
-    id: 'seller-1',
-    name: '김철수',
-    image: 'https://images.unsplash.com/photo-1640960543409-dbe56ccc30e2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx1c2VyJTIwcHJvZmlsZSUyMHBlcnNvbnxlbnwxfHx8fDE3NjIxNzMzNjZ8MA&ixlib=rb-4.1.0&q=80&w=1080',
-    rating: 4.8,
-    reviewCount: 23,
+  // 공유하기 핸들러
+  const handleShare = async () => {
+    if (!product) return;
+
+    const shareData = {
+      title: product.title,
+      text: `${product.title} - ${product.price.toLocaleString()}원`,
+      url: window.location.href,
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(window.location.href);
+        toast.success("링크가 복사되었습니다.");
+      }
+    } catch (error) {
+      console.error('Share failed:', error);
+    }
   };
 
-  // Mock data
-  const product = realProduct ? {
-    ...realProduct,
-    images: realProduct.images || [realProduct.image],
-    category: realProduct.category || '기타',
-    views: 234,
-    seller: defaultSeller,
-  } : {
-    id: productId,
-    images: [
-      'https://images.unsplash.com/photo-1758186355698-bd0183fc75ed?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxtb2Rlcm4lMjBlbGVjdHJvbmljcyUyMGdhZGdldHxlbnwxfHx8fDE3NjIxNjI0OTh8MA&ixlib=rb-4.1.0&q=80&w=1080',
-      'https://images.unsplash.com/photo-1634824506573-4a430d1d6111?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxmdXJuaXR1cmUlMjBob21lJTIwZGVjb3J8ZW58MXx8fHwxNzYyMTgwNjcxfDA&ixlib=rb-4.1.0&q=80&w=1080',
-    ],
-    title: '아이패드 프로 11인치 M2칩 (2022)',
-    price: 850000,
-    category: '전자기기',
-    status: 'available',
-    description: `거의 새 제품입니다. 
-    
-사용 기간 약 3개월 정도이며, 케이스를 끼워서 사용해서 스크래치 하나 없습니다.
-
-포함 구성품:
-- 아이패드 프로 본체
-- 정품 충전기 및 케이블
-- 애플 펜슬 2세대
-- 가죽 케이스 (갈색)
-
-직거래 선호하며, 택배 거래도 가능합니다.
-궁금하신 점 있으시면 채팅 주세요!`,
-    location: '강남구 역삼동',
-    timeAgo: '1시간 전',
-    views: 234,
-    likes: 12,
-    chatCount: 5,
-    seller: defaultSeller,
+  // 채팅하기 핸들러
+  const handleChat = () => {
+    if (!product) return;
+    // TODO: 실제 채팅방 생성 로직 구현
+    toast.info("채팅 기능은 곧 제공됩니다.");
+    // onNavigate('chatroom', chatId);
   };
+
+  // 시간 경과 표시
+  const getTimeAgo = (dateString: string) => {
+    const now = new Date();
+    const past = new Date(dateString);
+    const diffMs = now.getTime() - past.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return "방금 전";
+    if (diffMins < 60) return `${diffMins}분 전`;
+    if (diffHours < 24) return `${diffHours}시간 전`;
+    if (diffDays < 7) return `${diffDays}일 전`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)}주 전`;
+    if (diffDays < 365) return `${Math.floor(diffDays / 30)}개월 전`;
+    return `${Math.floor(diffDays / 365)}년 전`;
+  };
+
+  // 상태 배지 렌더링
+  const renderStatusBadge = (status: ProductStatus) => {
+    switch (status) {
+      case 'ON_SELL':
+        return <Badge className="bg-green-500">판매중</Badge>;
+      case 'RESERVED':
+        return <Badge className="bg-yellow-500">예약중</Badge>;
+      case 'SOLD_OUT':
+        return <Badge className="bg-gray-500">판매완료</Badge>;
+      default:
+        return null;
+    }
+  };
+
+  // 이미지 URL 생성 헬퍼
+  const getFullImageUrl = (path: string | undefined) => {
+    console.log(path);
+    if (!path) {
+      return '/p_default_img.png'; // 기본 이미지
+    }
+    // 이미 전체 URL인 경우 그대로 반환
+    if (path.startsWith('http') || path.startsWith('/')) {
+      return path;
+    }
+    // 상대 경로인 경우 전체 URL 구성
+    // API_BASE_URL = http://localhost:8081/api/v1 이므로 /static/만 추가
+    return `${API_BASE_URL}/static/${path}`;
+  };
+
+  // 스와이프 핸들러
+  // const handleTouchStart = (e: React.TouchEvent) => {
+  //   setTouchStart(e.targetTouches[0].clientX);
+  // };
+
+  // const handleTouchMove = (e: React.TouchEvent) => {
+  //   setTouchEnd(e.targetTouches[0].clientX);
+  // };
+
+  // const handleTouchEnd = () => {
+  //   if (!touchStart || !touchEnd) return;
+
+  //   const distance = touchStart - touchEnd;
+  //   const isLeftSwipe = distance > 50;
+  //   const isRightSwipe = distance < -50;
+
+  //   if (isLeftSwipe && currentImageIndex < displayImages.length - 1) {
+  //     setCurrentImageIndex(currentImageIndex + 1);
+  //   }
+  //   if (isRightSwipe && currentImageIndex > 0) {
+  //     setCurrentImageIndex(currentImageIndex - 1);
+  //   }
+
+  //   // 초기화
+  //   setTouchStart(0);
+  //   setTouchEnd(0);
+  // };
+
+  // const displayImages = product?.images && product.images.length > 0
+  //   ? product.images.map((img: any) => getFullImageUrl(img.pImg || img.pimg))
+  //   : [getFullImageUrl(undefined)];
+
+
+  // 로딩 상태
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background pb-20 md:pb-8">
+        <div className="sticky top-0 z-50 flex items-center justify-between border-b bg-background/95 backdrop-blur px-4 h-14">
+          <Button variant="ghost" size="icon" onClick={() => onNavigate('home')}>
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+        </div>
+        <div className="md:container md:mx-auto md:max-w-4xl">
+          <Skeleton className="aspect-square w-full md:rounded-xl md:mt-4" />
+          <div className="p-4 space-y-4">
+            <Skeleton className="h-8 w-3/4" />
+            <Skeleton className="h-6 w-1/2" />
+            <Skeleton className="h-20 w-full" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 에러 상태
+  if (error || !product) {
+    return (
+      <div className="min-h-screen bg-background pb-20 md:pb-8">
+        <div className="sticky top-0 z-50 flex items-center justify-between border-b bg-background/95 backdrop-blur px-4 h-14">
+          <Button variant="ghost" size="icon" onClick={() => onNavigate('home')}>
+            <ChevronLeft className="h-5 w-5" />
+          </Button>
+        </div>
+        <div className="flex flex-col items-center justify-center p-8 space-y-4">
+          <AlertCircle className="h-16 w-16 text-muted-foreground" />
+          <h2 className="text-xl font-semibold">{error || "상품을 찾을 수 없습니다"}</h2>
+          <Button onClick={() => onNavigate('home')}>홈으로 돌아가기</Button>
+        </div>
+      </div>
+    );
+  }
+
+  const displayImages = product.images && product.images.length > 0
+    ? product.images.map((img: any) => getFullImageUrl(img.pImg || img.pimg))
+    : [getFullImageUrl(undefined)];
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-8">
       {/* Header */}
       <div className="sticky top-0 z-50 flex items-center justify-between border-b bg-background/95 backdrop-blur px-4 h-14">
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           size="icon"
           onClick={() => onNavigate('home')}
         >
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleShare}
+          >
+            <Share2 className="h-5 w-5" />
+          </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon">
@@ -130,27 +305,27 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={() => handleStatusChange('available')}>
+              <DropdownMenuItem onClick={() => handleStatusChange('ON_SELL')}>
                 판매중으로 변경
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleStatusChange('reserved')}>
+              <DropdownMenuItem onClick={() => handleStatusChange('RESERVED')}>
                 예약중으로 변경
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => handleStatusChange('sold')}>
+              <DropdownMenuItem onClick={() => handleStatusChange('SOLD_OUT')}>
                 판매완료로 변경
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onNavigate('product-edit', product.id.toString())}>
                 수정
               </DropdownMenuItem>
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
                 onClick={() => setShowDeleteDialog(true)}
               >
                 삭제
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
                 onClick={() => window.open('https://www.police.go.kr/www/security/cyber.jsp', '_blank')}
               >
@@ -165,76 +340,103 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
         {/* Image Carousel */}
         <div className="relative aspect-square bg-muted md:rounded-xl md:mt-4 md:overflow-hidden">
           <ImageWithFallback
-            src={product.images[currentImageIndex]}
+            src={displayImages[currentImageIndex]}
             alt={product.title}
             className="h-full w-full object-cover"
           />
-          <div className="absolute bottom-4 right-4 rounded-full bg-black/60 px-3 py-1 text-white text-sm">
-            {currentImageIndex + 1} / {product.images.length}
-          </div>
-          {product.images.length > 1 && (
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
-              {product.images.map((_, index) => (
-                <button
-                  key={index}
-                  onClick={() => setCurrentImageIndex(index)}
-                  className={`h-2 w-2 rounded-full transition-all ${
-                    index === currentImageIndex ? 'bg-white w-6' : 'bg-white/50'
-                  }`}
-                />
-              ))}
-            </div>
+
+          {displayImages.length > 1 && (
+            <>
+              <div className="absolute bottom-4 right-4 rounded-full bg-black/60 px-3 py-1 text-white text-sm">
+                {currentImageIndex + 1} / {displayImages.length}
+              </div>
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
+                {displayImages.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setCurrentImageIndex(index)}
+                    className={`h-2 w-2 rounded-full transition-all ${
+                      index === currentImageIndex ? 'bg-white w-6' : 'bg-white/50'
+                    }`}
+                  />
+                ))}
+              </div>
+            </>
           )}
         </div>
 
         {/* Seller Info */}
-        <div className="bg-card border-b px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Avatar className="h-12 w-12">
-                <AvatarImage src={product.seller.image} />
-                <AvatarFallback>{product.seller.name[0]}</AvatarFallback>
-              </Avatar>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span>{product.seller.name}</span>
-                  <Badge variant="secondary" className="text-xs">
-                    ⭐ {product.seller.rating}
-                  </Badge>
+        {product.seller && (
+          <div className="bg-card border-b px-4 py-4">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-12 w-12">
+                  <AvatarImage src={getFullImageUrl(product.seller.profileImg)} />
+                  <AvatarFallback>{product.seller.name[0]}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{product.seller.name}</span>
+                    <Badge variant="secondary" className="text-xs">
+                      신뢰도 {product.seller.trust}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    @{product.seller.nick}
+                  </p>
                 </div>
-                <p className="text-sm text-muted-foreground">
-                  거래 후기 {product.seller.reviewCount}개
-                </p>
               </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onNavigate('seller-profile', product.seller!.id.toString())}
+              >
+                프로필 보기
+              </Button>
             </div>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => onNavigate('seller-profile', product.seller.id)}
-            >
-              프로필 보기
-            </Button>
+
+            {/* 판매자 평점 정보 */}
+            <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-1">
+                <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                <span className="font-medium">
+                  {product.seller.sellerRatingAvg?.toFixed(1) || '0.0'}
+                </span>
+                <span className="text-muted-foreground">
+                  ({product.seller.sellerRatingCount || 0}개 리뷰)
+                </span>
+              </div>
+              <Badge variant="outline" className="text-xs">
+                {product.seller.sellerGrade || '새내기'}
+              </Badge>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Product Info */}
         <div className="bg-card px-4 py-6">
-          <h1 className="mb-2">{product.title}</h1>
+          <div className="flex items-start justify-between mb-2">
+            <h1 className="text-2xl font-bold flex-1">{product.title}</h1>
+            {renderStatusBadge(product.status)}
+          </div>
+
           <p className="text-sm text-muted-foreground mb-4">
-            {product.category} · {product.timeAgo}
+            {product.category?.categoryNm} · {getTimeAgo(product.createdAt)}
           </p>
-          <div className="text-2xl mb-4">{product.price.toLocaleString()}원</div>
-          
+
+          <div className="text-2xl font-bold mb-4">
+            {product.price.toLocaleString()}원
+          </div>
+
           <div className="flex items-center gap-4 text-sm text-muted-foreground">
             <span className="flex items-center gap-1">
               <Eye className="h-4 w-4" />
-              조회 {product.views}
+              조회 {product.viewCount}
             </span>
             <span className="flex items-center gap-1">
               <Heart className="h-4 w-4" />
-              관심 {product.likes}
+              관심 {product.favoriteCount || 0}
             </span>
-            <span>채팅 {product.chatCount}</span>
           </div>
         </div>
 
@@ -242,9 +444,9 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
 
         {/* Description */}
         <div className="bg-card px-4 py-6">
-          <h3 className="mb-3">상품 설명</h3>
-          <p className="whitespace-pre-line text-muted-foreground">
-            {product.description}
+          <h3 className="text-lg font-semibold mb-3">상품 설명</h3>
+          <p className="whitespace-pre-line text-muted-foreground leading-relaxed">
+            {product.content}
           </p>
         </div>
 
@@ -252,11 +454,89 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
 
         {/* Location */}
         <div className="bg-card px-4 py-6">
-          <h3 className="mb-3">거래 희망 장소</h3>
+          <h3 className="text-lg font-semibold mb-3">거래 희망 장소</h3>
           <div className="flex items-center gap-2 text-muted-foreground">
             <MapPin className="h-4 w-4" />
-            <span>{product.location}</span>
+            <span>{product.locationNm}</span>
           </div>
+          {/* TODO: 지도 컴포넌트 추가 */}
+        </div>
+
+        <Separator />
+
+        {/* Seller Reviews Section */}
+        {product.seller && (
+          <div className="bg-card px-4 py-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">판매자 리뷰</h3>
+              {product.seller.sellerRatingCount && product.seller.sellerRatingCount > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onNavigate('seller-profile', product.seller!.id.toString())}
+                >
+                  전체보기
+                </Button>
+              )}
+            </div>
+
+            {reviewsLoading ? (
+              <div className="space-y-3">
+                <Skeleton className="h-20 w-full" />
+                <Skeleton className="h-20 w-full" />
+              </div>
+            ) : reviews.length > 0 ? (
+              <div className="space-y-4">
+                {reviews.map((review) => (
+                  <div key={review.id} className="border-b pb-4 last:border-0 last:pb-0">
+                    <div className="flex items-center gap-3 mb-2">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={getFullImageUrl(review.writerProfileImg)} />
+                        <AvatarFallback>{review.writerName?.[0] || 'U'}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{review.writerName}</span>
+                          <div className="flex items-center">
+                            {Array.from({ length: 5 }).map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`h-3 w-3 ${
+                                  i < review.rating
+                                    ? 'fill-yellow-400 text-yellow-400'
+                                    : 'text-gray-300'
+                                }`}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {getTimeAgo(review.createdAt)}
+                        </p>
+                      </div>
+                    </div>
+                    {review.content && (
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        {review.content}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                아직 리뷰가 없습니다.
+              </p>
+            )}
+          </div>
+        )}
+
+        <Separator />
+
+        {/* Related Products Section - TODO */}
+        <div className="bg-card px-4 py-6">
+          <h3 className="text-lg font-semibold mb-3">이 상품과 비슷한 상품</h3>
+          <p className="text-sm text-muted-foreground">관련 상품을 준비 중입니다.</p>
         </div>
       </div>
 
@@ -269,18 +549,14 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
             className="shrink-0"
             onClick={handleToggleFavorite}
           >
-            <Heart className={`h-6 w-6 ${isLiked ? 'fill-accent text-accent' : ''}`} />
+            <Heart className={`h-6 w-6 ${isLiked ? 'fill-red-500 text-red-500' : ''}`} />
           </Button>
-          <Button 
-            className="flex-1 bg-primary hover:bg-primary-hover"
-            onClick={() => {
-              if (realProduct) {
-                const chatId = findOrCreateChat(productId, realProduct, product.seller);
-                onNavigate('chat', chatId);
-              }
-            }}
+          <Button
+            className="flex-1 bg-primary hover:bg-primary/90"
+            onClick={handleChat}
+            disabled={product.status === 'SOLD_OUT'}
           >
-            채팅하기
+            {product.status === 'SOLD_OUT' ? '판매완료' : '채팅하기'}
           </Button>
         </div>
       </div>
@@ -296,7 +572,9 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>취소</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete}>삭제</AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive hover:bg-destructive/90">
+              삭제
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

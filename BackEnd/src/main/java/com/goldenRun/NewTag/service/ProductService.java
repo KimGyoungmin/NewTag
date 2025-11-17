@@ -24,6 +24,7 @@ public class ProductService {
 
     private final ProductRepository productRepository;
     private final SearchLogService searchLogService;
+    private final ReviewService reviewService;
 
     /**
      * 상품 목록 조회 (페이징, 정렬, 필터링)
@@ -129,7 +130,7 @@ public class ProductService {
                 .id(product.getId().intValue())
                 .mainImage(mainImage)
                 .title(product.getTitle())
-                .price(product.getPrice())
+                .price(product.getPrice().doubleValue())
                 .locationNm(product.getLocation_nm())
                 .createdAt(product.getCreatedAt())
                 .viewCount(product.getView_count())
@@ -142,25 +143,36 @@ public class ProductService {
      * Product -> DetailResponse 변환
      */
     private ProductDtos.DetailResponse convertToDetailResponse(Product product, Long currentUserId) {
-        List<String> images = product.getImages().stream()
+        List<ProductImage> sortedImages = product.getImages().stream()
                 .sorted((a, b) -> Boolean.compare(b.getIs_main(), a.getIs_main())) // 메인 이미지 우선
-                .map(ProductImage::getPath)
                 .collect(Collectors.toList());
 
-        String mainImage = images.isEmpty() ? "p_default_img.png" : images.get(0);
+        List<ProductDtos.ImageResponse> images = sortedImages.stream()
+                .map(img -> ProductDtos.ImageResponse.builder()
+                        .id(img.getId().intValue())
+                        .pImg(img.getPath())
+                        .isMain(img.getIs_main())
+                        .createdAt(img.getCreatedAt())
+                        .updatedAt(img.getUpdatedAt())
+                        .productId(product.getId().intValue())
+                        .build())
+                .collect(Collectors.toList());
+
+        String mainImage = sortedImages.isEmpty() ? "p_default_img.png" : sortedImages.get(0).getPath();
 
         // Favorite count와 likedByMe는 추후 구현
         long favoriteCount = 0L;
         boolean likedByMe = false;
 
-        // 판매자 평점은 추후 Review 엔티티 연결 시 구현
-        double sellerRatingAvg = 0.0;
-        long sellerRatingCount = 0L;
+        // 판매자 평점 정보 (ReviewService 연동)
+        Long sellerId = product.getSeller().getId();
+        double sellerRatingAvg = reviewService.getAverageRating(sellerId);
+        long sellerRatingCount = reviewService.getReviewCount(sellerId);
 
         return ProductDtos.DetailResponse.builder()
                 .id(product.getId().intValue())
                 .title(product.getTitle())
-                .price(product.getPrice())
+                .price(product.getPrice().doubleValue())
                 .content(product.getContent())
                 .status(product.getStatus())
                 .locationNm(product.getLocation_nm())
@@ -169,14 +181,17 @@ public class ProductService {
                 .viewCount(product.getView_count())
                 .favoriteCount(favoriteCount)
                 .timeAgo(getTimeAgo(product.getCreatedAt()))
+                .createdAt(product.getCreatedAt())
+                .categoryId(product.getCategory().getId().intValue())
                 .images(images)
                 .mainImage(mainImage)
                 .sellerId(product.getSeller().getId().intValue())
                 .sellerName(product.getSeller().getName())
+                .sellerNick(product.getSeller().getNick())
                 .sellerProfileImg(product.getSeller().getProfileImg())
                 .sellerRatingAvg(sellerRatingAvg)
                 .sellerRatingCount(sellerRatingCount)
-                .sellerGrade("일반") // 등급 로직은 추후 구현
+                .sellerGrade(reviewService.calculateUserGrade(sellerId))
                 .likedByMe(likedByMe)
                 .build();
     }

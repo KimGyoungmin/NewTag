@@ -28,10 +28,52 @@ export const productApi = {
   },
 
   // 상품 ID로 조회
-  getById: async (id: number): Promise<Product | null> => {
+  getById: async (id: number, userId?: number): Promise<Product | null> => {
     try {
-      const response = await apiClient.get<Product>(`/products/${id}`);
-      return response.data;
+      const params = userId ? { userId } : {};
+      const response = await apiClient.get<any>(`/products/${id}`, { params });
+
+      // 백엔드 응답을 프론트엔드 타입에 맞게 변환
+      const data = response.data;
+      console.log('Product detail response:', data);
+      console.log('Images from backend:', data.images);
+      return {
+        id: data.id,
+        price: data.price,
+        title: data.title,
+        content: data.content,
+        status: data.status,
+        locationNm: data.locationNm,
+        latitude: data.latitude,
+        longitude: data.longitude,
+        viewCount: data.viewCount,
+        isDelete: false,
+        createdAt: data.createdAt || new Date().toISOString(),
+        updatedAt: data.updatedAt || new Date().toISOString(),
+        sellerId: data.sellerId,
+        categoryId: data.categoryId || 0,
+        seller: data.sellerId ? {
+          id: data.sellerId,
+          name: data.sellerName,
+          nick: data.sellerNick || '',
+          email: '',
+          provider: 'LOCAL',
+          emailVerified: false,
+          phoneVerified: false,
+          role: 'USER',
+          isDelete: false,
+          trust: data.sellerRatingAvg || 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          profileImg: data.sellerProfileImg || '/default-avatar.png',
+          sellerRatingAvg: data.sellerRatingAvg || 0,
+          sellerRatingCount: data.sellerRatingCount || 0,
+          sellerGrade: data.sellerGrade || '새내기',
+        } : undefined,
+        images: data.images || [],
+        isFavorite: data.likedByMe,
+        favoriteCount: data.favoriteCount || 0,
+      };
     } catch (error) {
       console.error(`Failed to fetch product ${id}:`, error);
       return null;
