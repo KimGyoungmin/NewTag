@@ -1,127 +1,108 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import { tokenManager } from './tokenManager';
 
-// API Base URL (환경 변수에서 가져오기)
 const DEFAULT_SERVER_URL = 'http://localhost:8081/';
 const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || DEFAULT_SERVER_URL;
 const normalizedBaseUrl = rawBaseUrl.replace(/\/$/, '');
-const API_BASE_URL = normalizedBaseUrl.includes('/api')
+export const API_BASE_URL = normalizedBaseUrl.includes('/api')
   ? normalizedBaseUrl
   : `${normalizedBaseUrl}/api/v1`;
 
-/**
- * Axios 인스턴스 생성
- */
-const apiClient: AxiosInstance = axios.create({
+export const apiClient: AxiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
-  withCredentials: true, // 쿠키 포함
+  withCredentials: true,
 });
 
-/* 테스트 주석 */
+const refreshClient = axios.create({
+  baseURL: API_BASE_URL,
+  withCredentials: true,
+});
 
-/**
- * 요청 인터셉터 - 인증 토큰 자동 추가
- */
+let refreshPromise: Promise<string | null> | null = null;
+type RetryConfig = AxiosRequestConfig & { _retry?: boolean };
+
+const refreshAccessToken = async (): Promise<string | null> => {
+  if (!refreshPromise) {
+    refreshPromise = refreshClient
+      .post('/auth/refresh')
+      .then((response) => {
+        const { token, user } = response.data || {};
+        if (token) {
+          tokenManager.setSession(token, user ?? null);
+          return token as string;
+        }
+        tokenManager.clearSession();
+        return null;
+      })
+      .catch((error) => {
+        console.error('[API] Failed to refresh token', error);
+        tokenManager.clearSession();
+        return null;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+  return refreshPromise;
+};
+
 apiClient.interceptors.request.use(
   (config) => {
-    // 로컬 스토리지에서 토큰 가져오기
-    const token = localStorage.getItem('auth_token');
-
+    const token = tokenManager.getAccessToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log('[API Request] Token 추가됨:', token.substring(0, 20) + '...');
-    } else {
-      console.log('[API Request] Token 없음');
     }
-
-    console.log('[API Request]', config.method?.toUpperCase(), config.url);
-    console.log('[API Request] Headers:', config.headers);
     return config;
   },
-  (error) => {
-    console.error('[API Request Error]', error);
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-/**
- * 응답 인터셉터 - 에러 핸들링
- */
 apiClient.interceptors.response.use(
-  (response: AxiosResponse) => {
-    console.log('[API Response]', response.status, response.config.url);
-    return response;
-  },
-  (error) => {
-    console.error('[API Response Error]', error.response?.status, error.config?.url);
+  (response) => response,
+  async (error) => {
+    const status = error.response?.status;
+    const originalRequest = error.config as RetryConfig | undefined;
+    const requestUrl = originalRequest?.url ?? '';
+    const isAuthEndpoint = requestUrl.includes('/auth/refresh') || requestUrl.includes('/login');
 
-    // 인증 에러 처리 (401)
-    if (error.response?.status === 401) {
-      localStorage.removeItem('auth_token');
-      localStorage.removeItem('user');
-      // 로그인 페이지로 리다이렉트 (필요시)
-      // window.location.href = '/login';
+    if (status === 401 && originalRequest && !originalRequest._retry && !isAuthEndpoint) {
+      originalRequest._retry = true;
+      const newToken = await refreshAccessToken();
+      if (newToken) {
+        originalRequest.headers = originalRequest.headers || {};
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
+        return apiClient(originalRequest);
+      }
     }
 
-    // 권한 에러 처리 (403)
-    if (error.response?.status === 403) {
-      alert('접근 권한이 없습니다.');
-    }
-
-    // 서버 에러 처리 (500)
-    if (error.response?.status === 500) {
-      alert('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+    if (status === 401) {
+      tokenManager.clearSession();
     }
 
     return Promise.reject(error);
   }
 );
 
-/**
- * API 헬퍼 함수들
- */
 export const api = {
-  /**
-   * GET 요청
-   */
   get: <T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
     return apiClient.get<T>(url, config);
   },
-
-  /**
-   * POST 요청
-   */
   post: <T = any, D = any>(url: string, data?: D, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
     return apiClient.post<T>(url, data, config);
   },
-
-  /**
-   * PUT 요청
-   */
   put: <T = any, D = any>(url: string, data?: D, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
     return apiClient.put<T>(url, data, config);
   },
-
-  /**
-   * PATCH 요청
-   */
   patch: <T = any, D = any>(url: string, data?: D, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
     return apiClient.patch<T>(url, data, config);
   },
-
-  /**
-   * DELETE 요청
-   */
   delete: <T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
     return apiClient.delete<T>(url, config);
   },
-
-  /**
-   * 파일 업로드 (FormData)
-   */
   upload: <T = any>(url: string, formData: FormData, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => {
     return apiClient.post<T>(url, formData, {
       ...config,

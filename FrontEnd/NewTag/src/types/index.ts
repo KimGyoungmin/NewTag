@@ -212,11 +212,16 @@ export interface LoginRequest {
   password: string;
 }
 
+// 로그인 세션 사용자
+export type AuthUser = User;
+
+
 // 로그인 응답 (백엔드 응답 형식에 맞춤)
 export interface LoginResponse {
   success: boolean;
   message: string;
   token: string;
+  user?: AuthUser;
 }
 
 // 상품 등록 요청

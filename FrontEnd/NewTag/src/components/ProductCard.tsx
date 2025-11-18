@@ -65,8 +65,7 @@ export function ProductCard({
       return;
     }
 
-    // TODO: userId를 실제 사용자 ID로 변경 필요
-    const userId = 1;
+    const userId = currentUser.id;
 
     try {
       const response = await favoriteApi.toggleFavorite(Number(id), userId);

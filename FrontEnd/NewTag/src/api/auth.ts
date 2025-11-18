@@ -1,42 +1,40 @@
 import { api } from './client';
-import type { LoginRequest, LoginResponse, SignupRequest, User, ApiResponse } from '../types';
+import { tokenManager } from './tokenManager';
+import type { LoginRequest, LoginResponse, SignupRequest, User, ApiResponse, AuthUser } from '../types';
 
-const TOKEN_STORAGE_KEY = 'auth_token';
-const USER_STORAGE_KEY = 'user';
+const handleAuthSuccess = (data: LoginResponse) => {
+  if (data.success && data.token) {
+    tokenManager.setSession(data.token, data.user ?? tokenManager.getCurrentUser());
+  }
+};
 
-/**
- * 인증 관련 API
- */
 export const authApi = {
-  /**
-   * 로그인
-   */
-  login: async (credentials: LoginRequest): Promise<LoginResponse> => {
-    const response = await api.post<LoginResponse>('/login', credentials);
-    const loginData = response.data;
-
-    if (loginData.success && loginData.token) {
-      localStorage.setItem(TOKEN_STORAGE_KEY, loginData.token);
-      localStorage.setItem(USER_STORAGE_KEY, JSON.stringify({ nick: credentials.nick }));
-
-      // Dispatch custom event to notify Header component
-      window.dispatchEvent(new Event('auth-change'));
+  initialize: async (): Promise<AuthUser | null> => {
+    try {
+      const response = await api.post<LoginResponse>('/auth/refresh');
+      const data = response.data;
+      if (data.success && data.token) {
+        tokenManager.setSession(data.token, data.user ?? null);
+        return data.user ?? null;
+      }
+    } catch (error) {
+      // ignore - user not logged in
     }
-
-    return loginData;
+    tokenManager.clearSession();
+    return null;
   },
 
-  /**
-   * 회원가입
-   */
+  login: async (credentials: LoginRequest): Promise<LoginResponse> => {
+    const response = await api.post<LoginResponse>('/login', credentials);
+    handleAuthSuccess(response.data);
+    return response.data;
+  },
+
   signup: async (userData: SignupRequest): Promise<ApiResponse<User>> => {
     const response = await api.post<ApiResponse<User>>('/signup', userData);
     return response.data;
   },
 
-  /**
-   * 이메일 중복 확인
-   */
   checkEmailAvailable: async (email: string): Promise<boolean> => {
     const response = await api.get<ApiResponse<boolean>>('/emailMatch', {
       params: { email },
@@ -44,9 +42,6 @@ export const authApi = {
     return response.data.success;
   },
 
-  /**
-   * 닉네임 중복 확인
-   */
   checkNickAvailable: async (nick: string): Promise<boolean> => {
     const response = await api.get<ApiResponse<boolean>>('/idMatch', {
       params: { nick },
@@ -54,29 +49,19 @@ export const authApi = {
     return response.data.success;
   },
 
-  /**
-   * 로그아웃
-   */
-  logout: () => {
-    localStorage.removeItem(TOKEN_STORAGE_KEY);
-    localStorage.removeItem(USER_STORAGE_KEY);
-
-    // Dispatch custom event to notify Header component
-    window.dispatchEvent(new Event('auth-change'));
+  logout: async (): Promise<void> => {
+    try {
+      await api.post('/logout');
+    } finally {
+      tokenManager.clearSession();
+    }
   },
 
-  /**
-   * 현재 로그인 사용자 정보 가져오기
-   */
-  getCurrentUser: (): User | null => {
-    const userJson = localStorage.getItem(USER_STORAGE_KEY);
-    return userJson ? JSON.parse(userJson) : null;
+  getCurrentUser: (): AuthUser | null => {
+    return tokenManager.getCurrentUser();
   },
 
-  /**
-   * 로그인 상태 확인
-   */
   isAuthenticated: (): boolean => {
-    return !!localStorage.getItem(TOKEN_STORAGE_KEY);
+    return !!tokenManager.getAccessToken();
   },
 };
