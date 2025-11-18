@@ -1,8 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, Send } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, MoreVertical, Send } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/ui/alert-dialog";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { chatService } from "../services/firebase/chatService";
 import { db } from "../services/firebase/config";
@@ -20,7 +36,15 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [room, setRoom] = useState<ChatRoom | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const firstScrollDone = useRef(false);
+
+  // 채팅방이 바뀔 때마다 스크롤 상태를 초기화해 첫 렌더에서 즉시 맨 아래로 이동
+  useEffect(() => {
+    firstScrollDone.current = false;
+  }, [chatId]);
 
   useEffect(() => {
     const updateUser = () => {
@@ -70,9 +94,17 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
     return () => unsub();
   }, [chatId]);
 
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+  useLayoutEffect(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const isInitial = !firstScrollDone.current;
+    if (isInitial) {
+      // 첫 렌더에서는 즉시 맨 아래로 이동
+      el.scrollTop = el.scrollHeight;
+      firstScrollDone.current = true;
+    } else {
+      // 이후에는 부드럽게 최신 메시지로 이동
+      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     }
   }, [messages]);
 
@@ -132,6 +164,21 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
     return `${ampm} ${hh}:${m.toString().padStart(2, "0")}`;
   }
 
+  const handleLeaveChat = async () => {
+    setIsLeaving(true);
+    try {
+      await chatService.deleteChatRoom(chatId);
+      setMessages([]);
+      setRoom(null);
+      onNavigate("chat");
+    } catch (e) {
+      console.error("Failed to leave chat", e);
+    } finally {
+      setIsLeaving(false);
+      setIsLeaveDialogOpen(false);
+    }
+  };
+
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
@@ -146,6 +193,34 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
           </Avatar>
           <span>{peer.nick}</span>
         </div>
+        <AlertDialog open={isLeaveDialogOpen} onOpenChange={setIsLeaveDialogOpen}>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreVertical className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem className="text-destructive" onClick={() => setIsLeaveDialogOpen(true)}>
+                채팅방 나가기
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>채팅방을 나갈까요?</AlertDialogTitle>
+              <AlertDialogDescription>
+                "채팅방 나가기"를 선택하면 이전 대화 내용이 모두 삭제되고 채팅 목록에서도 사라집니다.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={isLeaving}>취소하기</AlertDialogCancel>
+              <AlertDialogAction onClick={handleLeaveChat} disabled={isLeaving}>
+                {isLeaving ? "나가는 중..." : "나가기"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
 
       {/* Product Info Card */}
@@ -174,7 +249,7 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
         {messages.map((msg) => {
           const isMine = currentUser && msg.senderId === currentUser.id;
           return (
@@ -198,7 +273,6 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
             </div>
           );
         })}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Input Area */}
