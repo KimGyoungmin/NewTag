@@ -6,6 +6,7 @@ import { Badge } from "../components/ui/badge";
 import { Separator } from "../components/ui/separator";
 import { Skeleton } from "../components/ui/skeleton";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
+import { KakaoMap } from "../components/KakaoMap";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +28,8 @@ import { productApi } from "../api/productApi";
 import { reviewApi } from "../api/reviewApi";
 import { favoriteApi } from "../api/favoriteApi";
 import { authApi } from "../api/auth";
+import { authApi as authApiService } from "../services/api/authApi";
+import { chatService } from "../services/firebase/chatService";
 import { toast } from "sonner";
 import type { Product, ProductStatus, Review } from "../types";
 import { API_BASE_URL } from "../constants";
@@ -185,11 +188,62 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
   };
 
   // 채팅하기 핸들러
-  const handleChat = () => {
+  const handleChat = async () => {
     if (!product) return;
-    // TODO: 실제 채팅방 생성 로직 구현
-    toast.info("채팅 기능은 곧 제공됩니다.");
-    // onNavigate('chatroom', chatId);
+
+    // Firebase 채팅을 위해 서버에서 최신 사용자 정보 조회 (id/nick 필수)
+    let currentUser = null as Awaited<ReturnType<typeof authApiService.getCurrentUser>> | null;
+    try {
+      currentUser = await authApiService.getCurrentUser();
+    } catch (err) {
+      console.error('Failed to fetch current user:', err);
+    }
+
+    if (!currentUser || !currentUser.id) {
+      toast.error("로그인이 필요해요.");
+      onNavigate('login');
+      return;
+    }
+
+    if (!product.seller?.id) {
+      toast.error("판매자 정보가 없어요.");
+      return;
+    }
+
+    if (currentUser.id === product.seller.id) {
+      toast.info("내가 올린 상품이에요.");
+      return;
+    }
+
+    try {
+      const productImage = product.images && product.images.length > 0
+        ? getFullImageUrl(product.images[0].pImg || product.images[0].pImg)
+        : getFullImageUrl(undefined);
+
+      const chatId = await chatService.getOrCreateChatRoom(
+        product.id,
+        {
+          id: product.seller.id,
+          nick: product.seller.nick,
+          profileImg: product.seller.profileImg ? getFullImageUrl(product.seller.profileImg) : undefined,
+        },
+        {
+          id: currentUser.id,
+          nick: currentUser.nick,
+          profileImg: currentUser.profileImg ? getFullImageUrl(currentUser.profileImg) : undefined,
+        },
+        {
+          title: product.title,
+          image: productImage,
+          price: product.price,
+        }
+      );
+
+      onNavigate('chatroom', chatId);
+    } catch (error) {
+      console.error('Failed to start chat:', error);
+      toast.error("채팅방을 불러오지 못했어요.");
+    }
   };
 
   // 시간 경과 표시
@@ -502,11 +556,25 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
         {/* Location */}
         <div className="bg-card px-4 py-6">
           <h3 className="text-lg font-semibold mb-3">거래 희망 장소</h3>
-          <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="flex items-center gap-2 text-muted-foreground mb-4">
             <MapPin className="h-4 w-4" />
             <span>{product.locationNm}</span>
           </div>
-          {/* TODO: 지도 컴포넌트 추가 */}
+          {/* 카카오 맵 표시 */}
+          {product.latitude && product.longitude && (
+            <div className="mt-4 rounded-lg overflow-hidden border">
+              <KakaoMap
+                latitude={product.latitude}
+                longitude={product.longitude}
+                locationName={product.locationNm}
+                height="300px"
+                level={3}
+                draggable={false}
+                zoomable={true}
+                showMarker={true}
+              />
+            </div>
+          )}
         </div>
 
         <Separator />

@@ -7,6 +7,7 @@ import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
 import { addProduct } from "../utils/localStorage";
 import { toast } from "sonner";
+import { LocationPicker } from "../components/LocationPicker";
 
 interface ProductRegisterPageProps {
   onNavigate: (page: string) => void;
@@ -19,6 +20,9 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
   const [price, setPrice] = useState('');
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('강남구 역삼동');
+  const [latitude, setLatitude] = useState<number>(37.5665);
+  const [longitude, setLongitude] = useState<number>(126.9780);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
 
   const handleImageAdd = () => {
     // Simulated image upload
@@ -29,6 +33,16 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
 
   const handleImageRemove = (index: number) => {
     setImages(images.filter((_, i) => i !== index));
+  };
+
+  const handleLocationSelect = (locationData: {
+    latitude: number;
+    longitude: number;
+    locationName: string;
+  }) => {
+    setLatitude(locationData.latitude);
+    setLongitude(locationData.longitude);
+    setLocation(locationData.locationName);
   };
 
   const handleSubmit = () => {
@@ -177,13 +191,28 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
           <Label htmlFor="location">거래 희망 장소</Label>
           <div className="mt-2 flex items-center gap-2">
             <MapPin className="h-5 w-5 text-primary" />
-            <span>{location}</span>
-            <Button variant="link" size="sm" className="ml-auto">
+            <span className="flex-1 text-sm">{location}</span>
+            <Button
+              variant="link"
+              size="sm"
+              className="ml-auto"
+              onClick={() => setShowLocationPicker(true)}
+            >
               변경
             </Button>
           </div>
         </div>
       </div>
+
+      {/* Location Picker Dialog */}
+      <LocationPicker
+        open={showLocationPicker}
+        onClose={() => setShowLocationPicker(false)}
+        onSelect={handleLocationSelect}
+        initialLatitude={latitude}
+        initialLongitude={longitude}
+        initialLocationName={location}
+      />
 
       {/* Bottom Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background p-4">
