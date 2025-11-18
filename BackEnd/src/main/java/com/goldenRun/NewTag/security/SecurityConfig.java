@@ -43,7 +43,8 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // CORS preflight 요청 (OPTIONS) 모두 허용
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                // 정적 리소스 (이미지 등) 접근 허용 - 가장 먼저 처리
+                // 정적 리소스 (이미지 등) 접근 허용
+                .requestMatchers("/api/v1/uploads/images/**").permitAll()
                 .requestMatchers("/api/v1/static/**").permitAll()
                 .requestMatchers("/static/**").permitAll()
                 // 공개 엔드포인트

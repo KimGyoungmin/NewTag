@@ -12,6 +12,7 @@ import {
 import { productsApi } from "../api/products";
 import { favoriteApi } from "../api/favoriteApi";
 import { authApi } from "../api/auth";
+import { resolveImageUrl } from "../utils/image";
 
 interface HomePageProps {
   onNavigate: (page: string, productId?: string) => void;
@@ -317,7 +318,7 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
                       <div key={product.id} ref={lastProductElementRef}>
                         <ProductCard
                           id={product.id.toString()}
-                          image={product.mainImage}
+                          image={resolveImageUrl(product.mainImage)}
                           title={product.title}
                           price={product.price}
                           location={product.locationNm}
@@ -335,7 +336,7 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
                       <ProductCard
                         key={product.id}
                         id={product.id.toString()}
-                        image={product.mainImage}
+                        image={resolveImageUrl(product.mainImage)}
                         title={product.title}
                         price={product.price}
                         location={product.locationNm}

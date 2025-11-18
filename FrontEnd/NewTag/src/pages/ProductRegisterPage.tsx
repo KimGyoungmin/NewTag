@@ -1,33 +1,76 @@
-import { useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { ChevronLeft, X, Camera, MapPin } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { addProduct } from "../utils/localStorage";
+import { CATEGORIES, IMAGE_CONFIG } from "../constants";
+import { postApi } from "../api/postApi";
+import { resolveImageUrl } from "../utils/image";
 import { toast } from "sonner";
 import { LocationPicker } from "../components/LocationPicker";
 
 interface ProductRegisterPageProps {
-  onNavigate: (page: string) => void;
+  onNavigate: (page: string, id?: string) => void;
 }
+
+const DEFAULT_LATITUDE = 37.4979;
+const DEFAULT_LONGITUDE = 127.0276;
 
 export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
   const [images, setImages] = useState<string[]>([]);
-  const [title, setTitle] = useState('');
-  const [category, setCategory] = useState('');
-  const [price, setPrice] = useState('');
-  const [description, setDescription] = useState('');
-  const [location, setLocation] = useState('강남구 역삼동');
-  const [latitude, setLatitude] = useState<number>(37.5665);
-  const [longitude, setLongitude] = useState<number>(126.9780);
-  const [showLocationPicker, setShowLocationPicker] = useState(false);
 
-  const handleImageAdd = () => {
-    // Simulated image upload
-    if (images.length < 10) {
-      setImages([...images, `https://images.unsplash.com/photo-1758186355698-bd0183fc75ed?w=400`]);
+  const [title, setTitle] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [price, setPrice] = useState("");
+  const [description, setDescription] = useState("");
+  const [location, setLocation] = useState("강남구청역 3번 출구");
+  const [isResell, setIsResell] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const categoryOptions = useMemo(
+    () =>
+      CATEGORIES.map(({ id, name, emoji }) => ({
+        value: id.toString(),
+        label: `${emoji ?? ""} ${name}`.trim(),
+      })),
+    []
+  );
+
+  const handleImageButtonClick = () => {
+    if (images.length >= 10) {
+      toast.error("이미지는 최대 10장까지 등록할 수 있습니다.");
+      return;
+    }
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (images.length >= 10) {
+      toast.error("이미지는 최대 10장까지 등록할 수 있습니다.");
+      event.target.value = "";
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      const result = await postApi.uploadImage(file);
+      setImages((prev) => [...prev, result.path]);
+      toast.success("이미지가 업로드되었습니다.");
+    } catch (error) {
+      console.error("Failed to upload image:", error);
+      toast.error("이미지 업로드에 실패했습니다.");
+    } finally {
+      setIsUploading(false);
+      event.target.value = "";
     }
   };
 
@@ -35,73 +78,122 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
     setImages(images.filter((_, i) => i !== index));
   };
 
-  const handleLocationSelect = (locationData: {
-    latitude: number;
-    longitude: number;
-    locationName: string;
-  }) => {
-    setLatitude(locationData.latitude);
-    setLongitude(locationData.longitude);
-    setLocation(locationData.locationName);
+
+  const getImagePreview = (path: string) => {
+    return resolveImageUrl(path);
   };
 
-  const handleSubmit = () => {
-    // Validate and convert price
-    const priceValue = parseInt(price);
-    if (isNaN(priceValue) || priceValue < 0) {
-      toast.error("올바른 가격을 입력해주세요");
+  const handleSubmit = async () => {
+    if (isSubmitting) return;
+
+    const priceValue = parseInt(price, 10);
+    if (Number.isNaN(priceValue) || priceValue <= 0) {
+      toast.error("올바른 가격을 입력해 주세요.");
       return;
     }
 
-    // Create product
-    addProduct({
-      image: images[0],
-      images,
+    if (!categoryId) {
+      toast.error("카테고리를 선택해 주세요.");
+      return;
+    }
+
+    const imagePayload =
+      images.length > 0
+        ? images.map((image, index) => ({
+            path: image,
+            isMain: index === 0,
+          }))
+        : [
+            {
+              path: IMAGE_CONFIG.DEFAULT_PRODUCT,
+              isMain: true,
+            },
+          ];
+
+    const payload = {
       title,
-      category,
+      content: description || title,
       price: priceValue,
-      description,
-      location,
-      status: 'available',
-    });
-    
-    toast.success("상품이 등록되었습니다!");
-    onNavigate('home');
+      categoryId: Number(categoryId),
+      locationNm: location,
+      latitude: DEFAULT_LATITUDE,
+      longitude: DEFAULT_LONGITUDE,
+      images: imagePayload,
+      isResell,
+    };
+
+    try {
+      setIsSubmitting(true);
+      const result = await postApi.create(payload);
+      toast.success("게시글이 등록되었습니다.");
+
+      if (result?.id) {
+        onNavigate("detail", String(result.id));
+      } else {
+        onNavigate("home");
+      }
+    } catch (error) {
+      console.error("Failed to create post:", error);
+      toast.error("게시글 등록에 실패했습니다. 다시 시도해 주세요.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      {/* Header */}
       <div className="sticky top-0 z-50 flex items-center justify-between border-b bg-background px-4 h-14">
-        <Button 
-          variant="ghost" 
+        <Button
+          variant="ghost"
           size="icon"
-          onClick={() => onNavigate('home')}
+          onClick={() => onNavigate("home")}
         >
           <ChevronLeft className="h-5 w-5" />
         </Button>
         <h2>상품 등록</h2>
-        <div className="w-10"></div>
+        <div className="w-10" />
       </div>
 
       <div className="container mx-auto max-w-2xl px-4 py-6 space-y-6">
-        {/* Image Upload */}
+        <div>
+          <Label className="mb-3 block">상품 유형</Label>
+          <div className="inline-flex items-center gap-2 rounded-full bg-muted p-1">
+            <Button
+              type="button"
+              variant={isResell ? "ghost" : "default"}
+              className={`flex-1 rounded-full ${!isResell ? "" : "bg-transparent"}`}
+              onClick={() => setIsResell(false)}
+            >
+              일반
+            </Button>
+            <Button
+              type="button"
+              variant={!isResell ? "ghost" : "default"}
+              className={`flex-1 rounded-full ${isResell ? "" : "bg-transparent"}`}
+              onClick={() => setIsResell(true)}
+            >
+              리셀
+            </Button>
+          </div>
+        </div>
+
         <div>
           <Label className="mb-3 block">상품 이미지</Label>
           <div className="flex gap-3 overflow-x-auto pb-2">
             <button
-              onClick={handleImageAdd}
-              className="flex h-24 w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed bg-muted transition-colors hover:bg-muted/80"
+              onClick={handleImageButtonClick}
+              className="flex h-24 w-24 shrink-0 flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed bg-muted transition-colors hover:bg-muted/80 disabled:opacity-60"
+              disabled={isUploading}
             >
               <Camera className="h-6 w-6 text-muted-foreground" />
               <span className="text-xs text-muted-foreground">
-                {images.length}/10
+                {isUploading ? "업로드 중..." : `${images.length}/10`}
               </span>
             </button>
             {images.map((image, index) => (
               <div key={index} className="relative h-24 w-24 shrink-0">
                 <img
-                  src={image}
+                  src={getImagePreview(image)}
                   alt={`Upload ${index + 1}`}
                   className="h-full w-full rounded-xl object-cover"
                 />
@@ -120,11 +212,17 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
             ))}
           </div>
           <p className="mt-2 text-sm text-muted-foreground">
-            첫 번째 사진이 대표 이미지입니다.
+            첫 번째 이미지는 자동으로 대표 이미지로 설정됩니다.
           </p>
+          <input
+            type="file"
+            accept="image/*"
+            ref={fileInputRef}
+            className="hidden"
+            onChange={handleFileChange}
+          />
         </div>
 
-        {/* Title */}
         <div>
           <Label htmlFor="title">제목</Label>
           <Input
@@ -136,27 +234,22 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
           />
         </div>
 
-        {/* Category */}
         <div>
           <Label htmlFor="category">카테고리</Label>
-          <Select value={category} onValueChange={setCategory}>
+          <Select value={categoryId} onValueChange={setCategoryId}>
             <SelectTrigger className="mt-2">
               <SelectValue placeholder="카테고리를 선택하세요" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="electronics">전자기기</SelectItem>
-              <SelectItem value="furniture">가구/인테리어</SelectItem>
-              <SelectItem value="fashion">의류/잡화</SelectItem>
-              <SelectItem value="sports">스포츠/레저</SelectItem>
-              <SelectItem value="books">도서</SelectItem>
-              <SelectItem value="beauty">뷰티/미용</SelectItem>
-              <SelectItem value="toys">장난감/취미</SelectItem>
-              <SelectItem value="etc">기타</SelectItem>
+              {categoryOptions.map((category) => (
+                <SelectItem key={category.value} value={category.value}>
+                  {category.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
 
-        {/* Price */}
         <div>
           <Label htmlFor="price">가격</Label>
           <div className="relative mt-2">
@@ -174,55 +267,44 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
           </div>
         </div>
 
-        {/* Description */}
         <div>
           <Label htmlFor="description">상품 설명</Label>
           <Textarea
             id="description"
-            placeholder="상품에 대한 자세한 설명을 입력하세요"
+            placeholder="상품에 대한 상세 설명을 작성해 주세요."
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             className="mt-2 min-h-[200px]"
           />
         </div>
 
-        {/* Location */}
         <div>
           <Label htmlFor="location">거래 희망 장소</Label>
           <div className="mt-2 flex items-center gap-2">
             <MapPin className="h-5 w-5 text-primary" />
-            <span className="flex-1 text-sm">{location}</span>
-            <Button
-              variant="link"
-              size="sm"
-              className="ml-auto"
-              onClick={() => setShowLocationPicker(true)}
-            >
+
+            <span>{location}</span>
+            <Button variant="link" size="sm" className="ml-auto" disabled>
               변경
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Location Picker Dialog */}
-      <LocationPicker
-        open={showLocationPicker}
-        onClose={() => setShowLocationPicker(false)}
-        onSelect={handleLocationSelect}
-        initialLatitude={latitude}
-        initialLongitude={longitude}
-        initialLocationName={location}
-      />
 
-      {/* Bottom Action Bar */}
       <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background p-4">
         <div className="container mx-auto max-w-2xl">
-          <Button 
+          <Button
             className="w-full bg-primary hover:bg-primary-hover"
             onClick={handleSubmit}
-            disabled={!title || !category || !price || images.length === 0}
+            disabled={
+              isSubmitting ||
+              !title ||
+              !categoryId ||
+              !price
+            }
           >
-            작성완료
+            {isSubmitting ? "등록 중..." : "작성 완료"}
           </Button>
         </div>
       </div>

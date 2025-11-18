@@ -41,6 +41,9 @@ public class Product {
 
     @Column(nullable=false) private Integer view_count;
     @Column(nullable=false) private Boolean is_delete;
+    @Column(name = "is_resell", nullable = false)
+    @Builder.Default
+    private Boolean isResell = false;
 
     @Column(nullable=false) private LocalDateTime createdAt;
     @Column(nullable=false) private LocalDateTime updatedAt;
@@ -62,6 +65,7 @@ public class Product {
         if (status == null) status = ProductStatus.ON_SELL;
         if (view_count == null) view_count = 0;
         if (is_delete == null) is_delete = false;
+        if (isResell == null) isResell = false;
     }
     @PreUpdate void preUpdate(){ updatedAt = LocalDateTime.now(); }
 }

@@ -26,10 +26,9 @@ export const CLAUDE_API_CONFIG = {
 export const CATEGORIES = [
   { id: 1, name: '디지털기기', emoji: '📱' },
   { id: 2, name: '가구/인테리어', emoji: '🛋️' },
-  { id: 3, name: '생활가전', emoji: '🧊' },
-  { id: 4, name: '의류/패션잡화', emoji: '👗' },
-  { id: 5, name: '스포츠/레저', emoji: '⚽' },
-  { id: 6, name: '도서/티켓/음반', emoji: '📚' },
+  { id: 3, name: '의류/패션잡화', emoji: '👗' },
+  { id: 4, name: '스포츠/레저', emoji: '⚽' },
+  { id: 5, name: '도서/티켓/음반', emoji: '📚' },
 ];
 
 // 제품 상태

@@ -26,6 +26,13 @@ data/
 logs/
 *.log
 
+# ============================================
+# Uploaded Files (사용자 업로드 이미지)
+# ============================================
+BackEnd/src/main/resources/static/products/
+!BackEnd/src/main/resources/static/products/.gitkeep
+
+
 # Python temporary files
 __pycache__/
 *.py[cod]

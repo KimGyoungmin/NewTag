@@ -62,6 +62,7 @@ export interface Product {
   longitude: number;
   viewCount: number;
   isDelete: boolean;
+  isResell?: boolean;
   createdAt: string;
   updatedAt: string;
   sellerId: number;

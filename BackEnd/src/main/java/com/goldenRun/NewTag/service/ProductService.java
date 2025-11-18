@@ -1,11 +1,16 @@
 package com.goldenRun.NewTag.service;
 
+import com.goldenRun.NewTag.Repository.CategoryRepository;
 import com.goldenRun.NewTag.Repository.ProductRepository;
+import com.goldenRun.NewTag.Repository.UserRepository;
 import com.goldenRun.NewTag.dto.ProductDtos;
+import com.goldenRun.NewTag.entity.Category;
 import com.goldenRun.NewTag.entity.Product;
 import com.goldenRun.NewTag.entity.ProductImage;
+import com.goldenRun.NewTag.entity.User;
 import com.goldenRun.NewTag.enums.ProductStatus;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -13,9 +18,13 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
+import org.springframework.util.StringUtils;
 
+import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -23,12 +32,16 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@Slf4j
 public class ProductService {
 
     private final ProductRepository productRepository;
+    private final UserRepository userRepository;
+    private final CategoryRepository categoryRepository;
     private final SearchLogService searchLogService;
     private final ReviewService reviewService;
     private final FavoriteService favoriteService;
+    private final FileStorageService fileStorageService;
 
     /**
      * 상품 목록 조회 (페이징, 정렬, 필터링)
@@ -144,6 +157,48 @@ public class ProductService {
         return convertToDetailResponse(product, sellerId);
     }
 
+    /**
+     * 상품 등록 (PostService의 createPost 통합)
+     */
+    @Transactional
+    public ProductDtos.DetailResponse createProduct(ProductDtos.CreateRequest request, String currentUserNick) {
+        User seller = resolveCurrentUser(currentUserNick);
+        Category category = resolveCategory(request.getCategoryId());
+
+        // 1. Product 엔티티 생성
+        Product product = buildProductEntity(request, seller, category);
+
+        // 2. Product 저장 (이미지는 temp 폴더 경로로 저장됨)
+        Product saved = productRepository.save(product);
+
+        // 3. temp 폴더의 이미지를 products/{productId}/ 폴더로 이동
+        migrateImagesToProductFolder(saved);
+
+        log.info("상품 등록 완료: productId={}, 이미지 개수={}", saved.getId(), saved.getImages().size());
+
+        return convertToDetailResponse(saved, seller.getId());
+    }
+
+    /**
+     * 상품 삭제 (소프트 삭제)
+     */
+    @Transactional
+    public void deleteProduct(Long productId, String currentUserNick) {
+        User seller = resolveCurrentUser(currentUserNick);
+
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
+
+        if (!product.getSeller().getId().equals(seller.getId())) {
+            throw new AccessDeniedException("본인이 등록한 상품만 삭제할 수 있습니다.");
+        }
+
+        product.setIs_delete(true);
+        product.setUpdatedAt(LocalDateTime.now());
+
+        log.info("상품 삭제 완료: productId={}, seller={}", productId, currentUserNick);
+    }
+
     // ============================================
     // Private Helper Methods
     // ============================================
@@ -166,10 +221,10 @@ public class ProductService {
      */
     private ProductDtos.ListItem convertToListItem(Product product, Map<Long, Long> favoriteCountMap) {
         String mainImage = product.getImages().stream()
-                .filter(img -> img.getIs_main())
+                .filter(ProductImage::getIs_main)
                 .findFirst()
-                .map(ProductImage::getPath)
-                .orElse("p_default_img.png");
+                .map(img -> resolveImagePath(img.getPath()))
+                .orElse(resolveImagePath(null));
 
         // Map에서 Favorite count 조회 (이미 한 번에 가져온 데이터)
         long favoriteCount = favoriteCountMap.getOrDefault(product.getId(), 0L);
@@ -184,6 +239,7 @@ public class ProductService {
                 .viewCount(product.getView_count())
                 .favoriteCount(favoriteCount)
                 .timeAgo(getTimeAgo(product.getCreatedAt()))
+                .isResell(product.getIsResell())
                 .build();
     }
 
@@ -192,10 +248,10 @@ public class ProductService {
      */
     private ProductDtos.ListItem convertToListItem(Product product) {
         String mainImage = product.getImages().stream()
-                .filter(img -> img.getIs_main())
+                .filter(ProductImage::getIs_main)
                 .findFirst()
-                .map(ProductImage::getPath)
-                .orElse("p_default_img.png");
+                .map(img -> resolveImagePath(img.getPath()))
+                .orElse(resolveImagePath(null));
 
         // Favorite count 조회
         long favoriteCount = favoriteService.getFavoriteCount(product.getId());
@@ -210,6 +266,7 @@ public class ProductService {
                 .viewCount(product.getView_count())
                 .favoriteCount(favoriteCount)
                 .timeAgo(getTimeAgo(product.getCreatedAt()))
+                .isResell(product.getIsResell())
                 .build();
     }
 
@@ -224,7 +281,7 @@ public class ProductService {
         List<ProductDtos.ImageResponse> images = sortedImages.stream()
                 .map(img -> ProductDtos.ImageResponse.builder()
                         .id(img.getId().intValue())
-                        .pImg(img.getPath())
+                        .pImg(resolveImagePath(img.getPath()))
                         .isMain(img.getIs_main())
                         .createdAt(img.getCreatedAt())
                         .updatedAt(img.getUpdatedAt())
@@ -232,7 +289,9 @@ public class ProductService {
                         .build())
                 .collect(Collectors.toList());
 
-        String mainImage = sortedImages.isEmpty() ? "p_default_img.png" : sortedImages.get(0).getPath();
+        String mainImage = sortedImages.isEmpty()
+                ? resolveImagePath(null)
+                : resolveImagePath(sortedImages.get(0).getPath());
 
         // Favorite count와 likedByMe 조회
         long favoriteCount = favoriteService.getFavoriteCount(product.getId());
@@ -267,6 +326,7 @@ public class ProductService {
                 .sellerRatingCount(sellerRatingCount)
                 .sellerGrade(reviewService.calculateUserGrade(sellerId))
                 .likedByMe(likedByMe)
+                .isResell(product.getIsResell())
                 .build();
     }
 
@@ -289,5 +349,143 @@ public class ProductService {
         if (days < 365) return (days / 30) + "개월 전";
 
         return (days / 365) + "년 전";
+    }
+
+    private String resolveImagePath(String path) {
+        if (path == null || path.isBlank()) {
+            return "/api/v1/static/p_default_img.png";
+        }
+        if (path.startsWith("http") || path.startsWith("/")) {
+            return path;
+        }
+        return "/api/v1/static/" + path.replace("\\", "/");
+    }
+
+    /**
+     * 현재 인증된 사용자 조회
+     */
+    private User resolveCurrentUser(String currentUserNick) {
+        if (!StringUtils.hasText(currentUserNick)) {
+            throw new AccessDeniedException("인증된 사용자만 접근할 수 있습니다.");
+        }
+
+        User user = userRepository.findByNick(currentUserNick);
+        if (user == null) {
+            throw new AccessDeniedException("사용자 정보를 찾을 수 없습니다.");
+        }
+        return user;
+    }
+
+    /**
+     * 카테고리 조회
+     */
+    private Category resolveCategory(Integer categoryId) {
+        if (categoryId == null) {
+            throw new IllegalArgumentException("카테고리를 선택해 주세요.");
+        }
+
+        return categoryRepository.findById(categoryId.longValue())
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 카테고리입니다."));
+    }
+
+    /**
+     * Product 엔티티 생성 (PostService에서 이동)
+     */
+    private Product buildProductEntity(ProductDtos.CreateRequest request, User seller, Category category) {
+        Product product = Product.builder()
+                .price(toBigDecimal(request.getPrice()))
+                .title(request.getTitle())
+                .content(request.getContent())
+                .status(ProductStatus.ON_SELL)
+                .location_nm(request.getLocationNm())
+                .latitude(toBigDecimal(request.getLatitude()))
+                .longitude(toBigDecimal(request.getLongitude()))
+                .view_count(0)
+                .is_delete(false)
+                .isResell(Boolean.TRUE.equals(request.getIsResell()))
+                .seller(seller)
+                .category(category)
+                .images(new ArrayList<>())
+                .build();
+
+        // 이미지 엔티티 생성 (temp 폴더 경로)
+        List<ProductImage> images = buildImageEntities(request.getImages(), product);
+        product.getImages().addAll(images);
+
+        return product;
+    }
+
+    /**
+     * ProductImage 엔티티 리스트 생성
+     */
+    private List<ProductImage> buildImageEntities(List<ProductDtos.ImageItem> imageItems, Product product) {
+        List<ProductImage> results = new ArrayList<>();
+        if (CollectionUtils.isEmpty(imageItems)) {
+            return results;
+        }
+
+        boolean hasMain = imageItems.stream().anyMatch(img -> Boolean.TRUE.equals(img.getIsMain()));
+
+        for (int i = 0; i < imageItems.size(); i++) {
+            ProductDtos.ImageItem item = imageItems.get(i);
+            boolean isMain = Boolean.TRUE.equals(item.getIsMain());
+
+            // 메인 이미지가 없으면 첫 번째를 메인으로 지정
+            if (!hasMain && i == 0) {
+                isMain = true;
+            }
+
+            ProductImage image = ProductImage.builder()
+                    .path(item.getPath())  // temp 폴더 경로
+                    .is_main(isMain)
+                    .product(product)
+                    .build();
+            results.add(image);
+        }
+
+        return results;
+    }
+
+    /**
+     * temp 폴더의 이미지를 products/{productId}/ 폴더로 이동
+     */
+    private void migrateImagesToProductFolder(Product product) {
+        if (CollectionUtils.isEmpty(product.getImages())) {
+            log.info("이미지가 없어 마이그레이션을 건너뜁니다: productId={}", product.getId());
+            return;
+        }
+
+        for (ProductImage image : product.getImages()) {
+            String tempPath = image.getPath();
+
+            // 이미 절대 경로이거나 URL인 경우 건너뛰기
+            if (tempPath == null || tempPath.startsWith("http") || tempPath.startsWith("/api/")) {
+                continue;
+            }
+
+            try {
+                // temp 폴더의 파일을 products/{productId}/ 폴더로 이동
+                String newPath = fileStorageService.moveToProductFolder(
+                    tempPath,
+                    product.getId(),
+                    image.getIs_main()
+                );
+
+                // DB에 새 경로 업데이트
+                image.setPath(newPath);
+
+                log.info("이미지 이동 완료: {} -> {}", tempPath, newPath);
+            } catch (Exception e) {
+                log.error("이미지 이동 실패: tempPath={}, productId={}", tempPath, product.getId(), e);
+                // 이동 실패해도 계속 진행 (기존 경로 유지)
+            }
+        }
+    }
+
+    /**
+     * Double을 BigDecimal로 변환
+     */
+    private BigDecimal toBigDecimal(Double value) {
+        return value == null ? null : BigDecimal.valueOf(value);
     }
 }

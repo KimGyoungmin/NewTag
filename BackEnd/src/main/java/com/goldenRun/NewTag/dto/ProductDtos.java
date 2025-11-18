@@ -19,7 +19,8 @@ public class ProductDtos {
         private Double latitude;
         private Double longitude;
         private Integer sellerId;
-        private List<ImageItem> images; // 파일명/URL 목록 (첫 번째를 isMain으로 지정)
+        private Boolean isResell;
+        private List<ImageItem> images; // ?뚯씪紐?URL 紐⑸줉 (泥?踰덉㎏瑜?isMain?쇰줈 吏??
     }
 
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
@@ -52,6 +53,7 @@ public class ProductDtos {
         private Integer viewCount;
         private Long favoriteCount;
         private String timeAgo; // "1시간 전" 같은 문자열
+        private Boolean isResell;
     }
 
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
@@ -82,13 +84,14 @@ public class ProductDtos {
         private long sellerRatingCount;
         private String sellerGrade; // 예: Gold/Silver 등
         private boolean likedByMe;
+        private Boolean isResell;
     }
 
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
     public static class ImageResponse {
         private Integer id;
         @JsonProperty("pImg")
-        private String pImg;  // 프론트엔드에서 pImg로 접근
+        private String pImg;  // ?꾨줎?몄뿏?쒖뿉??pImg濡??묎렐
         private Boolean isMain;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
@@ -100,3 +103,4 @@ public class ProductDtos {
         private ProductStatus status;
     }
 }
+
