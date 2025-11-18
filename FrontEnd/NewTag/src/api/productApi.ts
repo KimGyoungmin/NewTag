@@ -12,6 +12,7 @@ const mapProductDetail = (data: any): Product => ({
   longitude: data.longitude,
   viewCount: data.viewCount,
   isDelete: false,
+  isResell: data.isResell ?? false,
   createdAt: data.createdAt || new Date().toISOString(),
   updatedAt: data.updatedAt || new Date().toISOString(),
   sellerId: data.sellerId,

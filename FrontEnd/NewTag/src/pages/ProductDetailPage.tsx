@@ -31,7 +31,7 @@ import { authApi as authApiService } from "../services/api/authApi";
 import { chatService } from "../services/firebase/chatService";
 import { toast } from "sonner";
 import type { Product, ProductStatus, Review } from "../types";
-import { API_BASE_URL } from "../constants";
+import { resolveImageUrl } from "../utils/image";
 
 interface ProductDetailPageProps {
   productId: string;
@@ -56,12 +56,19 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
 
   // 상품 데이터 로드
   useEffect(() => {
+    const numericProductId = Number(productId);
+    if (!productId || Number.isNaN(numericProductId)) {
+      setError("잘못된 게시글 정보입니다.");
+      setLoading(false);
+      return;
+    }
+
     const loadProduct = async () => {
       setLoading(true);
       setError(null);
 
       try {
-        const data = await productApi.getById(Number(productId));
+        const data = await productApi.getById(numericProductId);
         if (data) {
           setProduct(data);
           // likedByMe 필드 사용 (백엔드에서 제공)
@@ -279,17 +286,7 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
 
   // 이미지 URL 생성 헬퍼
   const getFullImageUrl = (path: string | undefined) => {
-    console.log(path);
-    if (!path) {
-      return '/p_default_img.png'; // 기본 이미지
-    }
-    // 이미 전체 URL인 경우 그대로 반환
-    if (path.startsWith('http') || path.startsWith('/')) {
-      return path;
-    }
-    // 상대 경로인 경우 전체 URL 구성
-    // API_BASE_URL = http://localhost:8081/api/v1 이므로 /static/만 추가
-    return `${API_BASE_URL}/static/${path}`;
+    return resolveImageUrl(path);
   };
 
   // 스와이프 핸들러

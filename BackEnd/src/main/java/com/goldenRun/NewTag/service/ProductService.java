@@ -166,10 +166,10 @@ public class ProductService {
      */
     private ProductDtos.ListItem convertToListItem(Product product, Map<Long, Long> favoriteCountMap) {
         String mainImage = product.getImages().stream()
-                .filter(img -> img.getIs_main())
+                .filter(ProductImage::getIs_main)
                 .findFirst()
-                .map(ProductImage::getPath)
-                .orElse("p_default_img.png");
+                .map(img -> resolveImagePath(img.getPath()))
+                .orElse(resolveImagePath(null));
 
         // Map에서 Favorite count 조회 (이미 한 번에 가져온 데이터)
         long favoriteCount = favoriteCountMap.getOrDefault(product.getId(), 0L);
@@ -184,6 +184,7 @@ public class ProductService {
                 .viewCount(product.getView_count())
                 .favoriteCount(favoriteCount)
                 .timeAgo(getTimeAgo(product.getCreatedAt()))
+                .isResell(product.getIsResell())
                 .build();
     }
 
@@ -192,10 +193,10 @@ public class ProductService {
      */
     private ProductDtos.ListItem convertToListItem(Product product) {
         String mainImage = product.getImages().stream()
-                .filter(img -> img.getIs_main())
+                .filter(ProductImage::getIs_main)
                 .findFirst()
-                .map(ProductImage::getPath)
-                .orElse("p_default_img.png");
+                .map(img -> resolveImagePath(img.getPath()))
+                .orElse(resolveImagePath(null));
 
         // Favorite count 조회
         long favoriteCount = favoriteService.getFavoriteCount(product.getId());
@@ -210,6 +211,7 @@ public class ProductService {
                 .viewCount(product.getView_count())
                 .favoriteCount(favoriteCount)
                 .timeAgo(getTimeAgo(product.getCreatedAt()))
+                .isResell(product.getIsResell())
                 .build();
     }
 
@@ -224,7 +226,7 @@ public class ProductService {
         List<ProductDtos.ImageResponse> images = sortedImages.stream()
                 .map(img -> ProductDtos.ImageResponse.builder()
                         .id(img.getId().intValue())
-                        .pImg(img.getPath())
+                        .pImg(resolveImagePath(img.getPath()))
                         .isMain(img.getIs_main())
                         .createdAt(img.getCreatedAt())
                         .updatedAt(img.getUpdatedAt())
@@ -232,7 +234,9 @@ public class ProductService {
                         .build())
                 .collect(Collectors.toList());
 
-        String mainImage = sortedImages.isEmpty() ? "p_default_img.png" : sortedImages.get(0).getPath();
+        String mainImage = sortedImages.isEmpty()
+                ? resolveImagePath(null)
+                : resolveImagePath(sortedImages.get(0).getPath());
 
         // Favorite count와 likedByMe 조회
         long favoriteCount = favoriteService.getFavoriteCount(product.getId());
@@ -267,6 +271,7 @@ public class ProductService {
                 .sellerRatingCount(sellerRatingCount)
                 .sellerGrade(reviewService.calculateUserGrade(sellerId))
                 .likedByMe(likedByMe)
+                .isResell(product.getIsResell())
                 .build();
     }
 
@@ -289,5 +294,15 @@ public class ProductService {
         if (days < 365) return (days / 30) + "개월 전";
 
         return (days / 365) + "년 전";
+    }
+
+    private String resolveImagePath(String path) {
+        if (path == null || path.isBlank()) {
+            return "/api/v1/static/p_default_img.png";
+        }
+        if (path.startsWith("http") || path.startsWith("/")) {
+            return path;
+        }
+        return "/api/v1/static/" + path.replace("\\", "/");
     }
 }
