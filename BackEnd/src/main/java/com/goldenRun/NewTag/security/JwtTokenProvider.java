@@ -3,13 +3,11 @@ package com.goldenRun.NewTag.security;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
-
-import org.springframework.security.core.Authentication;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.stereotype.Component;
@@ -18,7 +16,6 @@ import com.goldenRun.NewTag.Repository.UserRepository;
 import com.goldenRun.NewTag.entity.User;
 
 import jakarta.annotation.PostConstruct;
-import java.security.Key;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -34,6 +31,12 @@ public class JwtTokenProvider {
 	@Value("${jwt.secret-key}")
 	private String secretKey;
 
+	@Value("${jwt.access-token-validity-ms:900000}")
+	private long accessTokenValidityMs;
+
+	@Value("${jwt.refresh-token-validity-ms:604800000}")
+	private long refreshTokenValidityMs;
+
 	private SecretKey key;
 
 	@PostConstruct
@@ -41,20 +44,27 @@ public class JwtTokenProvider {
 		this.key = Keys.hmacShaKeyFor(secretKey.getBytes());
 	}
 
-	// 토큰 생성
-	public String createToken(String userPk) {
-		Date now = new Date();
-		long tokenValidTime = 30 * 60 * 1000L;
-		Date validity = new Date(now.getTime() + tokenValidTime);
+	public String createAccessToken(String userPk) {
+		return createToken(userPk, accessTokenValidityMs, "access");
+	}
 
-		return Jwts.builder().subject(userPk)
+	public String createRefreshToken(String userPk) {
+		return createToken(userPk, refreshTokenValidityMs, "refresh");
+	}
+
+	private String createToken(String userPk, long validityMillis, String tokenType) {
+		Date now = new Date();
+		Date validity = new Date(now.getTime() + validityMillis);
+
+		return Jwts.builder()
+				.subject(userPk)
 				.issuedAt(now)
 				.expiration(validity)
+				.claim("tokenType", tokenType)
 				.signWith(key)
 				.compact();
 	}
 
-	// 토큰에서 인증 정보 조회
 	public Authentication getAuthentication(String token) {
 		String nick = this.getUserPk(token);
 		User user = userRepository.findByNick(nick);
@@ -63,14 +73,12 @@ public class JwtTokenProvider {
 			return null;
 		}
 
-		// 사용자 권한 설정
 		List<GrantedAuthority> authorities = new ArrayList<>();
 		authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
 
 		return new UsernamePasswordAuthenticationToken(nick, null, authorities);
 	}
 
-	// 토큰에서 회원 정보 추출
 	public String getUserPk(String token) {
 	    try {
 	        return Jwts.parser()
@@ -84,7 +92,6 @@ public class JwtTokenProvider {
 	    }
 	}
 
-	// 토큰 유효성 검증
 	public boolean validateToken(String token) {
 	    try {
 	        Jws<Claims> claims = Jwts.parser()
@@ -100,5 +107,31 @@ public class JwtTokenProvider {
 	        e.printStackTrace();
 	        return false;
 	    }
+	}
+
+	public boolean isAccessToken(String token) {
+		return hasTokenType(token, "access");
+	}
+
+	public boolean isRefreshToken(String token) {
+		return hasTokenType(token, "refresh");
+	}
+
+	private boolean hasTokenType(String token, String tokenType) {
+		try {
+			String value = Jwts.parser()
+					.setSigningKey(key)
+					.build()
+					.parseClaimsJws(token)
+					.getBody()
+					.get("tokenType", String.class);
+			return tokenType.equals(value);
+		} catch (Exception e) {
+			return false;
+		}
+	}
+
+	public long getRefreshTokenValidityMs() {
+		return refreshTokenValidityMs;
 	}
 }

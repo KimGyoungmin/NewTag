@@ -48,7 +48,7 @@ public class JwtAuthenticationFilter extends GenericFilterBean {
         System.out.println("[JWT Filter] Token extracted: " + (token != null ? token.substring(0, Math.min(20, token.length())) + "..." : "null"));
 
         // 토큰 유효성 검증
-        if (token != null && jwtTokenProvider.validateToken(token)) {
+        if (token != null && jwtTokenProvider.validateToken(token) && jwtTokenProvider.isAccessToken(token)) {
             // 토큰이 유효하면 인증 객체를 생성
             Authentication auth = jwtTokenProvider.getAuthentication(token);
             System.out.println("[JWT Filter] Authentication created: " + (auth != null ? auth.getName() : "null"));

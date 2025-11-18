@@ -1,11 +1,13 @@
 package com.goldenRun.NewTag.controller;
 
 import com.goldenRun.NewTag.dto.ProductDtos;
+import com.goldenRun.NewTag.enums.ProductStatus;
 import com.goldenRun.NewTag.service.ProductService;
 import com.goldenRun.NewTag.service.SearchLogService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -129,5 +131,18 @@ public class ProductController {
     ) {
         List<String> keywords = searchLogService.getRecentKeywords(userId, limit);
         return ResponseEntity.ok(keywords);
+    }
+
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<ProductDtos.DetailResponse> updateStatus(
+            @PathVariable Long id,
+            @RequestBody ProductDtos.StatusUpdateRequest request,
+            @AuthenticationPrincipal String currentUserNick
+    ) {
+        if (request.getStatus() == null) {
+            throw new IllegalArgumentException("변경할 상태를 선택해주세요.");
+        }
+        ProductDtos.DetailResponse updated = productService.updateProductStatus(id, request.getStatus(), currentUserNick);
+        return ResponseEntity.ok(updated);
     }
 }

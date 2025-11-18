@@ -43,15 +43,15 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
   const [hasMore, setHasMore] = useState(true);
 
   // 찜한 상품 목록 불러오기
-  const fetchFavorites = async () => {
-    const currentUser = authApi.getCurrentUser();
-    if (!currentUser) return;
-
-    // TODO: userId를 실제 사용자 ID로 변경 필요
-    const userId = 1;
+  const fetchFavorites = async (userId?: number | null) => {
+    const targetUserId = userId ?? authApi.getCurrentUser()?.id;
+    if (!targetUserId) {
+      setFavoriteProductIds(new Set());
+      return;
+    }
 
     try {
-      const productIds = await favoriteApi.getMyFavoriteProducts(userId);
+      const productIds = await favoriteApi.getMyFavoriteProducts(targetUserId);
       setFavoriteProductIds(new Set(productIds));
     } catch (err) {
       console.error('찜 목록 조회 실패:', err);
@@ -127,7 +127,7 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
           userId,
           'WEB',
           nextPage,
-          10
+          20
         );
       } else {
         // 검색어가 없으면 일반 상품 목록 조회
@@ -137,7 +137,7 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
           categoryId,
           sortBy,
           page: nextPage,
-          size: 10,
+          size: 20,
         });
       }
 
@@ -161,10 +161,18 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
 
   // 초기 로드 시 찜 목록 불러오기 (로그인한 경우에만)
   useEffect(() => {
-    const currentUser = authApi.getCurrentUser();
-    if (currentUser && authApi.isAuthenticated()) {
-      fetchFavorites();
-    }
+    const handleAuthChange = () => {
+      const user = authApi.getCurrentUser();
+      if (user) {
+        fetchFavorites(user.id);
+      } else {
+        setFavoriteProductIds(new Set());
+      }
+    };
+
+    handleAuthChange();
+    window.addEventListener('auth-change', handleAuthChange);
+    return () => window.removeEventListener('auth-change', handleAuthChange);
   }, []);
 
   // 카테고리, 정렬 옵션, 검색어 변경 시 상품 목록 다시 불러오기

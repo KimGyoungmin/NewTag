@@ -94,4 +94,9 @@ public class ProductDtos {
         private LocalDateTime updatedAt;
         private Integer productId;
     }
+
+    @Getter @Setter @NoArgsConstructor @AllArgsConstructor
+    public static class StatusUpdateRequest {
+        private ProductStatus status;
+    }
 }

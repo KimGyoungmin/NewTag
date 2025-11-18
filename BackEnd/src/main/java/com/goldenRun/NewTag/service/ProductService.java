@@ -4,11 +4,13 @@ import com.goldenRun.NewTag.Repository.ProductRepository;
 import com.goldenRun.NewTag.dto.ProductDtos;
 import com.goldenRun.NewTag.entity.Product;
 import com.goldenRun.NewTag.entity.ProductImage;
+import com.goldenRun.NewTag.enums.ProductStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -121,6 +123,25 @@ public class ProductService {
         Map<Long, Long> favoriteCountMap = favoriteService.getFavoriteCounts(productIds);
 
         return products.map(product -> convertToListItem(product, favoriteCountMap));
+    }
+
+    @Transactional
+    public ProductDtos.DetailResponse updateProductStatus(Long productId, ProductStatus newStatus, String currentUserNick) {
+        if (currentUserNick == null || currentUserNick.isBlank()) {
+            throw new AccessDeniedException("인증 정보가 필요합니다.");
+        }
+
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
+
+        if (!currentUserNick.equals(product.getSeller().getNick())) {
+            throw new AccessDeniedException("상품 상태를 변경할 권한이 없습니다.");
+        }
+
+        product.setStatus(newStatus);
+
+        Long sellerId = product.getSeller() != null ? product.getSeller().getId() : null;
+        return convertToDetailResponse(product, sellerId);
     }
 
     // ============================================
