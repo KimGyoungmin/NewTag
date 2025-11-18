@@ -10,6 +10,7 @@ import {
   getDocs,
   Timestamp,
   serverTimestamp,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from './config';
 import type { ChatMessage, ChatRoom } from '../../types';
@@ -97,22 +98,27 @@ export const chatService = {
       orderBy('createdAt', 'asc')
     );
 
-    return onSnapshot(q, (snapshot) => {
-      const messages = snapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          chatRoomId: data.chatRoomId,
-          senderId: data.senderId,
-          senderNick: data.senderNick,
-          senderProfileImg: data.senderProfileImg,
-          message: data.message,
-          createdAt: data.createdAt?.toDate() || new Date(),
-          isRead: data.isRead,
-        } as ChatMessage;
-      });
-      callback(messages);
-    });
+    // includeMetadataChanges:true로 서버 confirm 후 타임스탬프 반영되도록 보장
+    return onSnapshot(
+      q,
+      { includeMetadataChanges: true },
+      (snapshot) => {
+        const messages = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            chatRoomId: data.chatRoomId,
+            senderId: data.senderId,
+            senderNick: data.senderNick,
+            senderProfileImg: data.senderProfileImg,
+            message: data.message,
+            createdAt: data.createdAt?.toDate() || new Date(),
+            isRead: data.isRead,
+          } as ChatMessage;
+        });
+        callback(messages);
+      }
+    );
   },
 
   // 사용자의 채팅방 목록 구독
@@ -183,5 +189,24 @@ export const chatService = {
     );
 
     await Promise.all(updatePromises);
+  },
+
+  deleteChatRoom: async (chatRoomId: string) => {
+    const batch = writeBatch(db);
+
+    // Delete all messages in the room
+    const messagesQuery = query(
+      collection(db, 'messages'),
+      where('chatRoomId', '==', chatRoomId)
+    );
+    const messagesSnapshot = await getDocs(messagesQuery);
+    messagesSnapshot.forEach((messageDoc) => {
+      batch.delete(messageDoc.ref);
+    });
+
+    // Delete the chat room document
+    batch.delete(doc(db, 'chatRooms', chatRoomId));
+
+    await batch.commit();
   },
 };
