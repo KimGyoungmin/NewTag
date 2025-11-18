@@ -1,6 +1,8 @@
 import { api } from './client';
+
 import { tokenManager } from './tokenManager';
 import type { LoginRequest, LoginResponse, SignupRequest, User, ApiResponse, AuthUser } from '../types';
+
 
 const handleAuthSuccess = (data: LoginResponse) => {
   if (data.success && data.token) {
@@ -19,6 +21,7 @@ export const authApi = {
       }
     } catch (error) {
       // ignore - user not logged in
+
     }
     tokenManager.clearSession();
     return null;
@@ -48,6 +51,7 @@ export const authApi = {
     });
     return response.data.success;
   },
+
 
   logout: async (): Promise<void> => {
     try {

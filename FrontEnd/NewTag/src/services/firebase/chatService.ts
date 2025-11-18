@@ -18,16 +18,16 @@ export const chatService = {
   // 채팅방 생성 또는 가져오기
   getOrCreateChatRoom: async (
     productId: number,
-    sellerId: number,
-    buyerId: number,
+    seller: { id: number; nick?: string; profileImg?: string },
+    buyer: { id: number; nick?: string; profileImg?: string },
     productInfo: { title: string; image: string; price: number }
   ): Promise<string> => {
     // 기존 채팅방 확인
     const q = query(
       collection(db, 'chatRooms'),
       where('productId', '==', productId),
-      where('sellerId', '==', sellerId),
-      where('buyerId', '==', buyerId)
+      where('sellerId', '==', seller.id),
+      where('buyerId', '==', buyer.id)
     );
 
     const snapshot = await getDocs(q);
@@ -42,8 +42,12 @@ export const chatService = {
       productTitle: productInfo.title,
       productImage: productInfo.image,
       productPrice: productInfo.price,
-      sellerId,
-      buyerId,
+      sellerId: seller.id,
+      sellerNick: seller.nick,
+      sellerProfileImg: seller.profileImg,
+      buyerId: buyer.id,
+      buyerNick: buyer.nick,
+      buyerProfileImg: buyer.profileImg,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     };
@@ -126,20 +130,41 @@ export const chatService = {
       where('sellerId', '==', userId)
     );
 
-    // 두 쿼리 결과를 병합하기 위해 별도로 구독
+    // 두 쿼리 결과를 병합해서 전달
+    let buyerRooms: ChatRoom[] = [];
+    let sellerRooms: ChatRoom[] = [];
+
+    const emit = () => {
+      const merged = [...buyerRooms, ...sellerRooms];
+      callback(merged);
+    };
+
     const unsubscribe1 = onSnapshot(q, (snapshot) => {
-      const chatRooms = snapshot.docs.map((doc) => ({
+      buyerRooms = snapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
         createdAt: doc.data().createdAt?.toDate() || new Date(),
         updatedAt: doc.data().updatedAt?.toDate() || new Date(),
         lastMessageAt: doc.data().lastMessageAt?.toDate(),
       })) as ChatRoom[];
-
-      callback(chatRooms);
+      emit();
     });
 
-    return unsubscribe1;
+    const unsubscribe2 = onSnapshot(q2, (snapshot) => {
+      sellerRooms = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate() || new Date(),
+        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+        lastMessageAt: doc.data().lastMessageAt?.toDate(),
+      })) as ChatRoom[];
+      emit();
+    });
+
+    return () => {
+      unsubscribe1();
+      unsubscribe2();
+    };
   },
 
   // 메시지 읽음 처리
