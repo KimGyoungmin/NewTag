@@ -103,8 +103,12 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
     if (!product) return;
 
     try {
-      await productApi.update(product.id, { status: newStatus });
-      setProduct({ ...product, status: newStatus });
+      const updated = await productApi.updateStatus(product.id, newStatus);
+      if (updated) {
+        setProduct(updated);
+      } else {
+        setProduct({ ...product, status: newStatus });
+      }
       toast.success("상태가 변경되었습니다.");
     } catch (error) {
       toast.error("상태 변경에 실패했습니다.");
@@ -139,8 +143,7 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
       return;
     }
 
-    // TODO: userId를 실제 사용자 ID로 변경 필요 (현재는 임시로 1 사용)
-    const userId = 1;
+    const userId = currentUser.id;
 
     try {
       const response = await favoriteApi.toggleFavorite(product.id, userId);

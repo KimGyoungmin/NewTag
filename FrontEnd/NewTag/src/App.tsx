@@ -52,20 +52,17 @@ export default function App() {
   // ============================================
   // 초기 로드 - 로그인 상태 확인
   // ============================================
-
   useEffect(() => {
-    // 이미 로그인되어 있으면 홈으로 이동
-    const isLoggedIn = authApi.isAuthenticated();
-    console.log('[App] 초기 로드 - 로그인 상태:', isLoggedIn);
-    console.log('[App] localStorage auth_token:', localStorage.getItem('auth_token'));
-
-    if (isLoggedIn) {
-      console.log('[App] 로그인되어 있음 - home으로 이동');
-      setCurrentPage("home");
-    } else {
-      console.log('[App] 로그인 안됨 - login 페이지 유지');
-    }
+    let mounted = true;
+    authApi.initialize().then((user) => {
+      if (!mounted) return;
+      setCurrentPage(user ? "home" : "login");
+    });
+    return () => {
+      mounted = false;
+    };
   }, []);
+
 
   // ============================================
   // 네비게이션 핸들러
@@ -278,3 +275,4 @@ export default function App() {
     </div>
   );
 }
+

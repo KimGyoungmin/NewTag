@@ -7,8 +7,8 @@ import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { chatService } from "../services/firebase/chatService";
 import { db } from "../services/firebase/config";
 import { doc, getDoc } from "firebase/firestore";
-import { authApi } from "../services/api/authApi";
-import type { ChatMessage, ChatRoom, User } from "../types";
+import { authApi } from "../api/auth";
+import type { AuthUser, ChatMessage, ChatRoom } from "../types";
 
 interface ChatPageProps {
   chatId: string;
@@ -17,20 +17,19 @@ interface ChatPageProps {
 
 export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
   const [message, setMessage] = useState("");
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [room, setRoom] = useState<ChatRoom | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const me = await authApi.getCurrentUser();
-        setCurrentUser(me);
-      } catch (e) {
-        console.error("Failed to load current user", e);
-      }
-    })();
+    const updateUser = () => {
+      setCurrentUser(authApi.getCurrentUser());
+    };
+
+    updateUser();
+    window.addEventListener("auth-change", updateUser);
+    return () => window.removeEventListener("auth-change", updateUser);
   }, []);
 
   useEffect(() => {

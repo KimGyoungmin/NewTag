@@ -47,13 +47,13 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/static/**").permitAll()
                 .requestMatchers("/static/**").permitAll()
                 // 공개 엔드포인트
-                .requestMatchers("/api/auth/**", "/api/health", "/api/test", "/api/encode-password", "/api/v1/login", "/api/v1/signup", "/api/v1/emailMatch", "/api/v1/idMatch").permitAll()
+                .requestMatchers("/api/auth/**", "/api/health", "/api/test", "/api/encode-password", "/api/v1/login", "/api/v1/signup", "/api/v1/emailMatch", "/api/v1/idMatch", "/api/v1/auth/refresh").permitAll()
                 // 상품 관련 공개 API (로그인 없이 조회 가능)
                 .requestMatchers(HttpMethod.GET, "/api/v1/products", "/api/v1/products/**").permitAll()
                 // 리뷰 조회 공개 API (로그인 없이 조회 가능)
                 .requestMatchers(HttpMethod.GET, "/api/v1/reviews/**").permitAll()
                 // 찜하기 API 임시 공개 (개발용 - 나중에 인증 필요로 변경)
-                .requestMatchers("/api/v1/favorites/**").permitAll()
+                // .requestMatchers("/api/v1/favorites/**").permitAll()
                 // 나머지는 인증 필요
                 .anyRequest().authenticated()
             )
@@ -68,11 +68,10 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // 허용할 Origin 명시적 지정 (allowCredentials 사용 시 필수)
-        configuration.setAllowedOrigins(Arrays.asList(
-            "http://localhost:5173",  // Vite 기본 포트
-            "http://localhost:3000",  // Create React App 기본 포트
-            "http://localhost:5174"   // Vite 대체 포트
+        // 허용할 Origin 명시적 지정 (allowCredentials 사용 시 필수)        
+        configuration.setAllowedOriginPatterns(Arrays.asList(
+            "http://localhost:*",
+            "http://127.0.0.1:*"
         ));
 
         // 허용할 HTTP 메서드
@@ -80,8 +79,16 @@ public class SecurityConfig {
             "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
         ));
 
-        // 허용할 헤더 (모든 헤더 허용)
-        configuration.addAllowedHeader("*");
+        // 허용할 헤더
+        configuration.setAllowedHeaders(Arrays.asList(
+            "Authorization",
+            "Content-Type",
+            "X-Requested-With",
+            "Accept",
+            "Origin",
+            "Access-Control-Request-Method",
+            "Access-Control-Request-Headers"
+        ));
 
         // 인증 정보 포함 허용 (쿠키, Authorization 헤더 등)
         configuration.setAllowCredentials(true);

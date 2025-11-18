@@ -3,8 +3,8 @@ import { Search } from "lucide-react";
 import { ChatListItem } from "../components/ChatListItem";
 import { Input } from "../components/ui/input";
 import { chatService } from "../services/firebase/chatService";
-import { authApi } from "../services/api/authApi";
-import type { ChatRoom, User } from "../types";
+import { authApi } from "../api/auth";
+import type { AuthUser, ChatRoom } from "../types";
 
 interface ChatListPageProps {
   onNavigate: (page: string, chatId?: string) => void;
@@ -12,27 +12,37 @@ interface ChatListPageProps {
 
 export function ChatListPage({ onNavigate }: ChatListPageProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
 
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
 
-    const run = async () => {
-      try {
-        const me = await authApi.getCurrentUser();
-        setCurrentUser(me);
-        unsubscribe = chatService.subscribeToChatRooms(me.id, (list) => {
-          setRooms(list);
-        });
-      } catch (e) {
-        console.error("Failed to load current user or subscribe rooms", e);
+    const subscribe = () => {
+      if (unsubscribe) {
+        unsubscribe();
+        unsubscribe = null;
       }
+
+      const me = authApi.getCurrentUser();
+      setCurrentUser(me);
+
+      if (!me) {
+        setRooms([]);
+        return;
+      }
+
+      unsubscribe = chatService.subscribeToChatRooms(me.id, (list) => {
+        setRooms(list);
+      });
     };
-    run();
+
+    subscribe();
+    window.addEventListener("auth-change", subscribe);
 
     return () => {
       if (unsubscribe) unsubscribe();
+      window.removeEventListener("auth-change", subscribe);
     };
   }, []);
 

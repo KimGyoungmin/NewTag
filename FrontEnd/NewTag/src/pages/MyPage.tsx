@@ -100,9 +100,14 @@ export function MyPage({ onNavigate }: MyPageProps) {
     setProductStatuses(prev => ({ ...prev }));
   };
 
-  const handleLogoutConfirm = () => {
-    authApi.logout();
-    toast.success("로그아웃되었습니다.");
+  const handleLogoutConfirm = async () => {
+    try {
+      await authApi.logout();
+      toast.success("로그아웃되었습니다.");
+    } catch (error) {
+      console.error("Failed to logout", error);
+      toast.error("로그아웃 중 오류가 발생했습니다.");
+    }
     setShowLogoutDialog(false);
     onNavigate('login');
   };
