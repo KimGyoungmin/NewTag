@@ -49,7 +49,7 @@ export const postApi = {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
-    });
+    }); 
     return response.data;
   },
 };
