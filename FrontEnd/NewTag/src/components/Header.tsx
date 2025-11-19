@@ -44,7 +44,10 @@ export function Header({ onSearchClick, onSearch, onLogoClick, onLoginClick }: H
           }
         }
       } else {
+        // 로그아웃 시: 검색 기록 초기화 및 검색 오버레이 닫기
         setRecentSearches([]);
+        setIsSearchActive(false);
+        setSearchQuery('');
       }
     };
 
@@ -63,8 +66,19 @@ export function Header({ onSearchClick, onSearch, onLogoClick, onLoginClick }: H
   }, []);
 
   // Activate search and focus input
-  const handleSearchActivate = () => {
+  const handleSearchActivate = async () => {
     setIsSearchActive(true);
+
+    // 검색 오버레이를 열 때마다 최신 검색어 로드
+    const currentUser = authApi.getCurrentUser();
+    if (currentUser?.id) {
+      try {
+        const keywords = await productsApi.getRecentKeywords(currentUser.id, 10);
+        setRecentSearches(keywords);
+      } catch (error) {
+        console.error('Failed to load recent searches:', error);
+      }
+    }
   };
 
   // Close search overlay
@@ -81,21 +95,10 @@ export function Header({ onSearchClick, onSearch, onLogoClick, onLoginClick }: H
         onSearch(query);
       }
 
-      // Reload recent searches from Backend after search
-      const currentUser = authApi.getCurrentUser();
-      if (currentUser?.id) {
-        try {
-          // Wait a bit for the search log to be saved
-          setTimeout(async () => {
-            const keywords = await productsApi.getRecentKeywords(currentUser.id, 10);
-            setRecentSearches(keywords);
-          }, 500);
-        } catch (error) {
-          console.error('Failed to reload recent searches:', error);
-        }
-      }
-
+      // Close the search overlay
       handleSearchClose();
+
+      // Note: 검색 기록은 다음에 검색 오버레이를 열 때 최신 상태로 로드됩니다
     }
   };
 
@@ -106,14 +109,23 @@ export function Header({ onSearchClick, onSearch, onLogoClick, onLoginClick }: H
   };
 
   // Remove a recent search
-  // TODO: Backend API 추가 필요 - 검색어 개별 삭제
   const handleRemoveRecentSearch = async (query: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    // 임시로 로컬에서만 제거 (새로고침 시 다시 나타남)
-    setRecentSearches(prev => prev.filter(q => q !== query));
 
-    // TODO: Backend API 호출
-    // await productsApi.deleteRecentKeyword(userId, query);
+    const currentUser = authApi.getCurrentUser();
+    if (!currentUser?.id) return;
+
+    try {
+      // 백엔드 API 호출하여 검색어 삭제
+      await productsApi.deleteRecentKeyword(currentUser.id, query);
+
+      // UI 업데이트 (즉시 반영)
+      setRecentSearches(prev => prev.filter(q => q !== query));
+    } catch (error) {
+      console.error('Failed to delete recent search:', error);
+      // 실패 시에도 UI에서 일단 제거 (사용자 경험 개선)
+      setRecentSearches(prev => prev.filter(q => q !== query));
+    }
   };
 
   // Close on escape key
@@ -288,7 +300,7 @@ export function Header({ onSearchClick, onSearch, onLogoClick, onLoginClick }: H
                         </div>
                         <div
                           onClick={(e) => handleRemoveRecentSearch(query, e)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-background rounded cursor-pointer"
+                          className="opacity-60 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 hover:bg-background rounded cursor-pointer"
                         >
                           <X className="h-3 w-3 text-muted-foreground" />
                         </div>

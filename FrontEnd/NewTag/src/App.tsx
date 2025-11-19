@@ -63,6 +63,38 @@ export default function App() {
     };
   }, []);
 
+  // ============================================
+  // 로그인 상태 변경 감지 - 화면 초기화
+  // ============================================
+  useEffect(() => {
+    const handleAuthChange = () => {
+      const isAuth = authApi.isAuthenticated();
+
+      if (isAuth) {
+        // 로그인 시: 홈 화면으로 이동 및 검색어 초기화
+        setCurrentPage("home");
+        setSearchQuery("");
+        setSelectedProductId("");
+        setSelectedChatId("");
+        setSelectedSellerId("");
+      } else {
+        // 로그아웃 시: 로그인 화면으로 이동 및 모든 상태 초기화
+        setCurrentPage("login");
+        setSearchQuery("");
+        setSelectedProductId("");
+        setSelectedChatId("");
+        setSelectedSellerId("");
+      }
+    };
+
+    // auth-change 이벤트 리스너 등록
+    window.addEventListener('auth-change', handleAuthChange);
+
+    return () => {
+      window.removeEventListener('auth-change', handleAuthChange);
+    };
+  }, []);
+
 
   // ============================================
   // 네비게이션 핸들러
