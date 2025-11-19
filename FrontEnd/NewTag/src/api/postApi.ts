@@ -17,13 +17,39 @@ export interface CreatePostRequest {
   isResell: boolean;
 }
 
-export interface PostSimpleResponse {
+// Backend의 ProductDtos.DetailResponse와 완전히 일치
+export interface ProductDetailResponse {
   id: number;
   title: string;
   price: number;
+  content: string;
   status: string;
-  mainImage?: string;
-  createdAt?: string;
+  locationNm: string;
+  latitude: number;
+  longitude: number;
+  viewCount: number;
+  favoriteCount: number;
+  timeAgo: string;
+  createdAt: string;
+  categoryId: number;
+  images: Array<{
+    id: number;
+    pImg: string;
+    isMain: boolean;
+    createdAt: string;
+    updatedAt: string;
+    productId: number;
+  }>;
+  mainImage: string;
+  sellerId: number;
+  sellerName: string;
+  sellerNick: string;
+  sellerProfileImg: string;
+  sellerRatingAvg: number;
+  sellerRatingCount: number;
+  sellerGrade: string;
+  likedByMe: boolean;
+  isResell: boolean;
 }
 
 export interface UploadImageResponse {
@@ -33,8 +59,8 @@ export interface UploadImageResponse {
 }
 
 export const postApi = {
-  create: async (payload: CreatePostRequest): Promise<PostSimpleResponse> => {
-    const response = await api.post<PostSimpleResponse>('/products', payload);
+  create: async (payload: CreatePostRequest): Promise<ProductDetailResponse> => {
+    const response = await api.post<ProductDetailResponse>('/products', payload);
     return response.data;
   },
 

@@ -2,14 +2,8 @@ import { Search, X, Clock, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { useState, useEffect, useRef } from "react";
-import { Badge } from "./ui/badge";
-import {
-  getRecentSearches,
-  addRecentSearch,
-  removeRecentSearch,
-  clearRecentSearches
-} from "../utils/localStorage";
 import { authApi } from "../api/auth";
+import { productsApi } from "../api/products";
 
 interface HeaderProps {
   onSearchClick?: () => void;
@@ -28,13 +22,30 @@ export function Header({ onSearchClick, onSearch, onLogoClick, onLoginClick }: H
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Initialize recent searches from local storage
-  const [recentSearches, setRecentSearches] = useState<string[]>(getRecentSearches());
+  // Initialize recent searches (will be loaded from Backend)
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
-  // Check login status on mount and when localStorage changes
+  // Check login status and load recent searches from Backend
   useEffect(() => {
-    const checkAuthStatus = () => {
-      setIsLoggedIn(authApi.isAuthenticated());
+    const checkAuthStatus = async () => {
+      const isAuth = authApi.isAuthenticated();
+      setIsLoggedIn(isAuth);
+
+      // Load recent searches from Backend if logged in
+      if (isAuth) {
+        const currentUser = authApi.getCurrentUser();
+        if (currentUser?.id) {
+          try {
+            const keywords = await productsApi.getRecentKeywords(currentUser.id, 10);
+            setRecentSearches(keywords);
+          } catch (error) {
+            console.error('Failed to load recent searches:', error);
+            setRecentSearches([]);
+          }
+        }
+      } else {
+        setRecentSearches([]);
+      }
     };
 
     checkAuthStatus();
@@ -63,17 +74,27 @@ export function Header({ onSearchClick, onSearch, onLogoClick, onLoginClick }: H
   };
 
   // Handle search submission
-  const handleSearchSubmit = (query: string) => {
+  const handleSearchSubmit = async (query: string) => {
     if (query.trim()) {
-      // Add to recent searches
-      addRecentSearch(query);
-      setRecentSearches(getRecentSearches());
-      
-      // Navigate to search page with query
+      // Navigate to search page with query (this will trigger the search API)
       if (onSearch) {
         onSearch(query);
       }
-      
+
+      // Reload recent searches from Backend after search
+      const currentUser = authApi.getCurrentUser();
+      if (currentUser?.id) {
+        try {
+          // Wait a bit for the search log to be saved
+          setTimeout(async () => {
+            const keywords = await productsApi.getRecentKeywords(currentUser.id, 10);
+            setRecentSearches(keywords);
+          }, 500);
+        } catch (error) {
+          console.error('Failed to reload recent searches:', error);
+        }
+      }
+
       handleSearchClose();
     }
   };
@@ -85,10 +106,14 @@ export function Header({ onSearchClick, onSearch, onLogoClick, onLoginClick }: H
   };
 
   // Remove a recent search
-  const handleRemoveRecentSearch = (query: string, e: React.MouseEvent) => {
+  // TODO: Backend API 추가 필요 - 검색어 개별 삭제
+  const handleRemoveRecentSearch = async (query: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    removeRecentSearch(query);
-    setRecentSearches(getRecentSearches());
+    // 임시로 로컬에서만 제거 (새로고침 시 다시 나타남)
+    setRecentSearches(prev => prev.filter(q => q !== query));
+
+    // TODO: Backend API 호출
+    // await productsApi.deleteRecentKeyword(userId, query);
   };
 
   // Close on escape key
