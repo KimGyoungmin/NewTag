@@ -1,14 +1,15 @@
-import { useMemo, useRef, useState } from "react";
+﻿import { useMemo, useRef, useState } from "react";
 import { ChevronLeft, X, Camera, MapPin } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { CATEGORIES } from "../constants";
+import { CATEGORIES, IMAGE_CONFIG } from "../constants";
 import { postApi } from "../api/postApi";
 import { resolveImageUrl } from "../utils/image";
 import { toast } from "sonner";
+import { LocationPicker } from "../components/LocationPicker";
 
 interface ProductRegisterPageProps {
   onNavigate: (page: string, id?: string) => void;
@@ -19,6 +20,7 @@ const DEFAULT_LONGITUDE = 127.0276;
 
 export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
   const [images, setImages] = useState<string[]>([]);
+
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [price, setPrice] = useState("");
@@ -27,6 +29,8 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
   const [isResell, setIsResell] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [isAutoWriting, setIsAutoWriting] = useState(false);
+
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -75,6 +79,7 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
     setImages(images.filter((_, i) => i !== index));
   };
 
+
   const getImagePreview = (path: string) => {
     return resolveImageUrl(path);
   };
@@ -93,10 +98,18 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
       return;
     }
 
-    if (images.length === 0) {
-      toast.error("최소 한 장의 이미지를 등록해 주세요.");
-      return;
-    }
+    const imagePayload =
+      images.length > 0
+        ? images.map((image, index) => ({
+            path: image,
+            isMain: index === 0,
+          }))
+        : [
+            {
+              path: IMAGE_CONFIG.DEFAULT_PRODUCT,
+              isMain: true,
+            },
+          ];
 
     const payload = {
       title,
@@ -106,10 +119,7 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
       locationNm: location,
       latitude: DEFAULT_LATITUDE,
       longitude: DEFAULT_LONGITUDE,
-      images: images.map((image, index) => ({
-        path: image,
-        isMain: index === 0,
-      })),
+      images: imagePayload,
       isResell,
     };
 
@@ -128,6 +138,38 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
       toast.error("게시글 등록에 실패했습니다. 다시 시도해 주세요.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleAutoWrite = async () => {
+    if (isAutoWriting) return;
+    if (images.length === 0) {
+      toast.error("AI 자동 작성을 사용하려면 이미지를 먼저 업로드해주세요.");
+      return;
+    }
+    try {
+      setIsAutoWriting(true);
+      const result = await postApi.autoWrite(images);
+      if (result.title) {
+        setTitle(result.title);
+      }
+      if (result.content) {
+        setDescription(result.content);
+      }
+      if (result.price && result.price > 0) {
+        setPrice(result.price.toString());
+      }
+      if (result.categoryId) {
+        setCategoryId(result.categoryId.toString());
+      } else if (result.categoryName) {
+        toast.info(`추천 카테고리: ${result.categoryName}`);
+      }
+      toast.success("AI가 작성 내용을 불러왔어요.");
+    } catch (error) {
+      console.error("Failed to auto write:", error);
+      toast.error("AI 자동 작성에 실패했습니다. 다시 시도해주세요.");
+    } finally {
+      setIsAutoWriting(false);
     }
   };
 
@@ -214,6 +256,22 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
           />
         </div>
 
+        <div className="flex items-center justify-between rounded-lg border border-dashed px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold">AI 자동 작성</p>
+            <p className="text-xs text-muted-foreground">업로드한 첫 번째 이미지를 기반으로 제목 · 내용 · 가격 · 카테고리를 추천해 드립니다.</p>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            onClick={handleAutoWrite}
+            disabled={isAutoWriting || images.length === 0}
+          >
+            {isAutoWriting ? "생성 중..." : "AI 자동 작성"}
+          </Button>
+        </div>
+
         <div>
           <Label htmlFor="title">제목</Label>
           <Input
@@ -273,6 +331,7 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
           <Label htmlFor="location">거래 희망 장소</Label>
           <div className="mt-2 flex items-center gap-2">
             <MapPin className="h-5 w-5 text-primary" />
+
             <span>{location}</span>
             <Button variant="link" size="sm" className="ml-auto" disabled>
               변경
@@ -281,6 +340,7 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
         </div>
       </div>
 
+
       <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background p-4">
         <div className="container mx-auto max-w-2xl">
           <Button
@@ -288,10 +348,10 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
             onClick={handleSubmit}
             disabled={
               isSubmitting ||
+              isAutoWriting ||
               !title ||
               !categoryId ||
-              !price ||
-              images.length === 0
+              !price
             }
           >
             {isSubmitting ? "등록 중..." : "작성 완료"}
@@ -301,3 +361,8 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
     </div>
   );
 }
+
+
+
+
+

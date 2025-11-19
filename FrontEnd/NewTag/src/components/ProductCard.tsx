@@ -1,4 +1,4 @@
-import { Heart } from "lucide-react";
+import { Heart, MapPin } from "lucide-react";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 import { Button } from "./ui/button";
 import { Badge } from "./ui/badge";
@@ -6,6 +6,7 @@ import { useState } from "react";
 import { favoriteApi } from "../api/favoriteApi";
 import { authApi } from "../api/auth";
 import { toast } from "sonner";
+import { formatDistance } from "../utils/kakaoMap";
 
 /**
  * ============================================
@@ -32,6 +33,7 @@ interface ProductCardProps {
   chatCount: number;
   status?: 'available' | 'reserved' | 'sold';
   isLikedByMe?: boolean; // 백엔드에서 받은 찜 상태
+  distance?: number; // 거리 (km)
   onClick?: () => void;
   onNavigate?: (page: string) => void;
 }
@@ -47,6 +49,7 @@ export function ProductCard({
   chatCount,
   status = 'available',
   isLikedByMe = false,
+  distance,
   onClick,
   onNavigate
 }: ProductCardProps) {
@@ -114,7 +117,17 @@ export function ProductCard({
         </div>
         <div className="space-y-1">
           <div className="text-sm text-muted-foreground truncate">
-            {location} · {timeAgo}
+            {location}
+            {distance !== undefined && (
+              <>
+                {' · '}
+                <span className="inline-flex items-center gap-1">
+                  <MapPin className="h-3 w-3" />
+                  {formatDistance(distance)}
+                </span>
+              </>
+            )}
+            {' · '}{timeAgo}
           </div>
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
             <span className="flex items-center gap-1">

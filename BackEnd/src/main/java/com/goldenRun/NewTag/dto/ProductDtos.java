@@ -19,6 +19,7 @@ public class ProductDtos {
         private Double latitude;
         private Double longitude;
         private Integer sellerId;
+        private Boolean isResell;
         private List<ImageItem> images; // ?뚯씪紐?URL 紐⑸줉 (泥?踰덉㎏瑜?isMain?쇰줈 吏??
     }
 

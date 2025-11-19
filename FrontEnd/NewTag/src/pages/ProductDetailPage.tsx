@@ -6,6 +6,7 @@ import { Badge } from "../components/ui/badge";
 import { Separator } from "../components/ui/separator";
 import { Skeleton } from "../components/ui/skeleton";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
+import { KakaoMap } from "../components/KakaoMap";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -223,7 +224,7 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
 
     try {
       const productImage = product.images && product.images.length > 0
-        ? getFullImageUrl(product.images[0].pImg || product.images[0].pimg)
+        ? getFullImageUrl(product.images[0].pImg || product.images[0].pImg)
         : getFullImageUrl(undefined);
 
       const chatId = await chatService.getOrCreateChatRoom(
@@ -552,11 +553,25 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
         {/* Location */}
         <div className="bg-card px-4 py-6">
           <h3 className="text-lg font-semibold mb-3">거래 희망 장소</h3>
-          <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="flex items-center gap-2 text-muted-foreground mb-4">
             <MapPin className="h-4 w-4" />
             <span>{product.locationNm}</span>
           </div>
-          {/* TODO: 지도 컴포넌트 추가 */}
+          {/* 카카오 맵 표시 */}
+          {product.latitude && product.longitude && (
+            <div className="mt-4 rounded-lg overflow-hidden border">
+              <KakaoMap
+                latitude={product.latitude}
+                longitude={product.longitude}
+                locationName={product.locationNm}
+                height="300px"
+                level={3}
+                draggable={false}
+                zoomable={true}
+                showMarker={true}
+              />
+            </div>
+          )}
         </div>
 
         <Separator />
