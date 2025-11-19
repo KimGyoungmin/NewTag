@@ -32,6 +32,15 @@ export interface UploadImageResponse {
   url: string;
 }
 
+export interface AutoWriteResponse {
+  title?: string;
+  content?: string;
+  price?: number;
+  categoryId?: number;
+  categoryName?: string;
+  sourceImage?: string;
+}
+
 export const postApi = {
   create: async (payload: CreatePostRequest): Promise<PostSimpleResponse> => {
     const response = await api.post<PostSimpleResponse>('/products', payload);
@@ -50,6 +59,11 @@ export const postApi = {
         'Content-Type': 'multipart/form-data',
       },
     });
+    return response.data;
+  },
+
+  autoWrite: async (imagePaths: string[]): Promise<AutoWriteResponse> => {
+    const response = await api.post<AutoWriteResponse>('/ai/auto-listing', { imagePaths });
     return response.data;
   },
 };
