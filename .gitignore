@@ -70,3 +70,7 @@ target/
 *.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
+
+/venv
+.venv
+venv/

@@ -131,6 +131,24 @@ export const productsApi = {
   },
 
   /**
+   * 특정 검색어 삭제
+   */
+  deleteRecentKeyword: async (userId: number, keyword: string): Promise<void> => {
+    await api.delete('/products/search/recent', {
+      params: { userId, keyword },
+    });
+  },
+
+  /**
+   * 모든 검색어 삭제
+   */
+  deleteAllRecentKeywords: async (userId: number): Promise<void> => {
+    await api.delete('/products/search/recent/all', {
+      params: { userId },
+    });
+  },
+
+  /**
    * 위치 기반 상품 검색
    */
   getProductsByLocation: async (latitude: number, longitude: number, radius: number): Promise<Product[]> => {

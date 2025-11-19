@@ -2,14 +2,8 @@ import { Search, X, Clock, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { useState, useEffect, useRef } from "react";
-import { Badge } from "./ui/badge";
-import {
-  getRecentSearches,
-  addRecentSearch,
-  removeRecentSearch,
-  clearRecentSearches
-} from "../utils/localStorage";
 import { authApi } from "../api/auth";
+import { productsApi } from "../api/products";
 
 interface HeaderProps {
   onSearchClick?: () => void;
@@ -28,13 +22,33 @@ export function Header({ onSearchClick, onSearch, onLogoClick, onLoginClick }: H
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const scrollTimeoutRef = useRef<NodeJS.Timeout>();
 
-  // Initialize recent searches from local storage
-  const [recentSearches, setRecentSearches] = useState<string[]>(getRecentSearches());
+  // Initialize recent searches (will be loaded from Backend)
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
-  // Check login status on mount and when localStorage changes
+  // Check login status and load recent searches from Backend
   useEffect(() => {
-    const checkAuthStatus = () => {
-      setIsLoggedIn(authApi.isAuthenticated());
+    const checkAuthStatus = async () => {
+      const isAuth = authApi.isAuthenticated();
+      setIsLoggedIn(isAuth);
+
+      // Load recent searches from Backend if logged in
+      if (isAuth) {
+        const currentUser = authApi.getCurrentUser();
+        if (currentUser?.id) {
+          try {
+            const keywords = await productsApi.getRecentKeywords(currentUser.id, 10);
+            setRecentSearches(keywords);
+          } catch (error) {
+            console.error('Failed to load recent searches:', error);
+            setRecentSearches([]);
+          }
+        }
+      } else {
+        // 로그아웃 시: 검색 기록 초기화 및 검색 오버레이 닫기
+        setRecentSearches([]);
+        setIsSearchActive(false);
+        setSearchQuery('');
+      }
     };
 
     checkAuthStatus();
@@ -52,8 +66,19 @@ export function Header({ onSearchClick, onSearch, onLogoClick, onLoginClick }: H
   }, []);
 
   // Activate search and focus input
-  const handleSearchActivate = () => {
+  const handleSearchActivate = async () => {
     setIsSearchActive(true);
+
+    // 검색 오버레이를 열 때마다 최신 검색어 로드
+    const currentUser = authApi.getCurrentUser();
+    if (currentUser?.id) {
+      try {
+        const keywords = await productsApi.getRecentKeywords(currentUser.id, 10);
+        setRecentSearches(keywords);
+      } catch (error) {
+        console.error('Failed to load recent searches:', error);
+      }
+    }
   };
 
   // Close search overlay
@@ -63,18 +88,17 @@ export function Header({ onSearchClick, onSearch, onLogoClick, onLoginClick }: H
   };
 
   // Handle search submission
-  const handleSearchSubmit = (query: string) => {
+  const handleSearchSubmit = async (query: string) => {
     if (query.trim()) {
-      // Add to recent searches
-      addRecentSearch(query);
-      setRecentSearches(getRecentSearches());
-      
-      // Navigate to search page with query
+      // Navigate to search page with query (this will trigger the search API)
       if (onSearch) {
         onSearch(query);
       }
-      
+
+      // Close the search overlay
       handleSearchClose();
+
+      // Note: 검색 기록은 다음에 검색 오버레이를 열 때 최신 상태로 로드됩니다
     }
   };
 
@@ -85,10 +109,23 @@ export function Header({ onSearchClick, onSearch, onLogoClick, onLoginClick }: H
   };
 
   // Remove a recent search
-  const handleRemoveRecentSearch = (query: string, e: React.MouseEvent) => {
+  const handleRemoveRecentSearch = async (query: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    removeRecentSearch(query);
-    setRecentSearches(getRecentSearches());
+
+    const currentUser = authApi.getCurrentUser();
+    if (!currentUser?.id) return;
+
+    try {
+      // 백엔드 API 호출하여 검색어 삭제
+      await productsApi.deleteRecentKeyword(currentUser.id, query);
+
+      // UI 업데이트 (즉시 반영)
+      setRecentSearches(prev => prev.filter(q => q !== query));
+    } catch (error) {
+      console.error('Failed to delete recent search:', error);
+      // 실패 시에도 UI에서 일단 제거 (사용자 경험 개선)
+      setRecentSearches(prev => prev.filter(q => q !== query));
+    }
   };
 
   // Close on escape key
@@ -263,7 +300,7 @@ export function Header({ onSearchClick, onSearch, onLogoClick, onLoginClick }: H
                         </div>
                         <div
                           onClick={(e) => handleRemoveRecentSearch(query, e)}
-                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-background rounded cursor-pointer"
+                          className="opacity-60 md:opacity-0 md:group-hover:opacity-100 transition-opacity p-1 hover:bg-background rounded cursor-pointer"
                         >
                           <X className="h-3 w-3 text-muted-foreground" />
                         </div>

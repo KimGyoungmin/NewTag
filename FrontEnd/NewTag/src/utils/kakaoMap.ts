@@ -6,15 +6,79 @@ declare global {
   }
 }
 
+// 스크립트 로드 상태 추적
+let isLoading = false;
+let isLoaded = false;
+
+/**
+ * 카카오 맵 SDK 동적 로드
+ */
+const loadKakaoMapScript = (): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    // 이미 로드된 경우
+    if (isLoaded && window.kakao && window.kakao.maps) {
+      resolve();
+      return;
+    }
+
+    // 로딩 중인 경우 대기
+    if (isLoading) {
+      const checkLoaded = setInterval(() => {
+        if (isLoaded && window.kakao && window.kakao.maps) {
+          clearInterval(checkLoaded);
+          resolve();
+        }
+      }, 100);
+      return;
+    }
+
+    // 스크립트 로드 시작
+    isLoading = true;
+
+    const KAKAO_MAP_KEY = import.meta.env.VITE_KAKAO_MAP_APP_KEY;
+
+    if (!KAKAO_MAP_KEY) {
+      reject(new Error('카카오맵 API 키가 설정되지 않았습니다. .env 파일을 확인해주세요.'));
+      isLoading = false;
+      return;
+    }
+
+    const script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_MAP_KEY}&libraries=services,clusterer,drawing&autoload=false`;
+
+    script.onload = () => {
+      isLoading = false;
+      isLoaded = true;
+      resolve();
+    };
+
+    script.onerror = () => {
+      isLoading = false;
+      reject(new Error('카카오맵 SDK 로드에 실패했습니다. API 키와 네트워크를 확인해주세요.'));
+    };
+
+    document.head.appendChild(script);
+  });
+};
+
 /**
  * 카카오 맵 SDK 로드 대기
  */
 export const loadKakaoMap = (): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    if (window.kakao && window.kakao.maps) {
-      window.kakao.maps.load(() => resolve());
-    } else {
-      reject(new Error('카카오 맵 SDK를 로드할 수 없습니다.'));
+  return new Promise(async (resolve, reject) => {
+    try {
+      // 스크립트 로드
+      await loadKakaoMapScript();
+
+      // kakao.maps.load 호출
+      if (window.kakao && window.kakao.maps) {
+        window.kakao.maps.load(() => resolve());
+      } else {
+        reject(new Error('카카오 맵 SDK를 로드할 수 없습니다.'));
+      }
+    } catch (error) {
+      reject(error);
     }
   });
 };
