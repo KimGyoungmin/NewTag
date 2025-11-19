@@ -133,6 +133,35 @@ public class ProductController {
         return ResponseEntity.ok(keywords);
     }
 
+    /**
+     * 상품 등록
+     * POST /api/v1/products
+     */
+    @PostMapping
+    public ResponseEntity<ProductDtos.DetailResponse> createProduct(
+            @RequestBody ProductDtos.CreateRequest request,
+            @AuthenticationPrincipal String currentUserNick
+    ) {
+        ProductDtos.DetailResponse created = productService.createProduct(request, currentUserNick);
+        return ResponseEntity.status(201).body(created);
+    }
+
+    /**
+     * 상품 삭제 (소프트 삭제)
+     * DELETE /api/v1/products/{id}
+     */
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> deleteProduct(
+            @PathVariable Long id,
+            @AuthenticationPrincipal String currentUserNick
+    ) {
+        productService.deleteProduct(id, currentUserNick);
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "상품이 삭제되었습니다."
+        ));
+    }
+
     @PatchMapping("/{id}/status")
     public ResponseEntity<ProductDtos.DetailResponse> updateStatus(
             @PathVariable Long id,

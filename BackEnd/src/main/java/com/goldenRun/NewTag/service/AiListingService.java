@@ -45,6 +45,9 @@ public class AiListingService {
     @Value("${app.upload-dir:static/uploads}")
     private String uploadDir;
 
+    @Value("${app.upload.base-dir:}")
+    private String uploadBaseDir;
+
     private static final List<CategoryHint> CATEGORY_HINTS =
             List.of(
                     new CategoryHint("전자", List.of("전자", "디지털", "휴대폰", "모바일", "노트북", "카메라")),
@@ -128,23 +131,44 @@ public class AiListingService {
         }
 
         String normalized = rawPath.replace("\\", "/").strip();
-        Path path = Paths.get(normalized);
-        if (!path.isAbsolute()) {
-            Path uploadBase = Paths.get(uploadDir).toAbsolutePath().normalize();
-            String relative = normalized;
-            if (relative.startsWith("static/")) {
-                relative = relative.substring("static/".length());
+        Path initial = Paths.get(normalized);
+        if (initial.isAbsolute()) {
+            if (!Files.exists(initial)) {
+                throw new IllegalArgumentException("이미지 파일을 찾을 수 없습니다: " + initial);
             }
-            if (relative.startsWith("uploads/")) {
-                relative = relative.substring("uploads/".length());
-            }
-            path = uploadBase.resolve(relative).normalize();
+            return initial.toString();
         }
 
-        if (!Files.exists(path)) {
-            throw new IllegalArgumentException("이미지 파일을 찾을 수 없습니다: " + path);
+        List<Path> candidates = new ArrayList<>();
+        if (StringUtils.hasText(uploadDir)) {
+            candidates.add(buildCandidate(Paths.get(uploadDir), normalized));
         }
-        return path.toString();
+        if (StringUtils.hasText(uploadBaseDir)) {
+            candidates.add(buildCandidate(Paths.get(uploadBaseDir), normalized));
+        }
+
+        for (Path candidate : candidates) {
+            if (candidate != null && Files.exists(candidate)) {
+                return candidate.toString();
+            }
+        }
+
+        throw new IllegalArgumentException("이미지 파일을 찾을 수 없습니다: " + candidates);
+    }
+
+    private Path buildCandidate(Path baseDir, String raw) {
+        if (baseDir == null) {
+            return null;
+        }
+        Path normalizedBase = baseDir.toAbsolutePath().normalize();
+        String relative = raw;
+        if (relative.startsWith("static/")) {
+            relative = relative.substring("static/".length());
+        }
+        if (relative.startsWith("uploads/")) {
+            relative = relative.substring("uploads/".length());
+        }
+        return normalizedBase.resolve(relative).normalize();
     }
 
     private static String normalize(String input) {

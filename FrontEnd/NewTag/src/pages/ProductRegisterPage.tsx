@@ -5,10 +5,11 @@ import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { CATEGORIES } from "../constants";
+import { CATEGORIES, IMAGE_CONFIG } from "../constants";
 import { postApi } from "../api/postApi";
 import { resolveImageUrl } from "../utils/image";
 import { toast } from "sonner";
+import { LocationPicker } from "../components/LocationPicker";
 
 interface ProductRegisterPageProps {
   onNavigate: (page: string, id?: string) => void;
@@ -19,6 +20,7 @@ const DEFAULT_LONGITUDE = 127.0276;
 
 export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
   const [images, setImages] = useState<string[]>([]);
+
   const [title, setTitle] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [price, setPrice] = useState("");
@@ -28,6 +30,7 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isAutoWriting, setIsAutoWriting] = useState(false);
+
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -76,6 +79,7 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
     setImages(images.filter((_, i) => i !== index));
   };
 
+
   const getImagePreview = (path: string) => {
     return resolveImageUrl(path);
   };
@@ -94,10 +98,18 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
       return;
     }
 
-    if (images.length === 0) {
-      toast.error("최소 한 장의 이미지를 등록해 주세요.");
-      return;
-    }
+    const imagePayload =
+      images.length > 0
+        ? images.map((image, index) => ({
+            path: image,
+            isMain: index === 0,
+          }))
+        : [
+            {
+              path: IMAGE_CONFIG.DEFAULT_PRODUCT,
+              isMain: true,
+            },
+          ];
 
     const payload = {
       title,
@@ -107,10 +119,7 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
       locationNm: location,
       latitude: DEFAULT_LATITUDE,
       longitude: DEFAULT_LONGITUDE,
-      images: images.map((image, index) => ({
-        path: image,
-        isMain: index === 0,
-      })),
+      images: imagePayload,
       isResell,
     };
 
@@ -322,6 +331,7 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
           <Label htmlFor="location">거래 희망 장소</Label>
           <div className="mt-2 flex items-center gap-2">
             <MapPin className="h-5 w-5 text-primary" />
+
             <span>{location}</span>
             <Button variant="link" size="sm" className="ml-auto" disabled>
               변경
@@ -329,6 +339,7 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
           </div>
         </div>
       </div>
+
 
       <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background p-4">
         <div className="container mx-auto max-w-2xl">
@@ -340,8 +351,7 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
               isAutoWriting ||
               !title ||
               !categoryId ||
-              !price ||
-              images.length === 0
+              !price
             }
           >
             {isSubmitting ? "등록 중..." : "작성 완료"}
