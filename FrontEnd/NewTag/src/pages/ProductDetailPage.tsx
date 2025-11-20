@@ -110,6 +110,11 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
   const handleStatusChange = async (newStatus: ProductStatus) => {
     if (!product) return;
 
+    if (newStatus === "SOLD_OUT") {
+      onNavigate("select-buyer", product.id.toString());
+      return;
+    }
+
     try {
       const updated = await productApi.updateStatus(product.id, newStatus);
       if (updated) {

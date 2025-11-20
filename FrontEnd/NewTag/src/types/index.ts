@@ -1,5 +1,5 @@
 // ============================================
-// 타입 정의 (DDL.sql 기반)
+// ?�???�의 (DDL.sql 기반)
 // ============================================
 
 export type UserRole = 'USER' | 'ADMIN';
@@ -7,7 +7,7 @@ export type SocialProvider = 'LOCAL' | 'GOOGLE' | 'KAKAO' | 'NAVER';
 export type ProductStatus = 'ON_SELL' | 'SOLD_OUT' | 'RESERVED';
 export type TransactionStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 
-// User 타입
+// User ?�??
 export interface User {
   id: number;
   name: string;
@@ -27,13 +27,13 @@ export interface User {
   updatedAt: string;
   profileImg: string;
 
-  // 판매자 평점 정보 (상품 상세에서 사용)
+  // ?�매???�점 ?�보 (?�품 ?�세?�서 ?�용)
   sellerRatingAvg?: number;
   sellerRatingCount?: number;
   sellerGrade?: string;
 }
 
-// Address 타입
+// Address ?�??
 export interface Address {
   id: number;
   locationNm: string;
@@ -42,7 +42,7 @@ export interface Address {
   userId: number;
 }
 
-// Category 타입
+// Category ?�??
 export interface Category {
   id: number;
   categoryNm: string;
@@ -50,7 +50,7 @@ export interface Category {
   updatedAt: string;
 }
 
-// Product 타입
+// Product ?�??
 export interface Product {
   id: number;
   price: number;
@@ -68,16 +68,16 @@ export interface Product {
   sellerId: number;
   categoryId: number;
 
-  // 조인된 데이터 (선택적)
+  // 조인???�이??(?�택??
   seller?: User;
   category?: Category;
   images?: ProductImage[];
   isFavorite?: boolean;
   favoriteCount?: number;
-  likedByMe?: boolean; // 현재 사용자가 찜했는지 여부
+  likedByMe?: boolean; // ?�재 ?�용?��? 찜했?��? ?��?
 }
 
-// Product Image 타입
+// Product Image ?�??
 export interface ProductImage {
   id: number;
   pImg: string;
@@ -87,7 +87,7 @@ export interface ProductImage {
   productId: number;
 }
 
-// Favorite 타입
+// Favorite ?�??
 export interface Favorite {
   id: number;
   createdAt: string;
@@ -97,7 +97,7 @@ export interface Favorite {
   product?: Product;
 }
 
-// Transaction 타입
+// Transaction ?�??
 export interface Transaction {
   id: number;
   status: TransactionStatus;
@@ -107,13 +107,13 @@ export interface Transaction {
   buyerId: number;
   sellerId: number;
 
-  // 조인된 데이터
+  // 조인???�이??
   product?: Product;
   buyer?: User;
   seller?: User;
 }
 
-// Review 타입
+// Review ?�??
 export interface Review {
   id: number;
   rating: number; // 1 ~ 5
@@ -124,7 +124,7 @@ export interface Review {
   writerId: number;
   targetId: number;
 
-  // 조인된 데이터
+  // 조인???�이??
   transaction?: Transaction;
   writer?: User;
   target?: User;
@@ -134,7 +134,7 @@ export interface Review {
   productTitle?: string;
 }
 
-// 평점 요약 타입
+// ?�점 ?�약 ?�??
 export interface RatingSummary {
   averageRating: number;
   totalCount: number;
@@ -146,8 +146,20 @@ export interface RatingSummary {
 }
 
 // ============================================
-// Firebase Firestore 타입 (채팅)
+// Firebase Firestore Ÿ��(ä��)
 // ============================================
+
+export interface ReviewNavigationPayload {
+  transactionId: number;
+  targetId: number;
+  productId?: number;
+  productTitle?: string;
+  sellerName?: string;
+  sellerNick?: string;
+  sellerProfileImg?: string;
+  buyerId: number;
+  chatId?: string;
+}
 
 export interface ChatMessage {
   id: string;
@@ -158,7 +170,10 @@ export interface ChatMessage {
   message: string;
   createdAt: Date;
   isRead: boolean;
+  messageType?: string;
+  reviewPayload?: ReviewNavigationPayload | null;
 }
+
 
 export interface ChatRoom {
   id: string;
@@ -179,7 +194,7 @@ export interface ChatRoom {
 }
 
 // ============================================
-// 알림 타입
+// ?�림 ?�??
 // ============================================
 
 export interface Notification {
@@ -194,10 +209,10 @@ export interface Notification {
 }
 
 // ============================================
-// API 요청/응답 타입
+// API ?�청/?�답 ?�??
 // ============================================
 
-// 회원가입 요청
+// ?�원가???�청
 export interface SignupRequest {
   name: string;
   nick: string;
@@ -207,17 +222,17 @@ export interface SignupRequest {
   birth?: string;
 }
 
-// 로그인 요청
+// 로그???�청
 export interface LoginRequest {
-  nick: string;  // 백엔드는 nick 기반 로그인
+  nick: string;  // 백엔?�는 nick 기반 로그??
   password: string;
 }
 
-// 로그인 세션 사용자
+// 로그???�션 ?�용??
 export type AuthUser = User;
 
 
-// 로그인 응답 (백엔드 응답 형식에 맞춤)
+// 로그???�답 (백엔???�답 ?�식??맞춤)
 export interface LoginResponse {
   success: boolean;
   message: string;
@@ -225,7 +240,7 @@ export interface LoginResponse {
   user?: AuthUser;
 }
 
-// 상품 등록 요청
+// ?�품 ?�록 ?�청
 export interface ProductCreateRequest {
   title: string;
   content: string;
@@ -237,7 +252,7 @@ export interface ProductCreateRequest {
   images: File[];
 }
 
-// 상품 수정 요청
+// ?�품 ?�정 ?�청
 export interface ProductUpdateRequest {
   title?: string;
   content?: string;
@@ -246,7 +261,7 @@ export interface ProductUpdateRequest {
   status?: ProductStatus;
 }
 
-// 후기 작성 요청
+// ?�기 ?�성 ?�청
 export interface ReviewCreateRequest {
   transactionId: number;
   targetId: number;
@@ -254,7 +269,7 @@ export interface ReviewCreateRequest {
   content?: string;
 }
 
-// API 응답 공통 타입
+// API ?�답 공통 ?�??
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -262,7 +277,7 @@ export interface ApiResponse<T> {
   error?: string;
 }
 
-// 페이지네이션 응답
+// ?�이지?�이???�답
 export interface PaginatedResponse<T> {
   content: T[];
   totalElements: number;
@@ -272,7 +287,7 @@ export interface PaginatedResponse<T> {
 }
 
 // ============================================
-// UI 상태 타입
+// UI ?�태 ?�??
 // ============================================
 
 export type Screen =
@@ -290,7 +305,8 @@ export type Screen =
   | 'reviews'
   | 'review-write'
   | 'register'
-  | 'register-ai';
+  | 'register-ai'
+  | 'select-buyer';
 
 export interface ReviewTarget {
   productTitle: string;
