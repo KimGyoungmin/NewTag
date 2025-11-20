@@ -174,4 +174,14 @@ public class ProductController {
         ProductDtos.DetailResponse updated = productService.updateProductStatus(id, request.getStatus(), currentUserNick);
         return ResponseEntity.ok(updated);
     }
+
+    @PostMapping("/{id}/complete")
+    public ResponseEntity<ProductDtos.CompleteSaleResponse> completeSale(
+            @PathVariable Long id,
+            @RequestBody ProductDtos.CompleteSaleRequest request,
+            @AuthenticationPrincipal String currentUserNick
+    ) {
+        ProductDtos.CompleteSaleResponse response = productService.completeSale(id, request.getBuyerId(), currentUserNick);
+        return ResponseEntity.ok(response);
+    }
 }

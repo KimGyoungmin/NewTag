@@ -2,13 +2,16 @@ package com.goldenRun.NewTag.service;
 
 import com.goldenRun.NewTag.Repository.CategoryRepository;
 import com.goldenRun.NewTag.Repository.ProductRepository;
+import com.goldenRun.NewTag.Repository.TransactionRepository;
 import com.goldenRun.NewTag.Repository.UserRepository;
 import com.goldenRun.NewTag.dto.ProductDtos;
 import com.goldenRun.NewTag.entity.Category;
 import com.goldenRun.NewTag.entity.Product;
 import com.goldenRun.NewTag.entity.ProductImage;
+import com.goldenRun.NewTag.entity.Transaction;
 import com.goldenRun.NewTag.entity.User;
 import com.goldenRun.NewTag.enums.ProductStatus;
+import com.goldenRun.NewTag.enums.TransactionStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -38,6 +41,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
+    private final TransactionRepository transactionRepository;
     private final SearchLogService searchLogService;
     private final ReviewService reviewService;
     private final FavoriteService favoriteService;
@@ -155,6 +159,53 @@ public class ProductService {
 
         Long sellerId = product.getSeller() != null ? product.getSeller().getId() : null;
         return convertToDetailResponse(product, sellerId);
+    }
+
+    @Transactional
+    public ProductDtos.CompleteSaleResponse completeSale(Long productId, Long buyerId, String currentUserNick) {
+        if (buyerId == null) {
+            throw new IllegalArgumentException("구매자를 선택해 주세요.");
+        }
+        if (!StringUtils.hasText(currentUserNick)) {
+            throw new AccessDeniedException("인증 정보가 필요합니다.");
+        }
+
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
+
+        if (!currentUserNick.equals(product.getSeller().getNick())) {
+            throw new AccessDeniedException("상품의 판매자만 구매자를 지정할 수 있습니다.");
+        }
+
+        User buyer = userRepository.findById(buyerId)
+                .orElseThrow(() -> new IllegalArgumentException("구매자 정보를 찾을 수 없습니다."));
+
+        product.setStatus(ProductStatus.SOLD_OUT);
+
+        Transaction transaction = transactionRepository.findByProductId(productId)
+                .orElse(Transaction.builder()
+                        .product(product)
+                        .seller(product.getSeller())
+                        .buyer(buyer)
+                        .status(TransactionStatus.COMPLETED)
+                        .build());
+
+        transaction.setBuyer(buyer);
+        transaction.setSeller(product.getSeller());
+        transaction.setStatus(TransactionStatus.COMPLETED);
+        transaction.setUpdatedAt(LocalDateTime.now());
+
+        if (transaction.getProduct() == null) {
+            transaction.setProduct(product);
+        }
+
+        Transaction saved = transactionRepository.save(transaction);
+
+        ProductDtos.DetailResponse detail = convertToDetailResponse(product, product.getSeller().getId());
+        return ProductDtos.CompleteSaleResponse.builder()
+                .product(detail)
+                .transactionId(saved.getId())
+                .build();
     }
 
     /**
