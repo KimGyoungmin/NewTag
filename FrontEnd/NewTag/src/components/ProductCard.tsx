@@ -34,6 +34,7 @@ interface ProductCardProps {
   status?: 'available' | 'reserved' | 'sold';
   isLikedByMe?: boolean; // 백엔드에서 받은 찜 상태
   distance?: number; // 거리 (km)
+  sellerNick?: string; // 판매자 닉네임
   onClick?: () => void;
   onNavigate?: (page: string) => void;
 }
@@ -50,11 +51,16 @@ export function ProductCard({
   status = 'available',
   isLikedByMe = false,
   distance,
+  sellerNick,
   onClick,
   onNavigate
 }: ProductCardProps) {
   const [isLiked, setIsLiked] = useState(isLikedByMe);
   const [likeCount, setLikeCount] = useState(likes);
+
+  // 현재 로그인한 사용자가 판매자인지 확인
+  const currentUser = authApi.getCurrentUser();
+  const isOwner = sellerNick && currentUser?.nick === sellerNick;
 
   const handleLikeClick = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -98,16 +104,19 @@ export function ProductCard({
             </Badge>
           </div>
         )}
-        <Button
-          size="icon"
-          variant="ghost"
-          className="absolute top-2 right-2 h-8 w-8 rounded-full bg-white/90 hover:bg-white"
-          onClick={handleLikeClick}
-        >
-          <Heart 
-            className={`h-4 w-4 ${isLiked ? 'fill-red-500 text-red-500' : 'text-gray-600'}`}
-          />
-        </Button>
+        {/* 자신이 올린 상품이 아닐 때만 찜 버튼 표시 */}
+        {!isOwner && (
+          <Button
+            size="icon"
+            variant="ghost"
+            className="absolute top-2 right-2 h-8 w-8 rounded-full bg-white/90 hover:bg-white"
+            onClick={handleLikeClick}
+          >
+            <Heart
+              className={`h-4 w-4 ${isLiked ? 'fill-red-500 text-red-500' : 'text-gray-600'}`}
+            />
+          </Button>
+        )}
       </div>
       
       <div className="p-4">
@@ -130,10 +139,13 @@ export function ProductCard({
             {' · '}{timeAgo}
           </div>
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <Heart className={`h-4 w-4 ${isLiked ? 'fill-red-500 text-red-500' : ''}`} />
-              {likeCount}
-            </span>
+            {/* 자신이 올린 상품이 아닐 때만 찜 개수 표시 */}
+            {!isOwner && (
+              <span className="flex items-center gap-1">
+                <Heart className={`h-4 w-4 ${isLiked ? 'fill-red-500 text-red-500' : ''}`} />
+                {likeCount}
+              </span>
+            )}
             <span>채팅 {chatCount}</span>
           </div>
         </div>

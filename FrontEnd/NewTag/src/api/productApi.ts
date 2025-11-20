@@ -1,46 +1,64 @@
 import { apiClient } from '../services/api/client';
 import { Product, PaginatedResponse, ProductStatus } from '../types';
 
-const mapProductDetail = (data: any): Product => ({
-  id: data.id,
-  price: data.price,
-  title: data.title,
-  content: data.content,
-  status: data.status,
-  locationNm: data.locationNm,
-  latitude: data.latitude,
-  longitude: data.longitude,
-  viewCount: data.viewCount,
-  isDelete: false,
-  isResell: data.isResell ?? false,
-  createdAt: data.createdAt || new Date().toISOString(),
-  updatedAt: data.updatedAt || new Date().toISOString(),
-  sellerId: data.sellerId,
-  categoryId: data.categoryId || 0,
-  seller: data.sellerId
-    ? {
-        id: data.sellerId,
-        name: data.sellerName,
-        nick: data.sellerNick || '',
-        email: '',
-        provider: 'LOCAL',
-        emailVerified: false,
-        phoneVerified: false,
-        role: 'USER',
-        isDelete: false,
-        trust: data.sellerRatingAvg || 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        profileImg: data.sellerProfileImg || '/default-avatar.png',
-        sellerRatingAvg: data.sellerRatingAvg || 0,
-        sellerRatingCount: data.sellerRatingCount || 0,
-        sellerGrade: data.sellerGrade || '일반',
-      }
-    : undefined,
-  images: data.images || [],
-  isFavorite: data.likedByMe,
-  favoriteCount: data.favoriteCount || 0,
-});
+const mapProductDetail = (data: any): Product => {
+  const normalizedImages = (data.images || []).map((img: any) => ({
+    id: img.id,
+    pImg: img.pImg || img.pimg || '',
+    isMain: img.isMain,
+    createdAt: img.createdAt,
+    updatedAt: img.updatedAt,
+    productId: img.productId,
+    thumbnailPath: img.thumbnailPath,
+  }));
+
+  const primaryImage = normalizedImages.find((img) => img.isMain) ?? normalizedImages[0];
+  const mainImagePath = data.mainImage || primaryImage?.pImg;
+  const thumbnailImagePath = data.thumbnailImage || primaryImage?.thumbnailPath || mainImagePath;
+
+  return {
+    id: data.id,
+    price: data.price,
+    title: data.title,
+    content: data.content,
+    status: data.status,
+    locationNm: data.locationNm,
+    latitude: data.latitude,
+    longitude: data.longitude,
+    viewCount: data.viewCount,
+    isDelete: false,
+    isResell: data.isResell ?? false,
+    createdAt: data.createdAt || new Date().toISOString(),
+    updatedAt: data.updatedAt || new Date().toISOString(),
+    sellerId: data.sellerId,
+    categoryId: data.categoryId || 0,
+    mainImage: mainImagePath,
+    thumbnailImage: thumbnailImagePath,
+    seller: data.sellerId
+      ? {
+          id: data.sellerId,
+          name: data.sellerName,
+          nick: data.sellerNick || '',
+          email: '',
+          provider: 'LOCAL',
+          emailVerified: false,
+          phoneVerified: false,
+          role: 'USER',
+          isDelete: false,
+          trust: data.sellerRatingAvg || 0,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          profileImg: data.sellerProfileImg || '/default-avatar.png',
+          sellerRatingAvg: data.sellerRatingAvg || 0,
+          sellerRatingCount: data.sellerRatingCount || 0,
+          sellerGrade: data.sellerGrade || '일반',
+        }
+      : undefined,
+    images: normalizedImages,
+    isFavorite: data.likedByMe,
+    favoriteCount: data.favoriteCount || 0,
+  };
+};
 
 interface GetProductsParams {
   page?: number;
@@ -146,6 +164,30 @@ export const productApi = {
         currentPage: params.page || 0,
         pageSize: params.size || 20,
       };
+    }
+  },
+
+  getRelated: async (productId: number, limit: number = 6): Promise<any[]> => {
+    try {
+      const response = await apiClient.get<any[]>(`/products/${productId}/related`, {
+        params: { limit },
+      });
+      return response.data ?? [];
+    } catch (error) {
+      console.error(`Failed to fetch related products for ${productId}:`, error);
+      return [];
+    }
+  },
+
+  getSellerOther: async (productId: number, limit: number = 6): Promise<any[]> => {
+    try {
+      const response = await apiClient.get<any[]>(`/products/${productId}/seller-other`, {
+        params: { limit },
+      });
+      return response.data ?? [];
+    } catch (error) {
+      console.error(`Failed to fetch seller's other products for ${productId}:`, error);
+      return [];
     }
   },
 };

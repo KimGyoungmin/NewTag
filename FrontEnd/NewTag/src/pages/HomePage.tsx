@@ -23,6 +23,7 @@ interface HomePageProps {
 interface Product {
   id: number;
   mainImage: string;
+  thumbnailImage?: string;
   title: string;
   price: number;
   locationNm: string;
@@ -30,6 +31,11 @@ interface Product {
   viewCount: number;
   favoriteCount: number;
   timeAgo: string;
+  seller?: {
+    id: number;
+    nick: string;
+    name: string;
+  };
 }
 
 export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePageProps) {
@@ -318,7 +324,7 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
                       <div key={product.id} ref={lastProductElementRef}>
                         <ProductCard
                           id={product.id.toString()}
-                          image={resolveImageUrl(product.mainImage)}
+                          image={resolveImageUrl(product.thumbnailImage ?? product.mainImage)}
                           title={product.title}
                           price={product.price}
                           location={product.locationNm}
@@ -326,6 +332,7 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
                           likes={product.favoriteCount}
                           chatCount={product.viewCount}
                           isLikedByMe={favoriteProductIds.has(product.id)}
+                          sellerNick={product.seller?.nick}
                           onClick={() => onNavigate('detail', product.id.toString())}
                           onNavigate={onNavigate}
                         />
@@ -336,7 +343,7 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
                       <ProductCard
                         key={product.id}
                         id={product.id.toString()}
-                        image={resolveImageUrl(product.mainImage)}
+                        image={resolveImageUrl(product.thumbnailImage ?? product.mainImage)}
                         title={product.title}
                         price={product.price}
                         location={product.locationNm}
@@ -344,6 +351,7 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
                         likes={product.favoriteCount}
                         chatCount={product.viewCount}
                         isLikedByMe={favoriteProductIds.has(product.id)}
+                        sellerNick={product.seller?.nick}
                         onClick={() => onNavigate('detail', product.id.toString())}
                         onNavigate={onNavigate}
                       />

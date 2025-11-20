@@ -349,10 +349,3 @@ export function ResellDetailPage({ productId, onNavigate, products }: ResellDeta
     </div>
   );
 }
-
-
-
-
-
-
-
