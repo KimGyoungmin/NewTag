@@ -63,6 +63,8 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
   const [touchEnd, setTouchEnd] = useState(0);
   const [relatedProducts, setRelatedProducts] = useState<RelatedProduct[]>([]);
   const [relatedLoading, setRelatedLoading] = useState(false);
+  const [sellerProducts, setSellerProducts] = useState<RelatedProduct[]>([]);
+  const [sellerProductsLoading, setSellerProductsLoading] = useState(false);
 
   // 현재 로그인한 사용자가 상품 소유자인지 확인
   const currentUser = authApi.getCurrentUser();
@@ -146,6 +148,39 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
     };
 
     loadRelated();
+    return () => {
+      isCancelled = true;
+    };
+  }, [product?.id]);
+
+  // 판매자의 다른 상품 로드
+  useEffect(() => {
+    if (!product?.id) {
+      setSellerProducts([]);
+      return;
+    }
+
+    let isCancelled = false;
+    const loadSellerProducts = async () => {
+      setSellerProductsLoading(true);
+      try {
+        const items = await productApi.getSellerOther(product.id, 6);
+        if (!isCancelled) {
+          setSellerProducts(items ?? []);
+        }
+      } catch (err) {
+        console.error('Failed to load seller products:', err);
+        if (!isCancelled) {
+          setSellerProducts([]);
+        }
+      } finally {
+        if (!isCancelled) {
+          setSellerProductsLoading(false);
+        }
+      }
+    };
+
+    loadSellerProducts();
     return () => {
       isCancelled = true;
     };
@@ -700,6 +735,73 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
             ) : (
               <p className="text-sm text-muted-foreground text-center py-8">
                 아직 리뷰가 없습니다.
+              </p>
+            )}
+          </div>
+        )}
+
+        <Separator />
+
+        {/* Seller's Other Products Section */}
+        {product.seller && (
+          <div className="bg-card px-4 py-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold">{product.seller.name}님의 다른 상품</h3>
+                <p className="text-sm text-muted-foreground">이 판매자가 올린 다른 상품을 확인해보세요.</p>
+              </div>
+              {sellerProducts.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onNavigate('seller-profile', product.seller!.id.toString())}
+                >
+                  전체보기
+                </Button>
+              )}
+            </div>
+
+            {sellerProductsLoading ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div key={index} className="space-y-2">
+                    <Skeleton className="aspect-square w-full rounded-lg" />
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </div>
+                ))}
+              </div>
+            ) : sellerProducts.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {sellerProducts.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => handleRelatedProductClick(item.id)}
+                    className="text-left"
+                  >
+                    <div className="relative aspect-square rounded-xl overflow-hidden bg-muted">
+                      <ImageWithFallback
+                        src={resolveImageUrl(item.thumbnailImage ?? item.mainImage)}
+                        alt={item.title}
+                        className="h-full w-full object-cover transition-transform hover:scale-105"
+                      />
+                    </div>
+                    <div className="mt-3 space-y-1">
+                      <p className="text-sm font-medium line-clamp-2">{item.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.locationNm || '위치 정보 없음'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{item.timeAgo}</p>
+                      <p className="text-base font-semibold">
+                        {item.price ? `${item.price.toLocaleString()}원` : '가격 문의'}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                판매자의 다른 상품이 없습니다.
               </p>
             )}
           </div>

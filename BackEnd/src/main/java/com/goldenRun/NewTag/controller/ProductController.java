@@ -69,6 +69,19 @@ public class ProductController {
     }
 
     /**
+     * 판매자의 다른 상품 조회 (현재 상품 제외)
+     * GET /api/v1/products/{id}/seller-other?limit=6
+     */
+    @GetMapping("/{id}/seller-other")
+    public ResponseEntity<List<ProductDtos.ListItem>> getOtherProductsBySeller(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "6") int limit
+    ) {
+        List<ProductDtos.ListItem> otherProducts = productService.getOtherProductsBySeller(id, limit);
+        return ResponseEntity.ok(otherProducts);
+    }
+
+    /**
      * 상품 검색 (검색 로그 자동 저장)
      * GET /api/v1/products/search?keyword=아이폰&userId=1&deviceType=MOBILE&page=0&size=20
      */
@@ -213,5 +226,15 @@ public class ProductController {
         }
         ProductDtos.DetailResponse updated = productService.updateProductStatus(id, request.getStatus(), currentUserNick);
         return ResponseEntity.ok(updated);
+    }
+
+    @PostMapping("/{id}/complete")
+    public ResponseEntity<ProductDtos.CompleteSaleResponse> completeSale(
+            @PathVariable Long id,
+            @RequestBody ProductDtos.CompleteSaleRequest request,
+            @AuthenticationPrincipal String currentUserNick
+    ) {
+        ProductDtos.CompleteSaleResponse response = productService.completeSale(id, request.getBuyerId(), currentUserNick);
+        return ResponseEntity.ok(response);
     }
 }

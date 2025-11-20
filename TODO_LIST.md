@@ -9,17 +9,18 @@
 
 
 
-### 2. 관련 상품 추천 기능
+### 2. ✅ 관련 상품 추천 기능 (완료)
 - **예상 소요 시간**: 4-6시간
 - **중요도**: ★★★★☆
-- **위치**: ProductDetailPage
-- **파일**: `FrontEnd/NewTag/src/pages/ProductDetailPage.tsx:648`
+- **위치**: ProductDetailPage, ProductService
+- **완료일**: 2025-11-20
 
-**작업 내용**:
-- 같은 카테고리 상품 추천
-- 가격대 유사 상품 추천
-- 판매자의 다른 상품
-- 추천 알고리즘 구현
+**완료된 작업**:
+- ✅ 같은 카테고리 상품 추천 (조회수 높은 순)
+- ✅ 판매자의 다른 상품 섹션 추가
+- ✅ 백엔드 API 구현 (getRelatedProducts, getOtherProductsBySeller)
+- ✅ 프론트엔드 UI 구현 (그리드 레이아웃)
+- ✅ 로딩 스켈레톤 및 빈 상태 처리
 
 
 ## 🟡 중요 (Medium Priority)
@@ -44,61 +45,54 @@
 
 ---
 
-### 5. 이미지 최적화 & 썸네일 생성(마이페이지 외에 적용 완료)
+### 5. ✅ 이미지 최적화 & 썸네일 생성 (완료)
 - **예상 소요 시간**: 1일
 - **중요도**: ★★★★☆
 - **위치**: FileStorageService
 - **참고 문서**: `IMAGE_STORAGE_IMPROVEMENT.md:296-312`
+- **완료일**: 2025-11-20
 
-**작업 내용**:
-- 썸네일 자동 생성 (300x300)
-- WebP 변환 (용량 30% 감소)
-- 반응형 이미지 제공
+**완료된 작업**:
+- ✅ 썸네일 자동 생성 (300x300)
+- ✅ 이미지 최적화 (1600x1600, 85% 품질)
+- ⚠️ WebP 변환 (미구현 - 선택적)
 
 ---
 
-### 6. 자동 정리 배치 작업
+### 6. ✅ 자동 정리 배치 작업 (완료)
 - **예상 소요 시간**: 4-6시간
 - **중요도**: ★★★☆☆
-- **위치**: ProductService
+- **위치**: ProductService, ProductCleanupScheduler
 - **참고 문서**: `IMAGE_STORAGE_IMPROVEMENT.md:314-330`
+- **완료일**: 2025-11-20
 
-**작업 내용**:
-- 90일 이상 소프트 삭제된 상품 자동 정리
-- 스케줄러 설정 (매일 새벽 3시)
-- 이미지 파일 및 DB 레코드 완전 삭제
-
-```java
-@Scheduled(cron = "0 0 3 * * *")  // 매일 새벽 3시
-public void cleanupOldDeletedProducts() {
-    LocalDateTime cutoff = LocalDateTime.now().minusDays(90);
-    List<Product> oldProducts = productRepository
-        .findByIsDeleteTrueAndUpdatedAtBefore(cutoff);
-
-    oldProducts.forEach(product -> {
-        fileStorageService.deleteProductImages(product.getId());
-        productRepository.delete(product);
-    });
-}
-```
+**완료된 작업**:
+- ✅ ProductRepository 쿼리 메서드 추가
+- ✅ ProductService.cleanupOldDeletedProducts() 구현
+- ✅ ProductCleanupScheduler 스케줄러 생성
+- ✅ @EnableScheduling 활성화
+- ✅ 매일 새벽 3시 자동 실행
+- ✅ 이미지 파일 및 DB 레코드 완전 삭제
+- ✅ 상세 로깅 및 모니터링
 
 
-### 8. Frontend 라우팅 라이브러리 추가
+### 8. ✅ Frontend 라우팅 라이브러리 추가 (완료)
 - **예상 소요 시간**: 1일
 - **중요도**: ★★★★☆
-- **위치**: Frontend 구조
+- **위치**: Frontend 구조, App.tsx
 - **참고**: Gemini 분석 결과
+- **완료일**: 2025-11-20
 
-**작업 내용**:
-- `react-router-dom` 설치
-- 현재 수동 라우팅을 React Router로 변경
-- URL 기반 네비게이션 구현
-- 브라우저 히스토리 지원
-
-```bash
-npm install react-router-dom
-npm install --save-dev @types/react-router-dom
-```
+**완료된 작업**:
+- ✅ react-router-dom 패키지 설치
+- ✅ @types/react-router-dom 타입 정의 설치
+- ✅ BrowserRouter로 App 래핑
+- ✅ Routes와 Route로 라우팅 구조 전환
+- ✅ useNavigate, useLocation, useParams 훅 적용
+- ✅ URL 파라미터 처리 (RouteWrappers)
+- ✅ 인증 가드 구현
+- ✅ ScrollToTop 컴포넌트로 스크롤 문제 해결
+- ✅ 404 처리 및 리다이렉트
 
 ---
 
@@ -116,16 +110,19 @@ npm install --save-dev @types/react-router-dom
 
 ---
 
-### 10. 인증 시스템 통합
+### 10. ✅ 인증 시스템 통합 (완료)
 - **예상 소요 시간**: 2-3일
 - **중요도**: ★★★★☆
-- **위치**: 인증 구조
+- **위치**: tokenManager, authApi, client.ts
+- **완료일**: 2025-11-20
 
-**작업 내용**:
-- Firebase 인증과 JWT 역할 명확화
-- Firebase: 소셜 로그인 전용
-- JWT: API 인증 전용
-- 토큰 갱신 로직 개선
+**완료된 작업**:
+- ✅ 현재 시스템 분석 (Firebase는 채팅용, JWT만 인증용)
+- ✅ LocalStorage 토큰 지속성 추가 (새로고침 시 로그인 유지)
+- ✅ Refresh Token 자동 갱신 로직 개선
+- ✅ setAccessToken 메서드 추가 (조용한 갱신)
+- ✅ API 요청 401 에러 시 자동 토큰 갱신
+- ✅ AUTH_SYSTEM.md 문서 작성
 
 ---
 
@@ -305,6 +302,13 @@ CREATE TABLE image_metadata (
 - SearchLogRepository JPQL 쿼리 수정
 - 로그인 상태 변경 시 화면 초기화
 - 로그아웃 시 검색 오버레이 자동 닫기
+- **2025-11-20 완료**:
+  - ✅ 관련 상품 추천 기능 (카테고리 + 판매자)
+  - ✅ 자동 정리 배치 작업 (스케줄러)
+  - ✅ React Router 도입 (URL 라우팅)
+  - ✅ ScrollToTop 구현 (스크롤 문제 해결)
+  - ✅ 이미지 최적화 & 썸네일 생성 (기존 구현 확인)
+  - ✅ 인증 시스템 통합 (LocalStorage 지속성, 자동 갱신)
 
 ### 현재 진행 중 🚧
 - 없음
@@ -324,4 +328,5 @@ CREATE TABLE image_metadata (
 ---
 
 **작성자**: Claude Code AI Assistant
-**다음 리뷰 예정일**: 2025-11-26
+**최종 업데이트**: 2025-11-20
+**다음 리뷰 예정일**: 2025-11-27

@@ -1,5 +1,9 @@
 package com.goldenRun.NewTag.dto;
 
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -8,9 +12,15 @@ public class ReviewDtos {
 
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
     public static class CreateRequest {
+        @NotNull
         private Long transactionId;
-        private Long targetId; // 리뷰 대상자 (판매자 또는 구매자)
+        @NotNull
+        private Long targetId; // 리뷰 대상자
+        @NotNull
+        @Min(1)
+        @Max(5)
         private Integer rating; // 1-5점
+        @Size(max = 500)
         private String content; // 리뷰 내용
     }
 
@@ -41,13 +51,13 @@ public class ReviewDtos {
 
         // 거래 정보
         private Long transactionId;
-        private String productTitle; // 거래한 상품명
+        private String productTitle; // 거래 상품명
     }
 
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
     public static class RatingSummary {
-        private Double averageRating; // 평균 평점
-        private Long totalCount; // 총 리뷰 개수
+        private Double averageRating; // 평균 별점
+        private Long totalCount; // 전체 리뷰 개수
         private Long rating5Count; // 5점 개수
         private Long rating4Count; // 4점 개수
         private Long rating3Count; // 3점 개수

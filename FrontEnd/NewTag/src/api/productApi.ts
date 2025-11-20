@@ -178,4 +178,16 @@ export const productApi = {
       return [];
     }
   },
+
+  getSellerOther: async (productId: number, limit: number = 6): Promise<any[]> => {
+    try {
+      const response = await apiClient.get<any[]>(`/products/${productId}/seller-other`, {
+        params: { limit },
+      });
+      return response.data ?? [];
+    } catch (error) {
+      console.error(`Failed to fetch seller's other products for ${productId}:`, error);
+      return [];
+    }
+  },
 };

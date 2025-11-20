@@ -32,7 +32,12 @@ const refreshAccessToken = async (): Promise<string | null> => {
       .then((response) => {
         const { token, user } = response.data || {};
         if (token) {
-          tokenManager.setSession(token, user ?? null);
+          // Access Token만 갱신 (사용자 정보는 기존 것 유지)
+          if (user) {
+            tokenManager.setSession(token, user);
+          } else {
+            tokenManager.setAccessToken(token);
+          }
           return token as string;
         }
         tokenManager.clearSession();

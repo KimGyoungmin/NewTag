@@ -104,6 +104,24 @@ public class ProductDtos {
     public static class StatusUpdateRequest {
         private ProductStatus status;
     }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class CompleteSaleRequest {
+        private Long buyerId;
+    }
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class CompleteSaleResponse {
+        private DetailResponse product;
+        private Long transactionId;
+    }
 }
 
 

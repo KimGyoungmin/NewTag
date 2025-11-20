@@ -2,13 +2,16 @@ package com.goldenRun.NewTag.service;
 
 import com.goldenRun.NewTag.Repository.CategoryRepository;
 import com.goldenRun.NewTag.Repository.ProductRepository;
+import com.goldenRun.NewTag.Repository.TransactionRepository;
 import com.goldenRun.NewTag.Repository.UserRepository;
 import com.goldenRun.NewTag.dto.ProductDtos;
 import com.goldenRun.NewTag.entity.Category;
 import com.goldenRun.NewTag.entity.Product;
 import com.goldenRun.NewTag.entity.ProductImage;
+import com.goldenRun.NewTag.entity.Transaction;
 import com.goldenRun.NewTag.entity.User;
 import com.goldenRun.NewTag.enums.ProductStatus;
+import com.goldenRun.NewTag.enums.TransactionStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -38,6 +41,7 @@ public class ProductService {
     private final ProductRepository productRepository;
     private final UserRepository userRepository;
     private final CategoryRepository categoryRepository;
+    private final TransactionRepository transactionRepository;
     private final SearchLogService searchLogService;
     private final ReviewService reviewService;
     private final FavoriteService favoriteService;
@@ -169,6 +173,37 @@ public class ProductService {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * 판매자의 다른 상품 조회 (현재 상품 제외)
+     */
+    public List<ProductDtos.ListItem> getOtherProductsBySeller(Long productId, int limit) {
+        Product baseProduct = productRepository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
+
+        if (baseProduct.getSeller() == null) {
+            return List.of();
+        }
+
+        int pageSize = Math.max(limit, 1);
+        Pageable pageable = PageRequest.of(0, pageSize);
+        List<Product> otherProducts = productRepository
+                .findOtherProductsBySeller(baseProduct.getSeller().getId(), productId, pageable)
+                .getContent();
+
+        if (otherProducts.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> productIds = otherProducts.stream()
+                .map(Product::getId)
+                .collect(Collectors.toList());
+        Map<Long, Long> favoriteCountMap = favoriteService.getFavoriteCounts(productIds);
+
+        return otherProducts.stream()
+                .map(product -> convertToListItem(product, favoriteCountMap))
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public ProductDtos.DetailResponse updateProductStatus(Long productId, ProductStatus newStatus, String currentUserNick) {
         if (currentUserNick == null || currentUserNick.isBlank()) {
@@ -186,6 +221,53 @@ public class ProductService {
 
         Long sellerId = product.getSeller() != null ? product.getSeller().getId() : null;
         return convertToDetailResponse(product, sellerId);
+    }
+
+    @Transactional
+    public ProductDtos.CompleteSaleResponse completeSale(Long productId, Long buyerId, String currentUserNick) {
+        if (buyerId == null) {
+            throw new IllegalArgumentException("구매자를 선택해 주세요.");
+        }
+        if (!StringUtils.hasText(currentUserNick)) {
+            throw new AccessDeniedException("인증 정보가 필요합니다.");
+        }
+
+        Product product = productRepository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
+
+        if (!currentUserNick.equals(product.getSeller().getNick())) {
+            throw new AccessDeniedException("상품의 판매자만 구매자를 지정할 수 있습니다.");
+        }
+
+        User buyer = userRepository.findById(buyerId)
+                .orElseThrow(() -> new IllegalArgumentException("구매자 정보를 찾을 수 없습니다."));
+
+        product.setStatus(ProductStatus.SOLD_OUT);
+
+        Transaction transaction = transactionRepository.findByProductId(productId)
+                .orElse(Transaction.builder()
+                        .product(product)
+                        .seller(product.getSeller())
+                        .buyer(buyer)
+                        .status(TransactionStatus.COMPLETED)
+                        .build());
+
+        transaction.setBuyer(buyer);
+        transaction.setSeller(product.getSeller());
+        transaction.setStatus(TransactionStatus.COMPLETED);
+        transaction.setUpdatedAt(LocalDateTime.now());
+
+        if (transaction.getProduct() == null) {
+            transaction.setProduct(product);
+        }
+
+        Transaction saved = transactionRepository.save(transaction);
+
+        ProductDtos.DetailResponse detail = convertToDetailResponse(product, product.getSeller().getId());
+        return ProductDtos.CompleteSaleResponse.builder()
+                .product(detail)
+                .transactionId(saved.getId())
+                .build();
     }
 
     /**
@@ -567,5 +649,51 @@ public class ProductService {
      */
     private BigDecimal toBigDecimal(Double value) {
         return value == null ? null : BigDecimal.valueOf(value);
+    }
+
+    /**
+     * 90일 이상 소프트 삭제된 상품 자동 정리
+     * - 매일 새벽 3시 실행
+     * - 삭제된 지 90일이 넘은 상품의 이미지 파일 및 DB 레코드 완전 삭제
+     */
+    @Transactional
+    public int cleanupOldDeletedProducts() {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(90);
+        List<Product> oldProducts = productRepository.findByIsDeleteTrueAndUpdatedAtBefore(cutoff);
+
+        if (oldProducts.isEmpty()) {
+            log.info("정리할 오래된 삭제 상품이 없습니다.");
+            return 0;
+        }
+
+        int deletedCount = 0;
+        for (Product product : oldProducts) {
+            try {
+                // 1. 관련 이미지 파일 삭제
+                if (product.getImages() != null && !product.getImages().isEmpty()) {
+                    for (ProductImage image : product.getImages()) {
+                        try {
+                            fileStorageService.deleteFile(image.getPath());
+                            log.debug("이미지 파일 삭제 완료: {}", image.getPath());
+                        } catch (Exception e) {
+                            log.warn("이미지 파일 삭제 실패: path={}, error={}", image.getPath(), e.getMessage());
+                        }
+                    }
+                }
+
+                // 2. DB에서 상품 완전 삭제 (CASCADE로 관련 이미지도 자동 삭제)
+                productRepository.delete(product);
+                deletedCount++;
+
+                log.info("상품 완전 삭제 완료: productId={}, title={}, deletedAt={}",
+                        product.getId(), product.getTitle(), product.getUpdatedAt());
+            } catch (Exception e) {
+                log.error("상품 삭제 중 오류 발생: productId={}, error={}",
+                        product.getId(), e.getMessage(), e);
+            }
+        }
+
+        log.info("자동 정리 배치 작업 완료: 총 {}개 상품 삭제", deletedCount);
+        return deletedCount;
     }
 }
