@@ -31,6 +31,11 @@ interface Product {
   viewCount: number;
   favoriteCount: number;
   timeAgo: string;
+  seller?: {
+    id: number;
+    nick: string;
+    name: string;
+  };
 }
 
 export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePageProps) {
@@ -327,6 +332,7 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
                           likes={product.favoriteCount}
                           chatCount={product.viewCount}
                           isLikedByMe={favoriteProductIds.has(product.id)}
+                          sellerNick={product.seller?.nick}
                           onClick={() => onNavigate('detail', product.id.toString())}
                           onNavigate={onNavigate}
                         />
@@ -345,6 +351,7 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
                         likes={product.favoriteCount}
                         chatCount={product.viewCount}
                         isLikedByMe={favoriteProductIds.has(product.id)}
+                        sellerNick={product.seller?.nick}
                         onClick={() => onNavigate('detail', product.id.toString())}
                         onNavigate={onNavigate}
                       />

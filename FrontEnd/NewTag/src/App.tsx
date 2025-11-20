@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
+
 import { Header } from "./components/Header";
 import { BottomNav } from "./components/BottomNav";
 import { RegisterTypeDialog } from "./components/RegisterTypeDialog";
@@ -41,6 +42,7 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState<string>("");
 
   /** 상품 등록 타입 선택 Dialog 표시 여부 */
+
   const [showRegisterDialog, setShowRegisterDialog] = useState(false);
 
   /** 인증 상태 */
@@ -51,6 +53,7 @@ export default function App() {
   const location = useLocation();
 
   // ============================================
+
   // 초기 로드 - 로그인 상태 확인
   // ============================================
   useEffect(() => {
@@ -78,15 +81,18 @@ export default function App() {
         if (location.pathname === '/login' || location.pathname === '/signup') {
           navigate('/');
         }
+
         setSearchQuery("");
       } else {
         // 로그아웃 시 로그인 화면으로 이동
         navigate('/login');
+
         setSearchQuery("");
       }
     };
 
     // auth-change 이벤트 리스너 등록
+
     window.addEventListener('auth-change', handleAuthChange);
 
     return () => {
@@ -95,11 +101,13 @@ export default function App() {
   }, [navigate, location.pathname]);
 
   // ============================================
+
   // 네비게이션 핸들러
   // ============================================
 
   /**
    * 검색어 초기화 후 홈으로 이동
+
    */
   const handleClearSearch = () => {
     setSearchQuery("");
@@ -109,6 +117,7 @@ export default function App() {
   /**
    * 상품 등록 타입 선택 (일반/AI)
    * @param type 등록 타입
+
    */
   const handleRegisterTypeSelect = (type: "normal" | "ai") => {
     setShowRegisterDialog(false);
@@ -146,6 +155,7 @@ export default function App() {
     '/product/register',
   ];
 
+
   const showBottomNav = !hideBottomNavPaths.some(path => location.pathname.startsWith(path));
 
   // 현재 페이지 이름 추출 (BottomNav 활성화용)
@@ -171,6 +181,7 @@ export default function App() {
 
   // ============================================
   // 렌더링
+
   // ============================================
 
   return (
@@ -179,6 +190,7 @@ export default function App() {
       <ScrollToTop />
 
       {/* 상단 헤더 (검색바, 로고, 로그인) */}
+
       {showHeader && (
         <Header
           onSearch={(query) => {
@@ -294,11 +306,13 @@ export default function App() {
       </main>
 
       {/* 하단 네비게이션 바 (홈, 리셀, 등록, 채팅, 마이페이지) */}
+
       {showBottomNav && (
         <BottomNav
           currentPage={getCurrentPage()}
           onNavigate={(page) => {
             // 홈 버튼 클릭 시 검색어 초기화
+
             if (page === "home") {
               setSearchQuery("");
               navigate('/');
@@ -312,6 +326,7 @@ export default function App() {
       )}
 
       {/* 상품 등록 타입 선택 Dialog (일반/AI) */}
+
       <RegisterTypeDialog
         open={showRegisterDialog}
         onClose={() => setShowRegisterDialog(false)}
@@ -319,6 +334,7 @@ export default function App() {
       />
 
       {/* Toast 알림 */}
+
       <Toaster />
     </div>
   );

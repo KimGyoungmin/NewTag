@@ -236,6 +236,12 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
       return;
     }
 
+    // 자신이 올린 상품은 찜할 수 없음
+    if (isOwner) {
+      toast.info("내가 올린 상품은 찜할 수 없습니다.");
+      return;
+    }
+
     const userId = currentUser.id;
 
     try {
@@ -871,14 +877,17 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
       {/* Bottom Action Bar */}
       <div className="fixed bottom-16 md:bottom-0 left-0 right-0 z-50 border-t bg-background p-4 md:max-w-4xl md:mx-auto">
         <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="shrink-0"
-            onClick={handleToggleFavorite}
-          >
-            <Heart className={`h-6 w-6 ${isLiked ? 'fill-red-500 text-red-500' : ''}`} />
-          </Button>
+          {/* 자신이 올린 상품이 아닐 때만 찜 버튼 표시 */}
+          {!isOwner && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+              onClick={handleToggleFavorite}
+            >
+              <Heart className={`h-6 w-6 ${isLiked ? 'fill-red-500 text-red-500' : ''}`} />
+            </Button>
+          )}
           <Button
             className="flex-1 bg-primary hover:bg-primary/90"
             onClick={handleChat}

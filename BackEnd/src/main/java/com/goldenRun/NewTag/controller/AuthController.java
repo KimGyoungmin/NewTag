@@ -34,7 +34,7 @@ public class AuthController {
 
         String nick = authentication.getName();
         User user = userRepository.findByNick(nick);
-
+        
         if (user == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("success", false, "message", "사용자를 찾을 수 없습니다."));

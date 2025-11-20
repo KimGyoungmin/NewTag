@@ -55,6 +55,15 @@ public class ProductDtos {
         private Long favoriteCount;
         private String timeAgo; // "1시간 전" 같은 문자열
         private Boolean isResell;
+        // 판매자 정보 추가 (찜하기 버튼 표시 여부 판단용)
+        private SellerInfo seller;
+    }
+
+    @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class SellerInfo {
+        private Integer id;
+        private String nick;
+        private String name;
     }
 
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder

@@ -347,6 +347,16 @@ public class ProductService {
         // Map에서 Favorite count 조회 (이미 한 번에 가져온 데이터)
         long favoriteCount = favoriteCountMap.getOrDefault(product.getId(), 0L);
 
+        // 판매자 정보
+        ProductDtos.SellerInfo sellerInfo = null;
+        if (product.getSeller() != null) {
+            sellerInfo = ProductDtos.SellerInfo.builder()
+                    .id(product.getSeller().getId().intValue())
+                    .nick(product.getSeller().getNick())
+                    .name(product.getSeller().getName())
+                    .build();
+        }
+
         return ProductDtos.ListItem.builder()
                 .id(product.getId().intValue())
                 .mainImage(mainImage)
@@ -359,6 +369,7 @@ public class ProductService {
                 .favoriteCount(favoriteCount)
                 .timeAgo(getTimeAgo(product.getCreatedAt()))
                 .isResell(product.getIsResell())
+                .seller(sellerInfo)
                 .build();
     }
 
@@ -380,6 +391,16 @@ public class ProductService {
         // Favorite count 조회
         long favoriteCount = favoriteService.getFavoriteCount(product.getId());
 
+        // 판매자 정보
+        ProductDtos.SellerInfo sellerInfo = null;
+        if (product.getSeller() != null) {
+            sellerInfo = ProductDtos.SellerInfo.builder()
+                    .id(product.getSeller().getId().intValue())
+                    .nick(product.getSeller().getNick())
+                    .name(product.getSeller().getName())
+                    .build();
+        }
+
         return ProductDtos.ListItem.builder()
                 .id(product.getId().intValue())
                 .mainImage(mainImage)
@@ -392,6 +413,7 @@ public class ProductService {
                 .favoriteCount(favoriteCount)
                 .timeAgo(getTimeAgo(product.getCreatedAt()))
                 .isResell(product.getIsResell())
+                .seller(sellerInfo)
                 .build();
     }
 
