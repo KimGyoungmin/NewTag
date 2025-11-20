@@ -3,8 +3,10 @@ package com.goldenRun.NewTag.controller;
 import com.goldenRun.NewTag.dto.ReviewDtos;
 import com.goldenRun.NewTag.service.ReviewService;
 import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -17,6 +19,15 @@ import java.util.Map;
 public class ReviewController {
 
     private final ReviewService reviewService;
+
+    @PostMapping
+    public ResponseEntity<ReviewDtos.Response> createReview(
+            @Valid @RequestBody ReviewDtos.CreateRequest request,
+            @AuthenticationPrincipal String currentUserNick
+    ) {
+        ReviewDtos.Response response = reviewService.createReview(request, currentUserNick);
+        return ResponseEntity.ok(response);
+    }
 
     /**
      * 특정 사용자가 받은 리뷰 목록 조회
