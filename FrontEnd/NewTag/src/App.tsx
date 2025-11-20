@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+﻿import { useState, useEffect } from "react";
 import { Header } from "./components/Header";
 import { BottomNav } from "./components/BottomNav";
 import { RegisterTypeDialog } from "./components/RegisterTypeDialog";
@@ -19,33 +19,36 @@ import { LoginPage } from "./pages/LoginPage";
 import { SignupPage } from "./pages/SignupPage";
 import { ReviewWritePage } from "./pages/ReviewWritePage";
 import { authApi } from "./api/auth";
+import { RESELL_PRODUCTS, ResellProductRecord } from "./data/resellProducts";
 import type { ReviewNavigationPayload } from "./types";
 
 /**
- * NewTag 메인 ?�플리�??�션 컴포?�트
+ * NewTag 메인 �플리�션 컴포�트
  * 
- * 중고 거래 ?�랫?�의 ?�심 ?�우?�과 ?�태 관리�? ?�당?�니??
- * - ?�이지 ?�비게이??
- * - ?�품/채팅/?�매??ID 관�?
- * - ?�더/?�단�??�시 ?�어
+ * 중고 거래 �랫�의 �심 �우�과 �태 관리� �당�니?
+ * - �이지 �비게이??
+ * - �품/채팅/�매??ID 관�?
+ * - �더/�단�시 �어
  */
 export default function App() {
   // ============================================
-  // ?�태 관�?
+  // �태 관�?
   // ============================================
 
-  /** ?�재 ?�시 중인 ?�이지 */
+  /** �재 �시 중인 �이지 */
   const [currentPage, setCurrentPage] = useState<string>("login");
 
-  /** ?�택???�품 ID (?�세/?�정 ?�이지?? */
+  /** �택???�품 ID (�세/�정 �이지?? */
   const [selectedProductId, setSelectedProductId] = useState<string>("");
 
-  /** ?�택??채팅�?ID */
+  /** �택??채팅�ID */
   const [selectedChatId, setSelectedChatId] = useState<string>("");
 
-  /** ?�택???�매??ID */
+  /** �택???�매??ID */
   const [selectedSellerId, setSelectedSellerId] = useState<string>("");
 
+  /** 리셀 상품 데이터 (resell_auto.json / 정적 데이터) */
+  const [resellProducts, setResellProducts] = useState<ResellProductRecord[]>(RESELL_PRODUCTS);
 
   /** ���� �ۼ� �� ������ ���ؽ�Ʈ */
   const [reviewContext, setReviewContext] = useState<ReviewNavigationPayload | null>(null);
@@ -53,11 +56,11 @@ export default function App() {
   /** 검?�어 */
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  /** ?�품 ?�록 ?�???�택 Dialog ?�시 ?��? */
+  /** �품 �록 �택 Dialog �시 ��? */
   const [showRegisterDialog, setShowRegisterDialog] = useState(false);
 
   // ============================================
-  // 초기 로드 - 로그???�태 ?�인
+  // 초기 로드 - 로그???�태 �인
   // ============================================
   useEffect(() => {
     let mounted = true;
@@ -71,21 +74,21 @@ export default function App() {
   }, []);
 
   // ============================================
-  // 로그???�태 변�?감�? - ?�면 초기??
+  // 로그???�태 변�?감�? - �면 초기??
   // ============================================
   useEffect(() => {
     const handleAuthChange = () => {
       const isAuth = authApi.isAuthenticated();
 
       if (isAuth) {
-        // 로그???? ???�면?�로 ?�동 �?검?�어 초기??
+        // 로그???? ???�면�로 �동 �검?�어 초기??
         setCurrentPage("home");
         setSearchQuery("");
         setSelectedProductId("");
         setSelectedChatId("");
         setSelectedSellerId("");
       } else {
-        // 로그?�웃 ?? 로그???�면?�로 ?�동 �?모든 ?�태 초기??
+        // 로그�웃 ?? 로그???�면�로 �동 �모든 �태 초기??
         setCurrentPage("login");
         setSearchQuery("");
         setSelectedProductId("");
@@ -94,7 +97,7 @@ export default function App() {
       }
     };
 
-    // auth-change ?�벤??리스???�록
+    // auth-change �벤??리스�록
     window.addEventListener('auth-change', handleAuthChange);
 
     return () => {
@@ -104,16 +107,16 @@ export default function App() {
 
 
   // ============================================
-  // ?�비게이???�들??
+  // �비게이�들??
   // ============================================
   
   /**
-   * ?�이지 ?�동 처리
-   * @param page ?�동???�이지 ?�름
-   * @param id ?�품/채팅/?�매??ID (?�택?�항)
+   * �이지 �동 처리
+   * @param page �동???�이지 �름
+   * @param id �품/채팅/�매??ID (�택�항)
    */
   const handleNavigate = (page: string, id?: string) => {
-    // ?�품 ?�록?�??�이?�로그로 ?�???�택 ??진행
+    // �품 �록�?�이�로그로 �택 ??진행
     if (page === "register") {
       setShowRegisterDialog(true);
       return;
@@ -124,7 +127,7 @@ export default function App() {
       setReviewContext(null);
     }
 
-    // �??�이지�?ID ?�정
+    // �?�이지�ID �정
     if (page === "detail" && id) {
       setSelectedProductId(id);
     }
@@ -157,7 +160,7 @@ export default function App() {
   };
 
   /**
-   * 검?�어 초기??�??�으�??�동
+   * 검?�어 초기??�?�으�?�동
    */
   const handleClearSearch = () => {
     setSearchQuery("");
@@ -165,8 +168,8 @@ export default function App() {
   };
 
   /**
-   * ?�품 ?�록 ?�???�택 (?�반/AI)
-   * @param type ?�록 ?�??
+   * �품 �록 �택 (�반/AI)
+   * @param type �록 �?
    */
   const handleRegisterTypeSelect = (type: "normal" | "ai") => {
     if (type === "normal") {
@@ -177,21 +180,21 @@ export default function App() {
   };
 
   // ============================================
-  // ?�이지 ?�더�?
+  // �이지 �더�?
   // ============================================
   
   /**
-   * ?�재 ?�이지??맞는 컴포?�트 반환
+   * �재 �이지�맞는 컴포�트 반환
    */
   const renderPage = () => {
     switch (currentPage) {
-      // ?�증 ?�이지
+      // �증 �이지
       case "login":
         return <LoginPage onNavigate={handleNavigate} />;
       case "signup":
         return <SignupPage onNavigate={handleNavigate} />;
 
-      // 메인 ?�이지
+      // 메인 �이지
       case "home":
         return (
           <HomePage
@@ -201,18 +204,25 @@ export default function App() {
           />
         );
 
-      // 리�? ?�이지
+      // 리�? �이지
       case "resell":
-        return <ResellPage onNavigate={handleNavigate} />;
+        return (
+          <ResellPage
+            onNavigate={handleNavigate}
+            products={resellProducts}
+            onProductsChange={setResellProducts}
+          />
+        );
       case "resell-detail":
         return (
           <ResellDetailPage
             productId={selectedProductId}
             onNavigate={handleNavigate}
+            products={resellProducts}
           />
         );
 
-      // ?�품 ?�이지
+      // �품 �이지
       case "detail":
         return (
           <ProductDetailPage
@@ -247,7 +257,7 @@ export default function App() {
           />
         );
 
-      // 채팅 ?�이지
+      // 채팅 �이지
       case "chat":
         return <ChatListPage onNavigate={handleNavigate} />;
       case "chatroom":
@@ -258,7 +268,7 @@ export default function App() {
           />
         );
 
-      // ?�로???�이지
+      // �로?�이지
       case "mypage":
         return <MyPage onNavigate={handleNavigate} />;
       case "seller-profile":
@@ -275,10 +285,10 @@ export default function App() {
   };
 
   // ============================================
-  // UI ?�시 ?�어
+  // UI �시 �어
   // ============================================
   
-  /** ?�더�??�겨???�는 ?�이지 목록 */
+  /** �더�겨?�는 �이지 목록 */
   const showHeader =
     currentPage !== "chatroom" &&
     currentPage !== "seller-profile" &&
@@ -288,7 +298,7 @@ export default function App() {
     currentPage !== "login" &&
     currentPage !== "signup";
 
-  /** ?�단 ?�비게이?�을 ?�겨???�는 ?�이지 목록 */
+  /** �단 �비게이�을 �겨?�는 �이지 목록 */
   const showBottomNav = 
     currentPage !== "login" && 
     currentPage !== "signup" &&
@@ -299,12 +309,12 @@ export default function App() {
     currentPage !== "register-ai";
 
   // ============================================
-  // ?�더�?
+  // �더�?
   // ============================================
   
   return (
     <div className="min-h-screen bg-background">
-      {/* ?�단 ?�더 (검?�바, 로고, 로그?? */}
+      {/* �단 �더 (검�바, 로고, 로그?? */}
       {showHeader && (
         <Header
           onSearch={(query) => {
@@ -319,15 +329,15 @@ export default function App() {
         />
       )}
 
-      {/* 메인 콘텐�??�역 */}
+      {/* 메인 콘텐��역 */}
       <main className="w-full">{renderPage()}</main>
 
-      {/* ?�단 ?�비게이??�?(?? 리�?, ?�록, 채팅, 마이?�이지) */}
+      {/* �단 �비게이�?(� 리�, �록, 채팅, 마이�이지) */}
       {showBottomNav && (
         <BottomNav
           currentPage={currentPage}
           onNavigate={(page) => {
-            // ??버튼 ?�릭 ??검?�어 초기??
+            // �버튼 �릭 �검?�어 초기??
             if (page === "home") {
               setSearchQuery("");
             }
@@ -336,16 +346,15 @@ export default function App() {
         />
       )}
 
-      {/* ?�품 ?�록 ?�???�택 Dialog (?�반/AI) */}
+      {/* �품 �록 �택 Dialog (�반/AI) */}
       <RegisterTypeDialog
         open={showRegisterDialog}
         onClose={() => setShowRegisterDialog(false)}
         onSelectType={handleRegisterTypeSelect}
       />
 
-      {/* Toast ?�림 */}
+      {/* Toast �림 */}
       <Toaster />
     </div>
   );
 }
-

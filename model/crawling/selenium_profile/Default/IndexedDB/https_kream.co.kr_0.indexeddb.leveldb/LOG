@@ -1,0 +1,14 @@
+2025/11/20-14:43:21.184 4378 Reusing MANIFEST C:\NT\NewTag\model\crawling\selenium_profile\Default\IndexedDB\https_kream.co.kr_0.indexeddb.leveldb/MANIFEST-000001
+2025/11/20-14:43:21.184 4378 Recovering log #66
+2025/11/20-14:43:21.184 4378 Reusing old log C:\NT\NewTag\model\crawling\selenium_profile\Default\IndexedDB\https_kream.co.kr_0.indexeddb.leveldb/000066.log 
+2025/11/20-14:43:21.185 4378 Delete type=2 #64
+2025/11/20-14:43:21.256 4bf8 Level-0 table #71: started
+2025/11/20-14:43:21.258 4bf8 Level-0 table #71: 2711 bytes OK
+2025/11/20-14:43:21.259 4bf8 Delete type=0 #66
+2025/11/20-14:43:21.260 3e2c Manual compaction at level-0 from '\x00\x18\x00\x00\x00' @ 72057594037927935 : 1 .. '\x00\x19\x00\x00\x00' @ 0 : 0; will stop at '\x00\x18\x00\x00\x05' @ 1303 : 1
+2025/11/20-14:43:21.260 3e2c Compacting 1@0 + 1@1 files
+2025/11/20-14:43:21.262 3e2c Generated table #72@0: 284 keys, 4881 bytes
+2025/11/20-14:43:21.262 3e2c Compacted 1@0 + 1@1 files => 4881 bytes
+2025/11/20-14:43:21.263 3e2c compacted to: files[ 0 1 1 0 0 0 0 ]
+2025/11/20-14:43:21.264 3e2c Delete type=2 #71
+2025/11/20-14:43:21.265 3e2c Manual compaction at level-0 from '\x00\x18\x00\x00\x05' @ 1303 : 1 .. '\x00\x19\x00\x00\x00' @ 0 : 0; will stop at (end)

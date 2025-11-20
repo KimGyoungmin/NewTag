@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Search, ArrowUp, ArrowDown } from "lucide-react";
 import { Input } from "../components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
@@ -6,21 +6,57 @@ import { Badge } from "../components/ui/badge";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
 import { BrandFilter } from "../components/BrandFilter";
-import { RESELL_PRODUCTS } from "../data/resellProducts";
+import { RESELL_PRODUCTS, ResellProductRecord } from "../data/resellProducts";
 
 interface ResellPageProps {
   onNavigate: (page: string, id?: string) => void;
+  products?: ResellProductRecord[];
+  onProductsChange?: (products: ResellProductRecord[]) => void;
 }
 
 const FALLBACK_IMAGE = "/api/v1/static/p_default_img.png";
 const MAX_HISTORY_LIMIT = 100;
 
-export function ResellPage({ onNavigate }: ResellPageProps) {
+export function ResellPage({ onNavigate, products, onProductsChange }: ResellPageProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedBrands, setSelectedBrands] = useState<string[]>([]);
+  const [isAutoFeed, setIsAutoFeed] = useState(false);
+  const [localProducts, setLocalProducts] = useState<ResellProductRecord[]>(
+    products && products.length ? products : RESELL_PRODUCTS,
+  );
+
+  useEffect(() => {
+    if (products && products.length) {
+      setLocalProducts(products);
+    }
+  }, [products]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch("/resell_auto.json", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!Array.isArray(data) || data.length === 0) return;
+        if (!cancelled) {
+          setLocalProducts(data);
+          onProductsChange?.(data);
+          setIsAutoFeed(true);
+        }
+      } catch (err) {
+        console.info("resell_auto.json 불러오기 실패 (정적 데이터로 대체)", err);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [onProductsChange]);
 
   const normalizedProducts = useMemo(() => {
-    return RESELL_PRODUCTS.map((product) => {
+    const baseProducts = localProducts.length ? localProducts : RESELL_PRODUCTS;
+    return baseProducts.map((product) => {
       const normalizedHistory = product.priceHistory
         .map((point) => {
           const numericPrice = point.price ?? point.value ?? 0;
@@ -38,7 +74,7 @@ export function ResellPage({ onNavigate }: ResellPageProps) {
         priceHistory: normalizedHistory,
       };
     });
-  }, []);
+  }, [localProducts]);
 
   const availableBrands = useMemo(() => {
     const deduped = Array.from(
@@ -73,7 +109,9 @@ export function ResellPage({ onNavigate }: ResellPageProps) {
   const summaryTitle = searchQuery ? `"${searchQuery}" 검색 결과` : "리셀 데이터 연동 상품";
   const summarySubtitle = searchQuery
     ? `${filteredProducts.length}개의 상품이 조건을 만족합니다.`
-    : "model/Best_test에 있는 실제 거래 데이터를 기반으로 합니다.";
+    : isAutoFeed
+      ? "최근 크롤링/예측 결과(resell_auto.json)를 불러왔습니다."
+      : "model/Best_test에 있는 실제 거래 데이터를 기반으로 합니다.";
 
   return (
     <div className="min-h-screen pb-20 md:pb-8">
@@ -102,12 +140,11 @@ export function ResellPage({ onNavigate }: ResellPageProps) {
           <CardHeader>
             <CardTitle>AI 시세 전망</CardTitle>
             <p className="text-sm text-muted-foreground">
-              예측 모델 API가 연결되면 예상가와 변동 폭을 여기에서 확인할 수 있습니다.
+              크롤링/예측 결과(resell_auto.json)가 생성되면 자동 반영됩니다. 데이터가 없으면 빈 목록이 표시됩니다.
             </p>
           </CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            현재는 model/Best_test에 저장된 원본 거래 정보만 연결되어 있습니다. 예측 결과는 추후
-            제공됩니다.
+            현재는 model/Best_test에 저장된 원본 거래 정보만 연결되어 있습니다. 예측 결과는 super_kream_crawling.py 실행 시 생성됩니다.
           </CardContent>
         </Card>
 
