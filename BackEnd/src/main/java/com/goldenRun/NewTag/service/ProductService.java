@@ -138,6 +138,37 @@ public class ProductService {
         return products.map(product -> convertToListItem(product, favoriteCountMap));
     }
 
+    /**
+     * 관련 상품 추천
+     */
+    public List<ProductDtos.ListItem> getRelatedProducts(Long productId, int limit) {
+        Product baseProduct = productRepository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
+
+        if (baseProduct.getCategory() == null) {
+            return List.of();
+        }
+
+        int pageSize = Math.max(limit, 1);
+        Pageable pageable = PageRequest.of(0, pageSize);
+        List<Product> relatedProducts = productRepository
+                .findRelatedProducts(baseProduct.getCategory().getId(), productId, pageable)
+                .getContent();
+
+        if (relatedProducts.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> productIds = relatedProducts.stream()
+                .map(Product::getId)
+                .collect(Collectors.toList());
+        Map<Long, Long> favoriteCountMap = favoriteService.getFavoriteCounts(productIds);
+
+        return relatedProducts.stream()
+                .map(product -> convertToListItem(product, favoriteCountMap))
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public ProductDtos.DetailResponse updateProductStatus(Long productId, ProductStatus newStatus, String currentUserNick) {
         if (currentUserNick == null || currentUserNick.isBlank()) {
@@ -225,6 +256,11 @@ public class ProductService {
                 .findFirst()
                 .map(img -> resolveImagePath(img.getPath()))
                 .orElse(resolveImagePath(null));
+        String thumbnailImage = product.getImages().stream()
+                .filter(ProductImage::getIs_main)
+                .findFirst()
+                .map(img -> resolveThumbnailPath(img.getPath()))
+                .orElse(resolveThumbnailPath(null));
 
         // Map에서 Favorite count 조회 (이미 한 번에 가져온 데이터)
         long favoriteCount = favoriteCountMap.getOrDefault(product.getId(), 0L);
@@ -232,6 +268,7 @@ public class ProductService {
         return ProductDtos.ListItem.builder()
                 .id(product.getId().intValue())
                 .mainImage(mainImage)
+                .thumbnailImage(thumbnailImage)
                 .title(product.getTitle())
                 .price(product.getPrice().doubleValue())
                 .locationNm(product.getLocation_nm())
@@ -252,6 +289,11 @@ public class ProductService {
                 .findFirst()
                 .map(img -> resolveImagePath(img.getPath()))
                 .orElse(resolveImagePath(null));
+        String thumbnailImage = product.getImages().stream()
+                .filter(ProductImage::getIs_main)
+                .findFirst()
+                .map(img -> resolveThumbnailPath(img.getPath()))
+                .orElse(resolveThumbnailPath(null));
 
         // Favorite count 조회
         long favoriteCount = favoriteService.getFavoriteCount(product.getId());
@@ -259,6 +301,7 @@ public class ProductService {
         return ProductDtos.ListItem.builder()
                 .id(product.getId().intValue())
                 .mainImage(mainImage)
+                .thumbnailImage(thumbnailImage)
                 .title(product.getTitle())
                 .price(product.getPrice().doubleValue())
                 .locationNm(product.getLocation_nm())
@@ -286,6 +329,7 @@ public class ProductService {
                         .createdAt(img.getCreatedAt())
                         .updatedAt(img.getUpdatedAt())
                         .productId(product.getId().intValue())
+                        .thumbnailPath(resolveThumbnailPath(img.getPath()))
                         .build())
                 .collect(Collectors.toList());
 
@@ -359,6 +403,42 @@ public class ProductService {
             return path;
         }
         return "/api/v1/static/" + path.replace("\\", "/");
+    }
+
+    private String resolveThumbnailPath(String path) {
+        if (path == null || path.isBlank()) {
+            return resolveImagePath(null);
+        }
+        if (path.startsWith("http")) {
+            return path;
+        }
+
+        String normalizedPath = path;
+        int staticIndex = normalizedPath.indexOf("/static/");
+        if (staticIndex >= 0) {
+            normalizedPath = normalizedPath.substring(staticIndex + "/static/".length());
+        } else if (normalizedPath.startsWith("static/")) {
+            normalizedPath = normalizedPath.substring("static/".length());
+        } else if (normalizedPath.startsWith("/static/")) {
+            normalizedPath = normalizedPath.substring("/static/".length());
+        }
+
+        String thumbnailCandidate = fileStorageService.buildThumbnailPath(normalizedPath);
+        if (thumbnailCandidate == null) {
+            return resolveImagePath(path);
+        }
+
+        boolean isRelativePath = !thumbnailCandidate.startsWith("/") && !thumbnailCandidate.startsWith("http");
+        boolean thumbnailExists = isRelativePath && fileStorageService.thumbnailExists(normalizedPath);
+        if (!thumbnailExists && isRelativePath) {
+            return resolveImagePath(path);
+        }
+
+        if (thumbnailCandidate.startsWith("/")) {
+            return thumbnailCandidate;
+        }
+
+        return resolveImagePath(thumbnailCandidate);
     }
 
     /**

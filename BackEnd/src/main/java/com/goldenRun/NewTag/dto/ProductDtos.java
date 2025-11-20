@@ -46,6 +46,7 @@ public class ProductDtos {
     public static class ListItem {
         private Integer id;
         private String mainImage;
+        private String thumbnailImage;
         private String title;
         private Double price;
         private String locationNm;
@@ -96,6 +97,7 @@ public class ProductDtos {
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
         private Integer productId;
+        private String thumbnailPath;
     }
 
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor
@@ -103,4 +105,5 @@ public class ProductDtos {
         private ProductStatus status;
     }
 }
+
 

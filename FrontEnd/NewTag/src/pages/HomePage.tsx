@@ -23,6 +23,7 @@ interface HomePageProps {
 interface Product {
   id: number;
   mainImage: string;
+  thumbnailImage?: string;
   title: string;
   price: number;
   locationNm: string;
@@ -318,7 +319,7 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
                       <div key={product.id} ref={lastProductElementRef}>
                         <ProductCard
                           id={product.id.toString()}
-                          image={resolveImageUrl(product.mainImage)}
+                          image={resolveImageUrl(product.thumbnailImage ?? product.mainImage)}
                           title={product.title}
                           price={product.price}
                           location={product.locationNm}
@@ -336,7 +337,7 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
                       <ProductCard
                         key={product.id}
                         id={product.id.toString()}
-                        image={resolveImageUrl(product.mainImage)}
+                        image={resolveImageUrl(product.thumbnailImage ?? product.mainImage)}
                         title={product.title}
                         price={product.price}
                         location={product.locationNm}

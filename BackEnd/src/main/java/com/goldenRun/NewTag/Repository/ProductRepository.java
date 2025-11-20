@@ -58,4 +58,15 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
         @Param("distance") Double distance,
         Pageable pageable
     );
+
+    @Query("SELECT p FROM Product p " +
+            "WHERE p.category.id = :categoryId " +
+            "AND p.id <> :productId " +
+            "AND p.is_delete = false " +
+            "ORDER BY p.view_count DESC, p.createdAt DESC")
+    Page<Product> findRelatedProducts(
+            @Param("categoryId") Long categoryId,
+            @Param("productId") Long productId,
+            Pageable pageable
+    );
 }

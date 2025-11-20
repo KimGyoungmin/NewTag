@@ -39,6 +39,17 @@ interface ProductDetailPageProps {
   onNavigate: (page: string, id?: string) => void;
 }
 
+interface RelatedProduct {
+  id: number;
+  title: string;
+  price: number;
+  locationNm?: string;
+  mainImage?: string;
+  thumbnailImage?: string;
+  timeAgo?: string;
+  favoriteCount?: number;
+}
+
 export function ProductDetailPage({ productId, onNavigate }: ProductDetailPageProps) {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,6 +61,8 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
+  const [relatedProducts, setRelatedProducts] = useState<RelatedProduct[]>([]);
+  const [relatedLoading, setRelatedLoading] = useState(false);
 
   // 현재 로그인한 사용자가 상품 소유자인지 확인
   const currentUser = authApi.getCurrentUser();
@@ -105,6 +118,38 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
       setReviewsLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (!product?.id) {
+      setRelatedProducts([]);
+      return;
+    }
+
+    let isCancelled = false;
+    const loadRelated = async () => {
+      setRelatedLoading(true);
+      try {
+        const items = await productApi.getRelated(product.id, 6);
+        if (!isCancelled) {
+          setRelatedProducts(items ?? []);
+        }
+      } catch (err) {
+        console.error('Failed to load related products:', err);
+        if (!isCancelled) {
+          setRelatedProducts([]);
+        }
+      } finally {
+        if (!isCancelled) {
+          setRelatedLoading(false);
+        }
+      }
+    };
+
+    loadRelated();
+    return () => {
+      isCancelled = true;
+    };
+  }, [product?.id]);
 
   // 상태 변경 핸들러
   const handleStatusChange = async (newStatus: ProductStatus) => {
@@ -223,8 +268,9 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
     }
 
     try {
-      const productImage = product.images && product.images.length > 0
-        ? getFullImageUrl(product.images[0].pImg || product.images[0].pImg)
+      const firstImage = product.images && product.images.length > 0 ? product.images[0] : null;
+      const productImage = firstImage
+        ? getFullImageUrl(firstImage.thumbnailPath || firstImage.pImg || firstImage.pimg)
         : getFullImageUrl(undefined);
 
       const chatId = await chatService.getOrCreateChatRoom(
@@ -290,6 +336,17 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
     return resolveImageUrl(path);
   };
 
+  const imageSources =
+    product?.images && product.images.length > 0
+      ? product.images.map((img: any) => ({
+          full: getFullImageUrl(img.pImg || img.pimg),
+          thumb: getFullImageUrl(img.thumbnailPath || img.pImg || img.pimg),
+        }))
+      : [];
+
+  const heroImages = imageSources.length > 0 ? imageSources.map((img) => img.full) : [getFullImageUrl(undefined)];
+  const previewImages = imageSources.length > 0 ? imageSources.map((img) => img.thumb) : heroImages;
+
   // 스와이프 핸들러
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStart(e.targetTouches[0].clientX);
@@ -306,11 +363,7 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
     const isLeftSwipe = distance > 50;
     const isRightSwipe = distance < -50;
 
-    const images = product?.images && product.images.length > 0
-      ? product.images.map((img: any) => getFullImageUrl(img.pImg || img.pimg))
-      : [getFullImageUrl(undefined)];
-
-    if (isLeftSwipe && currentImageIndex < images.length - 1) {
+    if (isLeftSwipe && currentImageIndex < heroImages.length - 1) {
       setCurrentImageIndex(currentImageIndex + 1);
     }
     if (isRightSwipe && currentImageIndex > 0) {
@@ -322,10 +375,12 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
     setTouchEnd(0);
   };
 
+  const handleRelatedProductClick = (relatedId: number) => {
+    onNavigate('detail', relatedId.toString());
+  };
+
   // displayImages 배열 생성
-  const displayImages = product?.images && product.images.length > 0
-    ? product.images.map((img: any) => getFullImageUrl(img.pImg || img.pimg))
-    : [getFullImageUrl(undefined)];
+  const displayImages = previewImages;
 
   // 로딩 상태
   if (loading) {
@@ -438,15 +493,15 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
           onTouchEnd={handleTouchEnd}
         >
           <ImageWithFallback
-            src={displayImages[currentImageIndex]}
+            src={heroImages[currentImageIndex]}
             alt={product.title}
             className="h-full w-full object-cover"
           />
 
-          {displayImages.length > 1 && (
+          {heroImages.length > 1 && (
             <>
               <div className="absolute bottom-4 right-4 rounded-full bg-black/60 px-3 py-1 text-white text-sm">
-                {currentImageIndex + 1} / {displayImages.length}
+                {currentImageIndex + 1} / {heroImages.length}
               </div>
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
                 {displayImages.map((_, index) => (
@@ -526,21 +581,33 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
             {product.price.toLocaleString()}원
           </div>
 
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-6">
+            <span className="flex items-center gap-1">
+              <MapPin className="h-4 w-4" />
+              {product.locationNm}
+            </span>
             <span className="flex items-center gap-1">
               <Eye className="h-4 w-4" />
-              조회 {product.viewCount}
+              조회 {product.viewCount.toLocaleString()}
             </span>
             <span className="flex items-center gap-1">
               <Heart className="h-4 w-4" />
-              관심 {product.favoriteCount || 0}
+              찜 {product.favoriteCount || 0}
             </span>
+          </div>
+
+          <div className="prose prose-sm max-w-none text-foreground leading-relaxed">
+            {product.content.split('\n').map((line, index) => (
+              <p key={index} className="mb-4 last:mb-0">
+                {line}
+              </p>
+            ))}
           </div>
         </div>
 
         <Separator />
 
-        {/* Description */}
+{/* Description */}
         <div className="bg-card px-4 py-6">
           <h3 className="text-lg font-semibold mb-3">상품 설명</h3>
           <p className="whitespace-pre-line text-muted-foreground leading-relaxed">
@@ -645,12 +712,63 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
 
         <Separator />
 
-        {/* Related Products Section - TODO */}
         <div className="bg-card px-4 py-6">
-          <h3 className="text-lg font-semibold mb-3">이 상품과 비슷한 상품</h3>
-          <p className="text-sm text-muted-foreground">관련 상품을 준비 중입니다.</p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold">이 상품과 비슷한 상품</h3>
+              <p className="text-sm text-muted-foreground">관심 가질 만한 추천 상품을 모아봤어요.</p>
+            </div>
+            {relatedProducts.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={() => onNavigate('home')}>
+                더 보기
+              </Button>
+            )}
+          </div>
+
+          {relatedLoading ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="space-y-2">
+                  <Skeleton className="aspect-square w-full rounded-lg" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
+                </div>
+              ))}
+            </div>
+          ) : relatedProducts.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {relatedProducts.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => handleRelatedProductClick(item.id)}
+                  className="text-left"
+                >
+                  <div className="relative aspect-square rounded-xl overflow-hidden bg-muted">
+                    <ImageWithFallback
+                      src={resolveImageUrl(item.thumbnailImage ?? item.mainImage)}
+                      alt={item.title}
+                      className="h-full w-full object-cover transition-transform hover:scale-105"
+                    />
+                  </div>
+                  <div className="mt-3 space-y-1">
+                    <p className="text-sm font-medium line-clamp-2">{item.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.locationNm || '위치 정보 없음'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{item.timeAgo}</p>
+                    <p className="text-base font-semibold">
+                      {item.price ? `${item.price.toLocaleString()}원` : '가격 문의'}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              추천 상품을 아직 찾지 못했어요.
+            </p>
+          )}
         </div>
-      </div>
 
       {/* Bottom Action Bar */}
       <div className="fixed bottom-16 md:bottom-0 left-0 right-0 z-50 border-t bg-background p-4 md:max-w-4xl md:mx-auto">
