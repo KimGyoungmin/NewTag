@@ -1,3 +1,2 @@
-2025/11/20-16:43:39.322 a48 Reusing MANIFEST C:\NT\NewTag\model\crawling\selenium_profile\Default\Session Storage/MANIFEST-000001
-2025/11/20-16:43:39.326 a48 Recovering log #3
-2025/11/20-16:43:39.346 a48 Reusing old log C:\NT\NewTag\model\crawling\selenium_profile\Default\Session Storage/000003.log 
+2025/11/20-17:05:53.796 e74 Creating DB C:\Users\USER\Desktop\NewTag\model\crawling\selenium_profile\Default\Session Storage since it was missing.
+2025/11/20-17:05:53.818 e74 Reusing MANIFEST C:\Users\USER\Desktop\NewTag\model\crawling\selenium_profile\Default\Session Storage/MANIFEST-000001

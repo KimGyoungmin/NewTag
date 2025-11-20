@@ -16,6 +16,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { SignupPage } from "./pages/SignupPage";
 import { ReviewWritePage } from "./pages/ReviewWritePage";
 import { authApi } from "./api/auth";
+import type { ResellProductRecord } from "./data/resellProducts";
 import {
   ProductDetailWrapper,
   ProductEditWrapper,
@@ -48,6 +49,9 @@ export default function App() {
   /** 인증 상태 */
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [authLoading, setAuthLoading] = useState(true);
+
+  /** 리셀 상품 데이터 (ResellPage와 ResellDetailPage 공유) */
+  const [resellProducts, setResellProducts] = useState<ResellProductRecord[]>([]);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -240,11 +244,17 @@ export default function App() {
               {/* 리셀 페이지 */}
               <Route
                 path="/resell"
-                element={<ResellPage onNavigate={(page: string, id?: string) => id ? navigate(`/${page}/${id}`) : navigate(`/${page}`)} />}
+                element={
+                  <ResellPage
+                    onNavigate={(page: string, id?: string) => id ? navigate(`/${page}/${id}`) : navigate(`/${page}`)}
+                    products={resellProducts}
+                    onProductsChange={setResellProducts}
+                  />
+                }
               />
               <Route
                 path="/resell-detail/:id"
-                element={<ResellDetailWrapper />}
+                element={<ResellDetailWrapper products={resellProducts} />}
               />
 
               {/* 상품 페이지 */}

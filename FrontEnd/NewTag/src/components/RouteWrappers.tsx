@@ -5,6 +5,7 @@ import { SelectBuyerPage } from '../pages/SelectBuyerPage';
 import { ChatPage } from '../pages/ChatPage';
 import { SellerProfilePage } from '../pages/SellerProfilePage';
 import { ResellDetailPage } from '../pages/ResellDetailPage';
+import type { ResellProductRecord } from '../data/resellProducts';
 
 /**
  * React Router의 useParams를 사용하여 URL 파라미터를 props로 전달하는 래퍼 컴포넌트들
@@ -85,7 +86,7 @@ export function SellerProfileWrapper() {
   return <SellerProfilePage sellerId={id || ''} onNavigate={handleNavigate} />;
 }
 
-export function ResellDetailWrapper() {
+export function ResellDetailWrapper({ products }: { products?: ResellProductRecord[] }) {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
 
@@ -97,5 +98,5 @@ export function ResellDetailWrapper() {
     }
   };
 
-  return <ResellDetailPage productId={id || ''} onNavigate={handleNavigate} />;
+  return <ResellDetailPage productId={id || ''} onNavigate={handleNavigate} products={products} />;
 }
