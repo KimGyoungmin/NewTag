@@ -8,6 +8,7 @@ import { ProductDetailPage } from "./pages/ProductDetailPage";
 import { ProductRegisterPage } from "./pages/ProductRegisterPage";
 import { ProductRegisterAIPage } from "./pages/ProductRegisterAIPage";
 import { ProductEditPage } from "./pages/ProductEditPage";
+import { SelectBuyerPage } from "./pages/SelectBuyerPage";
 import { ChatListPage } from "./pages/ChatListPage";
 import { ChatPage } from "./pages/ChatPage";
 import { MyPage } from "./pages/MyPage";
@@ -16,41 +17,47 @@ import { ResellPage } from "./pages/ResellPage";
 import { ResellDetailPage } from "./pages/ResellDetailPage";
 import { LoginPage } from "./pages/LoginPage";
 import { SignupPage } from "./pages/SignupPage";
+import { ReviewWritePage } from "./pages/ReviewWritePage";
 import { authApi } from "./api/auth";
+import type { ReviewNavigationPayload } from "./types";
 
 /**
- * NewTag 메인 애플리케이션 컴포넌트
+ * NewTag 메인 ?�플리�??�션 컴포?�트
  * 
- * 중고 거래 플랫폼의 핵심 라우팅과 상태 관리를 담당합니다.
- * - 페이지 네비게이션
- * - 상품/채팅/판매자 ID 관리
- * - 헤더/하단바 표시 제어
+ * 중고 거래 ?�랫?�의 ?�심 ?�우?�과 ?�태 관리�? ?�당?�니??
+ * - ?�이지 ?�비게이??
+ * - ?�품/채팅/?�매??ID 관�?
+ * - ?�더/?�단�??�시 ?�어
  */
 export default function App() {
   // ============================================
-  // 상태 관리
+  // ?�태 관�?
   // ============================================
 
-  /** 현재 표시 중인 페이지 */
+  /** ?�재 ?�시 중인 ?�이지 */
   const [currentPage, setCurrentPage] = useState<string>("login");
 
-  /** 선택된 상품 ID (상세/수정 페이지용) */
+  /** ?�택???�품 ID (?�세/?�정 ?�이지?? */
   const [selectedProductId, setSelectedProductId] = useState<string>("");
 
-  /** 선택된 채팅방 ID */
+  /** ?�택??채팅�?ID */
   const [selectedChatId, setSelectedChatId] = useState<string>("");
 
-  /** 선택된 판매자 ID */
+  /** ?�택???�매??ID */
   const [selectedSellerId, setSelectedSellerId] = useState<string>("");
 
-  /** 검색어 */
+
+  /** ���� �ۼ� �� ������ ���ؽ�Ʈ */
+  const [reviewContext, setReviewContext] = useState<ReviewNavigationPayload | null>(null);
+
+  /** 검?�어 */
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  /** 상품 등록 타입 선택 Dialog 표시 여부 */
+  /** ?�품 ?�록 ?�???�택 Dialog ?�시 ?��? */
   const [showRegisterDialog, setShowRegisterDialog] = useState(false);
 
   // ============================================
-  // 초기 로드 - 로그인 상태 확인
+  // 초기 로드 - 로그???�태 ?�인
   // ============================================
   useEffect(() => {
     let mounted = true;
@@ -64,21 +71,21 @@ export default function App() {
   }, []);
 
   // ============================================
-  // 로그인 상태 변경 감지 - 화면 초기화
+  // 로그???�태 변�?감�? - ?�면 초기??
   // ============================================
   useEffect(() => {
     const handleAuthChange = () => {
       const isAuth = authApi.isAuthenticated();
 
       if (isAuth) {
-        // 로그인 시: 홈 화면으로 이동 및 검색어 초기화
+        // 로그???? ???�면?�로 ?�동 �?검?�어 초기??
         setCurrentPage("home");
         setSearchQuery("");
         setSelectedProductId("");
         setSelectedChatId("");
         setSelectedSellerId("");
       } else {
-        // 로그아웃 시: 로그인 화면으로 이동 및 모든 상태 초기화
+        // 로그?�웃 ?? 로그???�면?�로 ?�동 �?모든 ?�태 초기??
         setCurrentPage("login");
         setSearchQuery("");
         setSelectedProductId("");
@@ -87,7 +94,7 @@ export default function App() {
       }
     };
 
-    // auth-change 이벤트 리스너 등록
+    // auth-change ?�벤??리스???�록
     window.addEventListener('auth-change', handleAuthChange);
 
     return () => {
@@ -97,24 +104,27 @@ export default function App() {
 
 
   // ============================================
-  // 네비게이션 핸들러
+  // ?�비게이???�들??
   // ============================================
   
   /**
-   * 페이지 이동 처리
-   * @param page 이동할 페이지 이름
-   * @param id 상품/채팅/판매자 ID (선택사항)
+   * ?�이지 ?�동 처리
+   * @param page ?�동???�이지 ?�름
+   * @param id ?�품/채팅/?�매??ID (?�택?�항)
    */
   const handleNavigate = (page: string, id?: string) => {
-    // 상품 등록은 다이얼로그로 타입 선택 후 진행
+    // ?�품 ?�록?�??�이?�로그로 ?�???�택 ??진행
     if (page === "register") {
       setShowRegisterDialog(true);
       return;
     }
 
     setCurrentPage(page);
+    if (page !== "review-write") {
+      setReviewContext(null);
+    }
 
-    // 각 페이지별 ID 설정
+    // �??�이지�?ID ?�정
     if (page === "detail" && id) {
       setSelectedProductId(id);
     }
@@ -130,10 +140,24 @@ export default function App() {
     if (page === "product-edit" && id) {
       setSelectedProductId(id);
     }
+    if (page === "review-write") {
+      if (id) {
+        try {
+          setReviewContext(JSON.parse(id));
+        } catch {
+          setReviewContext(null);
+        }
+      } else {
+        setReviewContext(null);
+      }
+    }
+    if (page === "select-buyer" && id) {
+      setSelectedProductId(id);
+    }
   };
 
   /**
-   * 검색어 초기화 및 홈으로 이동
+   * 검?�어 초기??�??�으�??�동
    */
   const handleClearSearch = () => {
     setSearchQuery("");
@@ -141,8 +165,8 @@ export default function App() {
   };
 
   /**
-   * 상품 등록 타입 선택 (일반/AI)
-   * @param type 등록 타입
+   * ?�품 ?�록 ?�???�택 (?�반/AI)
+   * @param type ?�록 ?�??
    */
   const handleRegisterTypeSelect = (type: "normal" | "ai") => {
     if (type === "normal") {
@@ -153,21 +177,21 @@ export default function App() {
   };
 
   // ============================================
-  // 페이지 렌더링
+  // ?�이지 ?�더�?
   // ============================================
   
   /**
-   * 현재 페이지에 맞는 컴포넌트 반환
+   * ?�재 ?�이지??맞는 컴포?�트 반환
    */
   const renderPage = () => {
     switch (currentPage) {
-      // 인증 페이지
+      // ?�증 ?�이지
       case "login":
         return <LoginPage onNavigate={handleNavigate} />;
       case "signup":
         return <SignupPage onNavigate={handleNavigate} />;
 
-      // 메인 페이지
+      // 메인 ?�이지
       case "home":
         return (
           <HomePage
@@ -177,7 +201,7 @@ export default function App() {
           />
         );
 
-      // 리셀 페이지
+      // 리�? ?�이지
       case "resell":
         return <ResellPage onNavigate={handleNavigate} />;
       case "resell-detail":
@@ -188,7 +212,7 @@ export default function App() {
           />
         );
 
-      // 상품 페이지
+      // ?�품 ?�이지
       case "detail":
         return (
           <ProductDetailPage
@@ -207,8 +231,23 @@ export default function App() {
             onNavigate={handleNavigate}
           />
         );
+      case "select-buyer":
+        return (
+          <SelectBuyerPage
+            productId={selectedProductId}
+            onNavigate={handleNavigate}
+          />
+        );
 
-      // 채팅 페이지
+      case "review-write":
+        return (
+          <ReviewWritePage
+            payload={reviewContext}
+            onNavigate={handleNavigate}
+          />
+        );
+
+      // 채팅 ?�이지
       case "chat":
         return <ChatListPage onNavigate={handleNavigate} />;
       case "chatroom":
@@ -219,7 +258,7 @@ export default function App() {
           />
         );
 
-      // 프로필 페이지
+      // ?�로???�이지
       case "mypage":
         return <MyPage onNavigate={handleNavigate} />;
       case "seller-profile":
@@ -236,34 +275,36 @@ export default function App() {
   };
 
   // ============================================
-  // UI 표시 제어
+  // UI ?�시 ?�어
   // ============================================
   
-  /** 헤더를 숨겨야 하는 페이지 목록 */
+  /** ?�더�??�겨???�는 ?�이지 목록 */
   const showHeader =
     currentPage !== "chatroom" &&
     currentPage !== "seller-profile" &&
     currentPage !== "resell-detail" &&
     currentPage !== "product-edit" &&
+    currentPage !== "select-buyer" &&
     currentPage !== "login" &&
     currentPage !== "signup";
 
-  /** 하단 네비게이션을 숨겨야 하는 페이지 목록 */
+  /** ?�단 ?�비게이?�을 ?�겨???�는 ?�이지 목록 */
   const showBottomNav = 
     currentPage !== "login" && 
     currentPage !== "signup" &&
     currentPage !== "chatroom" &&
     currentPage !== "product-edit" &&
+    currentPage !== "select-buyer" &&
     currentPage !== "register-normal" &&
     currentPage !== "register-ai";
 
   // ============================================
-  // 렌더링
+  // ?�더�?
   // ============================================
   
   return (
     <div className="min-h-screen bg-background">
-      {/* 상단 헤더 (검색바, 로고, 로그인) */}
+      {/* ?�단 ?�더 (검?�바, 로고, 로그?? */}
       {showHeader && (
         <Header
           onSearch={(query) => {
@@ -278,15 +319,15 @@ export default function App() {
         />
       )}
 
-      {/* 메인 콘텐츠 영역 */}
+      {/* 메인 콘텐�??�역 */}
       <main className="w-full">{renderPage()}</main>
 
-      {/* 하단 네비게이션 바 (홈, 리셀, 등록, 채팅, 마이페이지) */}
+      {/* ?�단 ?�비게이??�?(?? 리�?, ?�록, 채팅, 마이?�이지) */}
       {showBottomNav && (
         <BottomNav
           currentPage={currentPage}
           onNavigate={(page) => {
-            // 홈 버튼 클릭 시 검색어 초기화
+            // ??버튼 ?�릭 ??검?�어 초기??
             if (page === "home") {
               setSearchQuery("");
             }
@@ -295,14 +336,14 @@ export default function App() {
         />
       )}
 
-      {/* 상품 등록 타입 선택 Dialog (일반/AI) */}
+      {/* ?�품 ?�록 ?�???�택 Dialog (?�반/AI) */}
       <RegisterTypeDialog
         open={showRegisterDialog}
         onClose={() => setShowRegisterDialog(false)}
         onSelectType={handleRegisterTypeSelect}
       />
 
-      {/* Toast 알림 */}
+      {/* Toast ?�림 */}
       <Toaster />
     </div>
   );

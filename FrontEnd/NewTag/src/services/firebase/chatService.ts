@@ -13,7 +13,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { db } from './config';
-import type { ChatMessage, ChatRoom } from '../../types';
+import type { ChatMessage, ChatRoom, ReviewNavigationPayload } from '../../types';
 
 export const chatService = {
   // 채팅방 생성 또는 가져오기
@@ -114,6 +114,8 @@ export const chatService = {
             message: data.message,
             createdAt: data.createdAt?.toDate() || new Date(),
             isRead: data.isRead,
+            messageType: data.messageType,
+            reviewPayload: data.reviewPayload || null,
           } as ChatMessage;
         });
         callback(messages);
@@ -208,5 +210,64 @@ export const chatService = {
     batch.delete(doc(db, 'chatRooms', chatRoomId));
 
     await batch.commit();
+  },
+
+  getBuyerCandidatesForProduct: async (
+    productId: number,
+    sellerId: number
+  ): Promise<
+    Array<{
+      chatId: string;
+      buyerId: number;
+      buyerNick?: string;
+      buyerProfileImg?: string;
+      lastMessage?: string;
+      lastMessageAt?: Date | null;
+    }>
+  > => {
+    const q = query(
+      collection(db, 'chatRooms'),
+      where('productId', '==', productId),
+      where('sellerId', '==', sellerId)
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((docSnap) => {
+      const data = docSnap.data() as any;
+      return {
+        chatId: docSnap.id,
+        buyerId: data.buyerId,
+        buyerNick: data.buyerNick,
+        buyerProfileImg: data.buyerProfileImg,
+        lastMessage: data.lastMessage,
+        lastMessageAt: data.lastMessageAt?.toDate?.() || null,
+      };
+    });
+  },
+
+  sendReviewRequestMessage: async (
+    chatRoomId: string,
+    sender: { id: number; nick?: string; profileImg?: string },
+    payload: ReviewNavigationPayload
+  ) => {
+    const message = "[시스템] 거래가 완료되었습니다. 아래 버튼을 눌러 리뷰를 작성해 주세요.";
+    const messageData = {
+      chatRoomId,
+      senderId: sender.id,
+      senderNick: sender.nick,
+      senderProfileImg: sender.profileImg,
+      message,
+      createdAt: serverTimestamp(),
+      isRead: false,
+      messageType: 'review_link',
+      reviewPayload: payload,
+    };
+
+    await addDoc(collection(db, 'messages'), messageData);
+    await updateDoc(doc(db, 'chatRooms', chatRoomId), {
+      lastMessage: message,
+      lastMessageAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
   },
 };
