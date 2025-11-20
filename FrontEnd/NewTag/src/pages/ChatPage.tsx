@@ -24,7 +24,7 @@ import { chatService } from "../services/firebase/chatService";
 import { db } from "../services/firebase/config";
 import { doc, getDoc } from "firebase/firestore";
 import { authApi } from "../api/auth";
-import type { AuthUser, ChatMessage, ChatRoom } from "../types";
+import type { AuthUser, ChatMessage, ChatRoom, ReviewNavigationPayload } from "../types";
 
 interface ChatPageProps {
   chatId: string;
@@ -156,6 +156,10 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
     }
   };
 
+  const handleReviewLink = (payload: ReviewNavigationPayload) => {
+    onNavigate("review-write", JSON.stringify(payload));
+  };
+
   function formatTime(d: Date): string {
     const h = d.getHours();
     const m = d.getMinutes();
@@ -266,6 +270,20 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
                 }`}
               >
                 <p className="break-words">{msg.message}</p>
+                {msg.messageType === 'review_link' &&
+                  !isMine &&
+                  msg.reviewPayload &&
+                  currentUser?.id === msg.reviewPayload.buyerId && (
+                    <div className="mt-2">
+                      <Button
+                        size="sm"
+                        className="bg-white text-primary hover:bg-white/90"
+                        onClick={() => handleReviewLink(msg.reviewPayload!)}
+                      >
+                        리뷰 작성하기
+                      </Button>
+                    </div>
+                  )}
                 <p className={`mt-1 text-xs ${isMine ? "text-white/70" : "text-muted-foreground"}`}>
                   {formatTime(msg.createdAt)}
                 </p>

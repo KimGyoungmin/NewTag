@@ -119,6 +119,22 @@ export const productApi = {
     }
   },
 
+  completeSale: async (
+    id: number,
+    buyerId: number
+  ): Promise<{ product: Product | null; transactionId: number | null }> => {
+    try {
+      const response = await apiClient.post<{ product: any; transactionId: number }>(`/products/${id}/complete`, { buyerId });
+      return {
+        product: response.data?.product ? mapProductDetail(response.data.product) : null,
+        transactionId: response.data?.transactionId ?? null,
+      };
+    } catch (error) {
+      console.error(`Failed to complete sale for product ${id}:`, error);
+      throw error;
+    }
+  },
+
   delete: async (id: number): Promise<boolean> => {
     try {
       await apiClient.delete(`/products/${id}`);
