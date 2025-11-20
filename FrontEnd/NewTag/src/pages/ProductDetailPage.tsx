@@ -244,7 +244,7 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
     if (!product) return;
 
     // Firebase 채팅을 위해 서버에서 최신 사용자 정보 조회 (id/nick 필수)
-    let currentUser = null as Awaited<ReturnType<typeof authApiService.getCurrentUser>> | null;
+    let currentUser: Awaited<ReturnType<typeof authApiService.getCurrentUser>> | null = null;
     try {
       currentUser = await authApiService.getCurrentUser();
     } catch (err) {
@@ -607,16 +607,6 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
 
         <Separator />
 
-{/* Description */}
-        <div className="bg-card px-4 py-6">
-          <h3 className="text-lg font-semibold mb-3">상품 설명</h3>
-          <p className="whitespace-pre-line text-muted-foreground leading-relaxed">
-            {product.content}
-          </p>
-        </div>
-
-        <Separator />
-
         {/* Location */}
         <div className="bg-card px-4 py-6">
           <h3 className="text-lg font-semibold mb-3">거래 희망 장소</h3>
@@ -769,6 +759,7 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
             </p>
           )}
         </div>
+      </div>
 
       {/* Bottom Action Bar */}
       <div className="fixed bottom-16 md:bottom-0 left-0 right-0 z-50 border-t bg-background p-4 md:max-w-4xl md:mx-auto">
