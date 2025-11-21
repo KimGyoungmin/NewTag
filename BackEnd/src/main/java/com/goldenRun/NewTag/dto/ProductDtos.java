@@ -9,6 +9,9 @@ import java.util.List;
 
 public class ProductDtos {
 
+    // =========================================================================
+    // 상품 생성 요청 DTO
+    // =========================================================================
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
     public static class CreateRequest {
         private Double price;
@@ -20,9 +23,14 @@ public class ProductDtos {
         private Double longitude;
         private Integer sellerId;
         private Boolean isResell;
-        private List<ImageItem> images; // ?뚯씪紐?URL 紐⑸줉 (泥?踰덉㎏瑜?isMain?쇰줈 吏??
+
+        // 이미지 파일 목록 (첫 번째 항목을 isMain=true로 설정)
+        private List<ImageItem> images;
     }
 
+    // =========================================================================
+    // 상품 수정 요청 DTO
+    // =========================================================================
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
     public static class UpdateRequest {
         private Double price;
@@ -33,15 +41,23 @@ public class ProductDtos {
         private Double latitude;
         private Double longitude;
         private Integer categoryId;
+
+        // 전체 이미지 수정 (기존 삭제 + 새로운 리스트)
         private List<ImageItem> images;
     }
 
+    // =========================================================================
+    // 이미지 항목 DTO
+    // =========================================================================
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
     public static class ImageItem {
-        private String path;
-        private Boolean isMain;
+        private String path;      // 이미지 URL 또는 경로
+        private Boolean isMain;   // 대표 이미지 여부
     }
 
+    // =========================================================================
+    // 상품 리스트 아이템 DTO
+    // =========================================================================
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
     public static class ListItem {
         private Integer id;
@@ -52,10 +68,13 @@ public class ProductDtos {
         private LocalDateTime createdAt;
         private Integer viewCount;
         private Long favoriteCount;
-        private String timeAgo; // "1시간 전" 같은 문자열
+        private String timeAgo;  // 예: “1시간 전”
         private Boolean isResell;
     }
 
+    // =========================================================================
+    // 상품 상세 조회 응답 DTO
+    // =========================================================================
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
     public static class DetailResponse {
         private Integer id;
@@ -72,53 +91,68 @@ public class ProductDtos {
         private LocalDateTime createdAt;
         private Integer categoryId;
 
-        private List<ImageResponse> images; // 모든 이미지(메인 우선 정렬)
+        private List<ImageResponse> images;  // 전체 이미지 목록
         private String mainImage;
 
-        // 판매자 박스
+        // 판매자 정보
         private Integer sellerId;
         private String sellerName;
         private String sellerNick;
         private String sellerProfileImg;
         private double sellerRatingAvg;
         private long sellerRatingCount;
-        private String sellerGrade; // 예: Gold/Silver 등
+        private String sellerGrade;
         private boolean likedByMe;
         private Boolean isResell;
     }
 
+    // =========================================================================
+    // 이미지 상세 응답 DTO
+    // =========================================================================
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
     public static class ImageResponse {
         private Integer id;
-        @JsonProperty("pImg")
-        private String pImg;  // ?꾨줎?몄뿏?쒖뿉??pImg濡??묎렐
+
+        @JsonProperty("pImg")  // 프론트에서 사용 중인 필드명
+        private String pImg;
+
         private Boolean isMain;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
         private Integer productId;
     }
 
+    // =========================================================================
+    // 상품 상태 변경 요청
+    // =========================================================================
     @Getter @Setter @NoArgsConstructor @AllArgsConstructor
     public static class StatusUpdateRequest {
         private ProductStatus status;
     }
 
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
+    // =========================================================================
+    // 거래 완료 요청
+    // =========================================================================
+    @Getter @Setter @NoArgsConstructor @AllArgsConstructor
     public static class CompleteSaleRequest {
         private Long buyerId;
     }
 
-    @Getter
-    @Setter
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
+    // =========================================================================
+    // 거래 완료 응답
+    // =========================================================================
+    @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
     public static class CompleteSaleResponse {
         private DetailResponse product;
         private Long transactionId;
     }
-}
 
+    // =========================================================================
+    // 상품 후기 작성 요청 DTO
+    // =========================================================================
+    @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class ReviewRequest {
+        private Double rating;    // 1.0 ~ 5.0
+        private String content;   // 후기 내용
+    }
+}

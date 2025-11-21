@@ -1,39 +1,21 @@
 package com.goldenRun.NewTag.dto;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 import lombok.*;
-
 import java.time.LocalDateTime;
 
 public class ReviewDtos {
 
-    @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
-    public static class CreateRequest {
-        @NotNull
-        private Long transactionId;
-        @NotNull
-        private Long targetId; // 리뷰 대상자
-        @NotNull
-        @Min(1)
-        @Max(5)
-        private Integer rating; // 1-5점
-        @Size(max = 500)
-        private String content; // 리뷰 내용
-    }
-
-    @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
-    public static class UpdateRequest {
-        private Integer rating;
-        private String content;
-    }
-
-    @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+    /* ============================
+       상세 리뷰 응답(Response)
+       ============================ */
+    @Getter
+    @Setter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class Response {
         private Long id;
-        private Integer rating;
+        private Double rating;
         private String content;
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
@@ -51,28 +33,62 @@ public class ReviewDtos {
 
         // 거래 정보
         private Long transactionId;
-        private String productTitle; // 거래 상품명
+        private String productTitle;
     }
 
-    @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
-    public static class RatingSummary {
-        private Double averageRating; // 평균 별점
-        private Long totalCount; // 전체 리뷰 개수
-        private Long rating5Count; // 5점 개수
-        private Long rating4Count; // 4점 개수
-        private Long rating3Count; // 3점 개수
-        private Long rating2Count; // 2점 개수
-        private Long rating1Count; // 1점 개수
+    /* Review → Response 변환 */
+    public static Response from(Review r) {
+        return Response.builder()
+                .id(r.getId())
+                .rating(r.getRating())
+                .content(r.getContent())
+                .createdAt(r.getCreatedAt())
+                .updatedAt(r.getUpdatedAt())
+
+                .writerId(r.getWriter().getId())
+                .writerName(r.getWriter().getName())
+                .writerNick(r.getWriter().getNick())
+                .writerProfileImg(r.getWriter().getProfileImg())
+
+                .targetId(r.getTarget().getId())
+                .targetName(r.getTarget().getName())
+                .targetNick(r.getTarget().getNick())
+
+                .transactionId(r.getTransaction().getId())
+                .productTitle(r.getTransaction().getProduct().getTitle())
+                .build();
     }
 
-    @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+    /* ============================
+       간단 요약 리뷰 응답(SimpleResponse)
+       ============================ */
+    @Getter
+    @Setter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
     public static class SimpleResponse {
         private Long id;
-        private Integer rating;
+        private Double rating;
         private String content;
         private LocalDateTime createdAt;
+
         private String writerName;
         private String writerNick;
         private String writerProfileImg;
+    }
+
+    /* Review → SimpleResponse 변환 */
+    public static SimpleResponse simpleFrom(Review r) {
+        return SimpleResponse.builder()
+                .id(r.getId())
+                .rating(r.getRating())
+                .content(r.getContent())
+                .createdAt(r.getCreatedAt())
+
+                .writerName(r.getWriter().getName())
+                .writerNick(r.getWriter().getNick())
+                .writerProfileImg(r.getWriter().getProfileImg())
+                .build();
     }
 }

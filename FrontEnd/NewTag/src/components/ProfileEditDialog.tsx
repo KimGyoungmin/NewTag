@@ -18,14 +18,14 @@ interface ProfileEditDialogProps {
   open: boolean;
   onClose: () => void;
   profile: UserProfile;
-  onSave: (profile: UserProfile) => void;
+  //onSave: (profile: UserProfile) => void;
 }
 
 export function ProfileEditDialog({
   open,
   onClose,
   profile,
-  onSave,
+  //onSave,
 }: ProfileEditDialogProps) {
   const [editedProfile, setEditedProfile] = useState<UserProfile>(profile);
   const fileInputRef = useRef<HTMLInputElement>(null);

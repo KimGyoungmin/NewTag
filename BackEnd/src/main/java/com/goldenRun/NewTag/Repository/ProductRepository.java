@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import com.goldenRun.NewTag.entity.Product;
+import com.goldenRun.NewTag.entity.User;
 import com.goldenRun.NewTag.enums.ProductStatus;
 
 import java.util.List;
@@ -58,4 +59,6 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
         @Param("distance") Double distance,
         Pageable pageable
     );
+
+    List<Product> findBySellerAndIsDeletedFalse(User seller);
 }

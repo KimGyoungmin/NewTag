@@ -11,8 +11,6 @@ import java.util.List;
 
 @Getter @Setter @Builder
 @NoArgsConstructor @AllArgsConstructor
-
-
 @Entity
 @Table(
     name = "product",
@@ -68,4 +66,8 @@ public class Product {
         if (isResell == null) isResell = false;
     }
     @PreUpdate void preUpdate(){ updatedAt = LocalDateTime.now(); }
+
+    @Column(nullable = false)
+private Boolean isDeleted = false;
+    
 }

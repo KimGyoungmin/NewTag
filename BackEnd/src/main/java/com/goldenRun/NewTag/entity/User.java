@@ -132,4 +132,8 @@ public class User {
         }
     }
 
+    // public Object getTrust() {
+    //     throw new UnsupportedOperationException("Not supported yet.");
+    // }
+
 }

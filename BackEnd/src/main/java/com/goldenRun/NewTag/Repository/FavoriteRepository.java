@@ -1,7 +1,10 @@
 
 package com.goldenRun.NewTag.Repository;
 
+import java.util.List;
+
 import com.goldenRun.NewTag.entity.Favorite;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -9,6 +12,8 @@ import org.springframework.stereotype.Repository;
 
 import java.util.Optional;
 import java.util.Set;
+
+import com.goldenRun.NewTag.entity.User;
 
 @Repository
 public interface FavoriteRepository extends JpaRepository<Favorite, Long> {
@@ -44,4 +49,6 @@ public interface FavoriteRepository extends JpaRepository<Favorite, Long> {
      * 특정 사용자와 상품의 찜 정보 삭제
      */
     void deleteByProductIdAndUserId(Long productId, Long userId);
+
+    public List<Favorite> findByUser(User user);
 }

@@ -1,6 +1,8 @@
 package com.goldenRun.NewTag.Repository;
 
 import com.goldenRun.NewTag.entity.Review;
+import com.goldenRun.NewTag.entity.User;
+
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -45,4 +47,10 @@ public interface ReviewRepository extends JpaRepository<Review, Long> {
      */
     @Query("SELECT COUNT(r) > 0 FROM Review r WHERE r.transaction.id = :transactionId AND r.writer.id = :writerId")
     boolean existsByTransactionIdAndWriterId(@Param("transactionId") Long transactionId, @Param("writerId") Long writerId);
+
+    List<Review> findByTarget(User targetUser);
+
+    Long countByTargetId(User currentUser);
+
+    Long countByTarget(User currentUser);
 }
