@@ -59,6 +59,28 @@ public class ProductController {
         return ResponseEntity.ok(product);
     }
 
+    @GetMapping("/{id}/related")
+    public ResponseEntity<List<ProductDtos.ListItem>> getRelatedProducts(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "6") int limit
+    ) {
+        List<ProductDtos.ListItem> related = productService.getRelatedProducts(id, limit);
+        return ResponseEntity.ok(related);
+    }
+
+    /**
+     * 판매자의 다른 상품 조회 (현재 상품 제외)
+     * GET /api/v1/products/{id}/seller-other?limit=6
+     */
+    @GetMapping("/{id}/seller-other")
+    public ResponseEntity<List<ProductDtos.ListItem>> getOtherProductsBySeller(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "6") int limit
+    ) {
+        List<ProductDtos.ListItem> otherProducts = productService.getOtherProductsBySeller(id, limit);
+        return ResponseEntity.ok(otherProducts);
+    }
+
     /**
      * 상품 검색 (검색 로그 자동 저장)
      * GET /api/v1/products/search?keyword=아이폰&userId=1&deviceType=MOBILE&page=0&size=20
@@ -131,6 +153,37 @@ public class ProductController {
     ) {
         List<String> keywords = searchLogService.getRecentKeywords(userId, limit);
         return ResponseEntity.ok(keywords);
+    }
+
+    /**
+     * 특정 검색어 삭제
+     * DELETE /api/v1/products/search/recent?userId=1&keyword=빵빵이
+     */
+    @DeleteMapping("/search/recent")
+    public ResponseEntity<Map<String, Object>> deleteRecentKeyword(
+            @RequestParam Long userId,
+            @RequestParam String keyword
+    ) {
+        searchLogService.deleteRecentKeyword(userId, keyword);
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "검색어가 삭제되었습니다."
+        ));
+    }
+
+    /**
+     * 모든 검색어 삭제
+     * DELETE /api/v1/products/search/recent/all?userId=1
+     */
+    @DeleteMapping("/search/recent/all")
+    public ResponseEntity<Map<String, Object>> deleteAllRecentKeywords(
+            @RequestParam Long userId
+    ) {
+        searchLogService.deleteAllRecentKeywords(userId);
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "모든 검색어가 삭제되었습니다."
+        ));
     }
 
     /**

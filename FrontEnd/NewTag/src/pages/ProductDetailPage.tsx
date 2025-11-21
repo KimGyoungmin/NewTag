@@ -39,6 +39,17 @@ interface ProductDetailPageProps {
   onNavigate: (page: string, id?: string) => void;
 }
 
+interface RelatedProduct {
+  id: number;
+  title: string;
+  price: number;
+  locationNm?: string;
+  mainImage?: string;
+  thumbnailImage?: string;
+  timeAgo?: string;
+  favoriteCount?: number;
+}
+
 export function ProductDetailPage({ productId, onNavigate }: ProductDetailPageProps) {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,6 +61,10 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [touchStart, setTouchStart] = useState(0);
   const [touchEnd, setTouchEnd] = useState(0);
+  const [relatedProducts, setRelatedProducts] = useState<RelatedProduct[]>([]);
+  const [relatedLoading, setRelatedLoading] = useState(false);
+  const [sellerProducts, setSellerProducts] = useState<RelatedProduct[]>([]);
+  const [sellerProductsLoading, setSellerProductsLoading] = useState(false);
 
   // 현재 로그인한 사용자가 상품 소유자인지 확인
   const currentUser = authApi.getCurrentUser();
@@ -106,6 +121,71 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
     }
   };
 
+  useEffect(() => {
+    if (!product?.id) {
+      setRelatedProducts([]);
+      return;
+    }
+
+    let isCancelled = false;
+    const loadRelated = async () => {
+      setRelatedLoading(true);
+      try {
+        const items = await productApi.getRelated(product.id, 6);
+        if (!isCancelled) {
+          setRelatedProducts(items ?? []);
+        }
+      } catch (err) {
+        console.error('Failed to load related products:', err);
+        if (!isCancelled) {
+          setRelatedProducts([]);
+        }
+      } finally {
+        if (!isCancelled) {
+          setRelatedLoading(false);
+        }
+      }
+    };
+
+    loadRelated();
+    return () => {
+      isCancelled = true;
+    };
+  }, [product?.id]);
+
+  // 판매자의 다른 상품 로드
+  useEffect(() => {
+    if (!product?.id) {
+      setSellerProducts([]);
+      return;
+    }
+
+    let isCancelled = false;
+    const loadSellerProducts = async () => {
+      setSellerProductsLoading(true);
+      try {
+        const items = await productApi.getSellerOther(product.id, 6);
+        if (!isCancelled) {
+          setSellerProducts(items ?? []);
+        }
+      } catch (err) {
+        console.error('Failed to load seller products:', err);
+        if (!isCancelled) {
+          setSellerProducts([]);
+        }
+      } finally {
+        if (!isCancelled) {
+          setSellerProductsLoading(false);
+        }
+      }
+    };
+
+    loadSellerProducts();
+    return () => {
+      isCancelled = true;
+    };
+  }, [product?.id]);
+
   // 상태 변경 핸들러
   const handleStatusChange = async (newStatus: ProductStatus) => {
     if (!product) return;
@@ -153,6 +233,12 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
     if (!currentUser) {
       toast.error("로그인이 필요합니다.");
       onNavigate('login');
+      return;
+    }
+
+    // 자신이 올린 상품은 찜할 수 없음
+    if (isOwner) {
+      toast.info("내가 올린 상품은 찜할 수 없습니다.");
       return;
     }
 
@@ -204,7 +290,7 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
     if (!product) return;
 
     // Firebase 채팅을 위해 서버에서 최신 사용자 정보 조회 (id/nick 필수)
-    let currentUser = null as Awaited<ReturnType<typeof authApiService.getCurrentUser>> | null;
+    let currentUser: Awaited<ReturnType<typeof authApiService.getCurrentUser>> | null = null;
     try {
       currentUser = await authApiService.getCurrentUser();
     } catch (err) {
@@ -228,8 +314,9 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
     }
 
     try {
-      const productImage = product.images && product.images.length > 0
-        ? getFullImageUrl(product.images[0].pImg || product.images[0].pImg)
+      const firstImage = product.images && product.images.length > 0 ? product.images[0] : null;
+      const productImage = firstImage
+        ? getFullImageUrl(firstImage.thumbnailPath || firstImage.pImg || firstImage.pimg)
         : getFullImageUrl(undefined);
 
       const chatId = await chatService.getOrCreateChatRoom(
@@ -295,6 +382,17 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
     return resolveImageUrl(path);
   };
 
+  const imageSources =
+    product?.images && product.images.length > 0
+      ? product.images.map((img: any) => ({
+          full: getFullImageUrl(img.pImg || img.pimg),
+          thumb: getFullImageUrl(img.thumbnailPath || img.pImg || img.pimg),
+        }))
+      : [];
+
+  const heroImages = imageSources.length > 0 ? imageSources.map((img) => img.full) : [getFullImageUrl(undefined)];
+  const previewImages = imageSources.length > 0 ? imageSources.map((img) => img.thumb) : heroImages;
+
   // 스와이프 핸들러
   const handleTouchStart = (e: React.TouchEvent) => {
     setTouchStart(e.targetTouches[0].clientX);
@@ -311,11 +409,7 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
     const isLeftSwipe = distance > 50;
     const isRightSwipe = distance < -50;
 
-    const images = product?.images && product.images.length > 0
-      ? product.images.map((img: any) => getFullImageUrl(img.pImg || img.pimg))
-      : [getFullImageUrl(undefined)];
-
-    if (isLeftSwipe && currentImageIndex < images.length - 1) {
+    if (isLeftSwipe && currentImageIndex < heroImages.length - 1) {
       setCurrentImageIndex(currentImageIndex + 1);
     }
     if (isRightSwipe && currentImageIndex > 0) {
@@ -327,10 +421,12 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
     setTouchEnd(0);
   };
 
+  const handleRelatedProductClick = (relatedId: number) => {
+    onNavigate('detail', relatedId.toString());
+  };
+
   // displayImages 배열 생성
-  const displayImages = product?.images && product.images.length > 0
-    ? product.images.map((img: any) => getFullImageUrl(img.pImg || img.pimg))
-    : [getFullImageUrl(undefined)];
+  const displayImages = previewImages;
 
   // 로딩 상태
   if (loading) {
@@ -443,15 +539,15 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
           onTouchEnd={handleTouchEnd}
         >
           <ImageWithFallback
-            src={displayImages[currentImageIndex]}
+            src={heroImages[currentImageIndex]}
             alt={product.title}
             className="h-full w-full object-cover"
           />
 
-          {displayImages.length > 1 && (
+          {heroImages.length > 1 && (
             <>
               <div className="absolute bottom-4 right-4 rounded-full bg-black/60 px-3 py-1 text-white text-sm">
-                {currentImageIndex + 1} / {displayImages.length}
+                {currentImageIndex + 1} / {heroImages.length}
               </div>
               <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2">
                 {displayImages.map((_, index) => (
@@ -531,26 +627,28 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
             {product.price.toLocaleString()}원
           </div>
 
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
+          <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mb-6">
+            <span className="flex items-center gap-1">
+              <MapPin className="h-4 w-4" />
+              {product.locationNm}
+            </span>
             <span className="flex items-center gap-1">
               <Eye className="h-4 w-4" />
-              조회 {product.viewCount}
+              조회 {product.viewCount.toLocaleString()}
             </span>
             <span className="flex items-center gap-1">
               <Heart className="h-4 w-4" />
-              관심 {product.favoriteCount || 0}
+              찜 {product.favoriteCount || 0}
             </span>
           </div>
-        </div>
 
-        <Separator />
-
-        {/* Description */}
-        <div className="bg-card px-4 py-6">
-          <h3 className="text-lg font-semibold mb-3">상품 설명</h3>
-          <p className="whitespace-pre-line text-muted-foreground leading-relaxed">
-            {product.content}
-          </p>
+          <div className="prose prose-sm max-w-none text-foreground leading-relaxed">
+            {product.content.split('\n').map((line, index) => (
+              <p key={index} className="mb-4 last:mb-0">
+                {line}
+              </p>
+            ))}
+          </div>
         </div>
 
         <Separator />
@@ -650,24 +748,146 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
 
         <Separator />
 
-        {/* Related Products Section - TODO */}
+        {/* Seller's Other Products Section */}
+        {product.seller && (
+          <div className="bg-card px-4 py-6">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold">{product.seller.name}님의 다른 상품</h3>
+                <p className="text-sm text-muted-foreground">이 판매자가 올린 다른 상품을 확인해보세요.</p>
+              </div>
+              {sellerProducts.length > 0 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => onNavigate('seller-profile', product.seller!.id.toString())}
+                >
+                  전체보기
+                </Button>
+              )}
+            </div>
+
+            {sellerProductsLoading ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {Array.from({ length: 3 }).map((_, index) => (
+                  <div key={index} className="space-y-2">
+                    <Skeleton className="aspect-square w-full rounded-lg" />
+                    <Skeleton className="h-4 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </div>
+                ))}
+              </div>
+            ) : sellerProducts.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {sellerProducts.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => handleRelatedProductClick(item.id)}
+                    className="text-left"
+                  >
+                    <div className="relative aspect-square rounded-xl overflow-hidden bg-muted">
+                      <ImageWithFallback
+                        src={resolveImageUrl(item.thumbnailImage ?? item.mainImage)}
+                        alt={item.title}
+                        className="h-full w-full object-cover transition-transform hover:scale-105"
+                      />
+                    </div>
+                    <div className="mt-3 space-y-1">
+                      <p className="text-sm font-medium line-clamp-2">{item.title}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.locationNm || '위치 정보 없음'}
+                      </p>
+                      <p className="text-xs text-muted-foreground">{item.timeAgo}</p>
+                      <p className="text-base font-semibold">
+                        {item.price ? `${item.price.toLocaleString()}원` : '가격 문의'}
+                      </p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-6">
+                판매자의 다른 상품이 없습니다.
+              </p>
+            )}
+          </div>
+        )}
+
+        <Separator />
+
         <div className="bg-card px-4 py-6">
-          <h3 className="text-lg font-semibold mb-3">이 상품과 비슷한 상품</h3>
-          <p className="text-sm text-muted-foreground">관련 상품을 준비 중입니다.</p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold">이 상품과 비슷한 상품</h3>
+              <p className="text-sm text-muted-foreground">관심 가질 만한 추천 상품을 모아봤어요.</p>
+            </div>
+            {relatedProducts.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={() => onNavigate('home')}>
+                더 보기
+              </Button>
+            )}
+          </div>
+
+          {relatedLoading ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+              {Array.from({ length: 3 }).map((_, index) => (
+                <div key={index} className="space-y-2">
+                  <Skeleton className="aspect-square w-full rounded-lg" />
+                  <Skeleton className="h-4 w-3/4" />
+                  <Skeleton className="h-4 w-1/2" />
+                </div>
+              ))}
+            </div>
+          ) : relatedProducts.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              {relatedProducts.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => handleRelatedProductClick(item.id)}
+                  className="text-left"
+                >
+                  <div className="relative aspect-square rounded-xl overflow-hidden bg-muted">
+                    <ImageWithFallback
+                      src={resolveImageUrl(item.thumbnailImage ?? item.mainImage)}
+                      alt={item.title}
+                      className="h-full w-full object-cover transition-transform hover:scale-105"
+                    />
+                  </div>
+                  <div className="mt-3 space-y-1">
+                    <p className="text-sm font-medium line-clamp-2">{item.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.locationNm || '위치 정보 없음'}
+                    </p>
+                    <p className="text-xs text-muted-foreground">{item.timeAgo}</p>
+                    <p className="text-base font-semibold">
+                      {item.price ? `${item.price.toLocaleString()}원` : '가격 문의'}
+                    </p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              추천 상품을 아직 찾지 못했어요.
+            </p>
+          )}
         </div>
       </div>
 
       {/* Bottom Action Bar */}
       <div className="fixed bottom-16 md:bottom-0 left-0 right-0 z-50 border-t bg-background p-4 md:max-w-4xl md:mx-auto">
         <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="shrink-0"
-            onClick={handleToggleFavorite}
-          >
-            <Heart className={`h-6 w-6 ${isLiked ? 'fill-red-500 text-red-500' : ''}`} />
-          </Button>
+          {/* 자신이 올린 상품이 아닐 때만 찜 버튼 표시 */}
+          {!isOwner && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+              onClick={handleToggleFavorite}
+            >
+              <Heart className={`h-6 w-6 ${isLiked ? 'fill-red-500 text-red-500' : ''}`} />
+            </Button>
+          )}
           <Button
             className="flex-1 bg-primary hover:bg-primary/90"
             onClick={handleChat}

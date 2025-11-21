@@ -1,6 +1,9 @@
 package com.goldenRun.NewTag.service;
 
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import net.coobird.thumbnailator.Thumbnails;
+import net.coobird.thumbnailator.geometry.Positions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -9,6 +12,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 
 @Service
@@ -21,10 +25,20 @@ public class FileStorageService {
     @Value("${app.upload.product-dir:products}")
     private String productDir;
 
+    private static final int OPTIMIZE_MAX_WIDTH = 1600;
+    private static final int OPTIMIZE_MAX_HEIGHT = 1600;
+    private static final double OPTIMIZE_QUALITY = 0.85;
+    private static final int THUMBNAIL_SIZE = 300;
+
+    private Path baseDirectoryPath;
+
+    @PostConstruct
+    void init() {
+        this.baseDirectoryPath = Paths.get(baseDir).toAbsolutePath().normalize();
+    }
+
     /**
-     * 상품 이미지 임시 저장 (상품 ID 없을 때)
-     * @param file 업로드할 파일
-     * @return DB 저장용 경로 (예: "products/temp/abc123.jpg")
+     * 임시 이미지 저장 (상품 ID 미지정)
      */
     public String store(MultipartFile file) {
         return storeProductImage(file, null, false);
@@ -32,10 +46,6 @@ public class FileStorageService {
 
     /**
      * 상품 이미지 저장
-     * @param file 업로드할 파일
-     * @param productId 상품 ID (null이면 temp 폴더)
-     * @param isMain 메인 이미지 여부
-     * @return DB 저장용 경로 (예: "products/1/main.jpg")
      */
     public String storeProductImage(MultipartFile file, Long productId, boolean isMain) {
         validateFile(file);
@@ -45,15 +55,15 @@ public class FileStorageService {
         String folder = productId != null ? String.valueOf(productId) : "temp";
 
         try {
-            // products/{productId}/ 폴더 생성
-            Path productFolder = Paths.get(baseDir, productDir, folder).toAbsolutePath().normalize();
+            Path productFolder = getProductFolder(folder);
             Files.createDirectories(productFolder);
 
-            // 파일 저장
             Path targetLocation = productFolder.resolve(filename);
             file.transferTo(targetLocation);
 
-            // DB 저장용 경로 반환 (products/1/main.jpg)
+            optimizeImageFile(targetLocation);
+            createThumbnailFile(targetLocation);
+
             String relativePath = productDir + "/" + folder + "/" + filename;
             log.info("✅ Stored product image: {}", targetLocation);
             return relativePath.replace("\\", "/");
@@ -65,63 +75,56 @@ public class FileStorageService {
     }
 
     /**
-     * 임시 폴더의 이미지를 상품 폴더로 이동
-     * @param tempPath 임시 경로 (예: "products/temp/abc123.jpg")
-     * @param productId 상품 ID
-     * @param isMain 메인 이미지 여부
-     * @return 새 경로 (예: "products/1/main.jpg")
+     * temp 폴더 이미지를 상품 폴더로 이동
      */
     public String moveToProductFolder(String tempPath, Long productId, boolean isMain) {
         if (tempPath == null || !tempPath.startsWith(productDir + "/temp/")) {
-            return tempPath; // 이미 상품 폴더에 있거나 잘못된 경로
+            return tempPath;
         }
 
         try {
-            // 기존 파일 경로
-            Path sourcePath = Paths.get(baseDir, tempPath).toAbsolutePath().normalize();
+            Path sourcePath = getAbsolutePath(tempPath);
             if (!Files.exists(sourcePath)) {
                 log.warn("⚠️ Source file not found: {}", sourcePath);
                 return tempPath;
             }
 
-            // 새 파일 경로
             String extension = getFileExtension(tempPath);
             String newFilename = generateFilename(isMain, extension);
-            Path targetFolder = Paths.get(baseDir, productDir, String.valueOf(productId)).toAbsolutePath().normalize();
+            Path targetFolder = getProductFolder(String.valueOf(productId));
             Files.createDirectories(targetFolder);
 
             Path targetPath = targetFolder.resolve(newFilename);
+            Files.move(sourcePath, targetPath, StandardCopyOption.REPLACE_EXISTING);
 
-            // 파일 이동
-            Files.move(sourcePath, targetPath);
+            moveThumbnailIfExists(tempPath, productId, newFilename);
 
             String newPath = productDir + "/" + productId + "/" + newFilename;
-            log.info("📦 Moved image: {} → {}", tempPath, newPath);
+            log.info("✅ Moved image: {} -> {}", tempPath, newPath);
             return newPath.replace("\\", "/");
 
         } catch (IOException e) {
             log.error("❌ Failed to move image", e);
-            return tempPath; // 이동 실패 시 기존 경로 유지
+            return tempPath;
         }
     }
 
     /**
-     * 상품 폴더 전체 삭제
-     * @param productId 상품 ID
+     * 상품 이미지 폴더 삭제
      */
     public void deleteProductFolder(Long productId) {
         try {
-            Path productFolder = Paths.get(baseDir, productDir, String.valueOf(productId)).toAbsolutePath().normalize();
+            Path productFolder = getProductFolder(String.valueOf(productId));
             if (Files.exists(productFolder)) {
                 Files.walk(productFolder)
-                    .sorted((a, b) -> b.compareTo(a)) // 역순 정렬 (파일 먼저 삭제)
-                    .forEach(path -> {
-                        try {
-                            Files.delete(path);
-                        } catch (IOException e) {
-                            log.error("Failed to delete: {}", path, e);
-                        }
-                    });
+                        .sorted((a, b) -> b.compareTo(a))
+                        .forEach(path -> {
+                            try {
+                                Files.delete(path);
+                            } catch (IOException e) {
+                                log.error("Failed to delete: {}", path, e);
+                            }
+                        });
                 log.info("🗑️ Deleted product folder: {}", productFolder);
             }
         } catch (IOException e) {
@@ -130,8 +133,7 @@ public class FileStorageService {
     }
 
     /**
-     * 특정 이미지 파일 삭제
-     * @param relativePath DB에 저장된 경로 (예: "products/1/main.jpg")
+     * 단일 이미지/썸네일 삭제
      */
     public void deleteFile(String relativePath) {
         if (relativePath == null || relativePath.isEmpty()) {
@@ -139,47 +141,47 @@ public class FileStorageService {
         }
 
         try {
-            Path filePath = Paths.get(baseDir, relativePath).toAbsolutePath().normalize();
+            Path filePath = getAbsolutePath(relativePath);
             if (Files.exists(filePath)) {
                 Files.delete(filePath);
                 log.info("🗑️ Deleted file: {}", filePath);
+            }
+
+            String thumbRelative = buildThumbnailPath(relativePath);
+            if (thumbRelative != null) {
+                Path thumbPath = getAbsolutePath(thumbRelative);
+                if (Files.exists(thumbPath)) {
+                    Files.delete(thumbPath);
+                    log.info("🗑️ Deleted thumbnail: {}", thumbPath);
+                }
             }
         } catch (IOException e) {
             log.error("❌ Failed to delete file: {}", relativePath, e);
         }
     }
 
-    // ==================== Private Helper Methods ====================
+    // ========== Helper Methods ==========
 
-    /**
-     * 파일 유효성 검증
-     */
     private void validateFile(MultipartFile file) {
         if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("업로드할 이미지가 없습니다.");
+            throw new IllegalArgumentException("업로드된 이미지가 없습니다.");
         }
 
-        // 파일 타입 검증
         String contentType = file.getContentType();
         if (contentType == null || !contentType.startsWith("image/")) {
             throw new IllegalArgumentException("이미지 파일만 업로드 가능합니다.");
         }
 
-        // 파일 크기 검증 (10MB)
         if (file.getSize() > 10 * 1024 * 1024) {
-            throw new IllegalArgumentException("파일 크기는 10MB를 초과할 수 없습니다.");
+            throw new IllegalArgumentException("파일 크기는 10MB 이하만 허용됩니다.");
         }
 
-        // 확장자 검증
         String extension = getFileExtension(file.getOriginalFilename()).toLowerCase();
         if (!extension.matches("\\.(jpg|jpeg|png|gif|webp)")) {
-            throw new IllegalArgumentException("지원하지 않는 이미지 형식입니다. (jpg, jpeg, png, gif, webp만 가능)");
+            throw new IllegalArgumentException("지원하지 않는 확장자입니다. (jpg, jpeg, png, gif, webp)");
         }
     }
 
-    /**
-     * 파일 확장자 추출
-     */
     private String getFileExtension(String filename) {
         if (filename == null) {
             return "";
@@ -188,14 +190,88 @@ public class FileStorageService {
         return lastDot >= 0 ? filename.substring(lastDot) : "";
     }
 
-    /**
-     * 파일명 생성
-     */
     private String generateFilename(boolean isMain, String extension) {
         if (isMain) {
             return "main" + extension;
         } else {
             return "sub_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8) + extension;
         }
+    }
+
+    private Path getProductFolder(String folder) {
+        return baseDirectoryPath.resolve(Paths.get(productDir, folder)).normalize();
+    }
+
+    private Path getAbsolutePath(String relativePath) {
+        return baseDirectoryPath.resolve(relativePath).normalize();
+    }
+
+    private void optimizeImageFile(Path originalPath) {
+        try {
+            if (!Files.exists(originalPath)) {
+                return;
+            }
+            Path tempFile = Files.createTempFile("opt_", getFileExtension(originalPath.getFileName().toString()));
+            Thumbnails.Builder<Path> builder = Thumbnails.of(originalPath)
+                    .size(OPTIMIZE_MAX_WIDTH, OPTIMIZE_MAX_HEIGHT)
+                    .outputQuality(OPTIMIZE_QUALITY);
+            builder.toFile(tempFile.toFile());
+            Files.move(tempFile, originalPath, StandardCopyOption.REPLACE_EXISTING);
+        } catch (Exception e) {
+            log.warn("⚠️ Failed to optimize image {}: {}", originalPath, e.getMessage());
+        }
+    }
+
+    private void createThumbnailFile(Path originalPath) {
+        try {
+            if (!Files.exists(originalPath)) {
+                return;
+            }
+            String thumbnailName = buildThumbnailFileName(originalPath.getFileName().toString());
+            Path thumbnailPath = originalPath.getParent().resolve(thumbnailName);
+            Thumbnails.of(originalPath)
+                    .crop(Positions.CENTER)
+                    .size(THUMBNAIL_SIZE, THUMBNAIL_SIZE)
+                    .outputQuality(OPTIMIZE_QUALITY)
+                    .toFile(thumbnailPath.toFile());
+        } catch (Exception e) {
+            log.warn("⚠️ Failed to create thumbnail for {}: {}", originalPath, e.getMessage());
+        }
+    }
+
+    private void moveThumbnailIfExists(String tempRelativePath, Long productId, String newFilename) throws IOException {
+        String tempThumbPath = buildThumbnailPath(tempRelativePath);
+        if (tempThumbPath == null) {
+            return;
+        }
+        Path sourceThumb = getAbsolutePath(tempThumbPath);
+        if (!Files.exists(sourceThumb)) {
+            return;
+        }
+
+        Path targetFolder = getProductFolder(String.valueOf(productId));
+        Files.createDirectories(targetFolder);
+        Path targetThumb = targetFolder.resolve(buildThumbnailFileName(newFilename));
+        Files.move(sourceThumb, targetThumb, StandardCopyOption.REPLACE_EXISTING);
+    }
+
+    public String buildThumbnailPath(String relativePath) {
+        if (relativePath == null || relativePath.isBlank()) {
+            return null;
+        }
+        int idx = relativePath.lastIndexOf("/");
+        String dir = idx >= 0 ? relativePath.substring(0, idx + 1) : "";
+        String fileName = idx >= 0 ? relativePath.substring(idx + 1) : relativePath;
+        return (dir + buildThumbnailFileName(fileName)).replace("\\", "/");
+    }
+
+    private String buildThumbnailFileName(String originalFileName) {
+        return "thumb_" + originalFileName;
+    }
+
+    public boolean thumbnailExists(String relativePath) {
+        String thumb = buildThumbnailPath(relativePath);
+        if (thumb == null) return false;
+        return Files.exists(getAbsolutePath(thumb));
     }
 }
