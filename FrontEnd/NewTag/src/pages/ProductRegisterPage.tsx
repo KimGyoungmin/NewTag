@@ -68,7 +68,8 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
       toast.success("이미지가 업로드되었습니다.");
     } catch (error) {
       console.error("Failed to upload image:", error);
-      toast.error("이미지 업로드에 실패했습니다.");
+      const errorMessage = error instanceof Error ? error.message : "이미지 업로드에 실패했습니다.";
+      toast.error(errorMessage);
     } finally {
       setIsUploading(false);
       event.target.value = "";
@@ -249,7 +250,7 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
           </p>
           <input
             type="file"
-            accept="image/*"
+            accept=".jpg,.jpeg,.jfif,.png,.gif,.webp,.bmp,.tiff,.tif"
             ref={fileInputRef}
             className="hidden"
             onChange={handleFileChange}
