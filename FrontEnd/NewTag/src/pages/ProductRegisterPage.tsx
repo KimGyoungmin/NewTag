@@ -1,5 +1,7 @@
 ﻿import { useMemo, useRef, useState } from "react";
 import { ChevronLeft, X, Camera, MapPin } from "lucide-react";
+import { useEffect } from "react";
+import { useLocation as useRouterLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
@@ -9,11 +11,22 @@ import { CATEGORIES, IMAGE_CONFIG } from "../constants";
 import { postApi } from "../api/postApi";
 import { resolveImageUrl } from "../utils/image";
 import { toast } from "sonner";
-import { LocationPicker } from "../components/LocationPicker";
 
 interface ProductRegisterPageProps {
   onNavigate: (page: string, id?: string) => void;
 }
+
+type RegisterFormState = {
+  title: string;
+  categoryId: string;
+  price: string;
+  description: string;
+  images: string[];
+  isResell: boolean;
+  location: string;
+  latitude: number;
+  longitude: number;
+};
 
 const DEFAULT_LATITUDE = 37.4979;
 const DEFAULT_LONGITUDE = 127.0276;
@@ -30,9 +43,17 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isAutoWriting, setIsAutoWriting] = useState(false);
+  const [latitude, setLatitude] = useState(DEFAULT_LATITUDE);
+  const [longitude, setLongitude] = useState(DEFAULT_LONGITUDE);
 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+  const routerLocation = useRouterLocation();
+  const locationState = routerLocation.state as {
+    selectedLocation?: { locationName: string; latitude: number; longitude: number };
+    formState?: RegisterFormState;
+  } | null;
 
   const categoryOptions = useMemo(
     () =>
@@ -117,8 +138,8 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
       price: priceValue,
       categoryId: Number(categoryId),
       locationNm: location,
-      latitude: DEFAULT_LATITUDE,
-      longitude: DEFAULT_LONGITUDE,
+      latitude,
+      longitude,
       images: imagePayload,
       isResell,
     };
@@ -171,6 +192,56 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
     } finally {
       setIsAutoWriting(false);
     }
+  };
+
+  useEffect(() => {
+    const formState = locationState?.formState;
+    if (!formState) return;
+
+    setTitle(formState.title ?? "");
+    setCategoryId(formState.categoryId ?? "");
+    setPrice(formState.price ?? "");
+    setDescription(formState.description ?? "");
+    setImages(formState.images ?? []);
+    setIsResell(!!formState.isResell);
+    setLocation(formState.location ?? location);
+    setLatitude(formState.latitude ?? DEFAULT_LATITUDE);
+    setLongitude(formState.longitude ?? DEFAULT_LONGITUDE);
+  }, [locationState?.formState]);
+
+  useEffect(() => {
+    if (locationState?.selectedLocation) {
+      const { locationName, latitude, longitude } = locationState.selectedLocation;
+      setLocation(locationName);
+      setLatitude(latitude);
+      setLongitude(longitude);
+      navigate("/product/register", { replace: true });
+    }
+  }, [locationState?.selectedLocation, navigate]);
+
+  const handleLocationChange = () => {
+    const formState: RegisterFormState = {
+      title,
+      categoryId,
+      price,
+      description,
+      images,
+      isResell,
+      location,
+      latitude,
+      longitude,
+    };
+
+    navigate("/product/location", {
+      state: {
+        formState,
+        currentLocation: {
+          locationName: location,
+          latitude,
+          longitude,
+        },
+      },
+    });
   };
 
   return (
@@ -333,7 +404,7 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
             <MapPin className="h-5 w-5 text-primary" />
 
             <span>{location}</span>
-            <Button variant="link" size="sm" className="ml-auto" disabled>
+            <Button variant="link" size="sm" className="ml-auto" onClick={handleLocationChange}>
               변경
             </Button>
           </div>

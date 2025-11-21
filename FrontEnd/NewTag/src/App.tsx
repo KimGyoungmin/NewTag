@@ -1,69 +1,72 @@
 import { useState, useEffect } from "react";
+import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-dom";
+
 import { Header } from "./components/Header";
 import { BottomNav } from "./components/BottomNav";
 import { RegisterTypeDialog } from "./components/RegisterTypeDialog";
+import { ScrollToTop } from "./components/ScrollToTop";
 import { Toaster } from "./components/ui/sonner";
 import { HomePage } from "./pages/HomePage";
-import { ProductDetailPage } from "./pages/ProductDetailPage";
 import { ProductRegisterPage } from "./pages/ProductRegisterPage";
 import { ProductRegisterAIPage } from "./pages/ProductRegisterAIPage";
-import { ProductEditPage } from "./pages/ProductEditPage";
-import { SelectBuyerPage } from "./pages/SelectBuyerPage";
 import { ChatListPage } from "./pages/ChatListPage";
-import { ChatPage } from "./pages/ChatPage";
 import { MyPage } from "./pages/MyPage";
-import { SellerProfilePage } from "./pages/SellerProfilePage";
 import { ResellPage } from "./pages/ResellPage";
-import { ResellDetailPage } from "./pages/ResellDetailPage";
 import { LoginPage } from "./pages/LoginPage";
 import { SignupPage } from "./pages/SignupPage";
 import { ReviewWritePage } from "./pages/ReviewWritePage";
 import { authApi } from "./api/auth";
-import type { ReviewNavigationPayload } from "./types";
+import type { ResellProductRecord } from "./data/resellProducts";
+import { LocationSelectPage } from "./pages/LocationSelectPage";
+import {
+  ProductDetailWrapper,
+  ProductEditWrapper,
+  SelectBuyerWrapper,
+  ChatRoomWrapper,
+  SellerProfileWrapper,
+  ResellDetailWrapper,
+} from "./components/RouteWrappers";
 
 /**
- * NewTag 메인 ?�플리�??�션 컴포?�트
- * 
- * 중고 거래 ?�랫?�의 ?�심 ?�우?�과 ?�태 관리�? ?�당?�니??
- * - ?�이지 ?�비게이??
- * - ?�품/채팅/?�매??ID 관�?
- * - ?�더/?�단�??�시 ?�어
+ * NewTag 메인 애플리케이션 컴포넌트
+ *
+ * React Router를 사용한 중고 거래 플랫폼
+ * - URL 기반 라우팅
+ * - 브라우저 히스토리 지원
+ * - 상태 관리 및 네비게이션
  */
 export default function App() {
   // ============================================
-  // ?�태 관�?
+  // 상태 관리
   // ============================================
 
-  /** ?�재 ?�시 중인 ?�이지 */
-  const [currentPage, setCurrentPage] = useState<string>("login");
-
-  /** ?�택???�품 ID (?�세/?�정 ?�이지?? */
-  const [selectedProductId, setSelectedProductId] = useState<string>("");
-
-  /** ?�택??채팅�?ID */
-  const [selectedChatId, setSelectedChatId] = useState<string>("");
-
-  /** ?�택???�매??ID */
-  const [selectedSellerId, setSelectedSellerId] = useState<string>("");
-
-
-  /** ���� �ۼ� �� ������ ���ؽ�Ʈ */
-  const [reviewContext, setReviewContext] = useState<ReviewNavigationPayload | null>(null);
-
-  /** 검?�어 */
+  /** 검색어 */
   const [searchQuery, setSearchQuery] = useState<string>("");
 
-  /** ?�품 ?�록 ?�???�택 Dialog ?�시 ?��? */
+  /** 상품 등록 타입 선택 Dialog 표시 여부 */
+
   const [showRegisterDialog, setShowRegisterDialog] = useState(false);
 
+  /** 인증 상태 */
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  /** 리셀 상품 데이터 (ResellPage와 ResellDetailPage 공유) */
+  const [resellProducts, setResellProducts] = useState<ResellProductRecord[]>([]);
+
+  const navigate = useNavigate();
+  const location = useLocation();
+
   // ============================================
-  // 초기 로드 - 로그???�태 ?�인
+
+  // 초기 로드 - 로그인 상태 확인
   // ============================================
   useEffect(() => {
     let mounted = true;
     authApi.initialize().then((user) => {
       if (!mounted) return;
-      setCurrentPage(user ? "home" : "login");
+      setIsAuthenticated(!!user);
+      setAuthLoading(false);
     });
     return () => {
       mounted = false;
@@ -71,281 +74,299 @@ export default function App() {
   }, []);
 
   // ============================================
-  // 로그???�태 변�?감�? - ?�면 초기??
+  // 로그인 상태 변경 감지
   // ============================================
   useEffect(() => {
     const handleAuthChange = () => {
       const isAuth = authApi.isAuthenticated();
+      setIsAuthenticated(isAuth);
 
       if (isAuth) {
-        // 로그???? ???�면?�로 ?�동 �?검?�어 초기??
-        setCurrentPage("home");
+        // 로그인 시 홈 화면으로 이동 및 검색어 초기화
+        if (location.pathname === '/login' || location.pathname === '/signup') {
+          navigate('/');
+        }
+
         setSearchQuery("");
-        setSelectedProductId("");
-        setSelectedChatId("");
-        setSelectedSellerId("");
       } else {
-        // 로그?�웃 ?? 로그???�면?�로 ?�동 �?모든 ?�태 초기??
-        setCurrentPage("login");
+        // 로그아웃 시 로그인 화면으로 이동
+        navigate('/login');
+
         setSearchQuery("");
-        setSelectedProductId("");
-        setSelectedChatId("");
-        setSelectedSellerId("");
       }
     };
 
-    // auth-change ?�벤??리스???�록
+    // auth-change 이벤트 리스너 등록
+
     window.addEventListener('auth-change', handleAuthChange);
 
     return () => {
       window.removeEventListener('auth-change', handleAuthChange);
     };
-  }, []);
-
+  }, [navigate, location.pathname]);
 
   // ============================================
-  // ?�비게이???�들??
+  // Debug - showRegisterDialog 상태 변화 로깅
   // ============================================
-  
-  /**
-   * ?�이지 ?�동 처리
-   * @param page ?�동???�이지 ?�름
-   * @param id ?�품/채팅/?�매??ID (?�택?�항)
-   */
-  const handleNavigate = (page: string, id?: string) => {
-    // ?�품 ?�록?�??�이?�로그로 ?�???�택 ??진행
-    if (page === "register") {
-      setShowRegisterDialog(true);
-      return;
-    }
+  useEffect(() => {
+    console.log('[App] showRegisterDialog changed to:', showRegisterDialog);
+  }, [showRegisterDialog]);
 
-    setCurrentPage(page);
-    if (page !== "review-write") {
-      setReviewContext(null);
-    }
+  // ============================================
 
-    // �??�이지�?ID ?�정
-    if (page === "detail" && id) {
-      setSelectedProductId(id);
-    }
-    if (page === "chatroom" && id) {
-      setSelectedChatId(id);
-    }
-    if (page === "seller-profile" && id) {
-      setSelectedSellerId(id);
-    }
-    if (page === "resell-detail" && id) {
-      setSelectedProductId(id);
-    }
-    if (page === "product-edit" && id) {
-      setSelectedProductId(id);
-    }
-    if (page === "review-write") {
-      if (id) {
-        try {
-          setReviewContext(JSON.parse(id));
-        } catch {
-          setReviewContext(null);
-        }
-      } else {
-        setReviewContext(null);
-      }
-    }
-    if (page === "select-buyer" && id) {
-      setSelectedProductId(id);
-    }
-  };
+  // 네비게이션 핸들러
+  // ============================================
 
   /**
-   * 검?�어 초기??�??�으�??�동
+   * 검색어 초기화 후 홈으로 이동
+
    */
   const handleClearSearch = () => {
     setSearchQuery("");
-    setCurrentPage("home");
+    navigate('/');
   };
 
   /**
-   * ?�품 ?�록 ?�???�택 (?�반/AI)
-   * @param type ?�록 ?�??
+   * 상품 등록 타입 선택 (일반/AI)
+   * @param type 등록 타입
+
    */
   const handleRegisterTypeSelect = (type: "normal" | "ai") => {
+    setShowRegisterDialog(false);
     if (type === "normal") {
-      setCurrentPage("register-normal");
+      navigate('/product/register');
     } else {
-      setCurrentPage("register-ai");
+      navigate('/product/register-ai');
     }
   };
 
   // ============================================
-  // ?�이지 ?�더�?
+  // UI 표시 여부
   // ============================================
-  
-  /**
-   * ?�재 ?�이지??맞는 컴포?�트 반환
-   */
-  const renderPage = () => {
-    switch (currentPage) {
-      // ?�증 ?�이지
-      case "login":
-        return <LoginPage onNavigate={handleNavigate} />;
-      case "signup":
-        return <SignupPage onNavigate={handleNavigate} />;
 
-      // 메인 ?�이지
-      case "home":
-        return (
-          <HomePage
-            onNavigate={handleNavigate}
-            searchQuery={searchQuery}
-            onClearSearch={handleClearSearch}
-          />
-        );
+  /** 헤더를 숨겨야 하는 페이지 목록 */
+  const hideHeaderPaths = [
+    '/login',
+    '/signup',
+    '/chat/',
+    '/seller/',
+    '/resell/',
+    '/product/edit/',
+    '/product/select-buyer/',
+  ];
 
-      // 리�? ?�이지
-      case "resell":
-        return <ResellPage onNavigate={handleNavigate} />;
-      case "resell-detail":
-        return (
-          <ResellDetailPage
-            productId={selectedProductId}
-            onNavigate={handleNavigate}
-          />
-        );
+  const showHeader = !hideHeaderPaths.some(path => location.pathname.startsWith(path));
 
-      // ?�품 ?�이지
-      case "detail":
-        return (
-          <ProductDetailPage
-            productId={selectedProductId}
-            onNavigate={handleNavigate}
-          />
-        );
-      case "register-normal":
-        return <ProductRegisterPage onNavigate={handleNavigate} />;
-      case "register-ai":
-        return <ProductRegisterAIPage onNavigate={handleNavigate} />;
-      case "product-edit":
-        return (
-          <ProductEditPage
-            productId={selectedProductId}
-            onNavigate={handleNavigate}
-          />
-        );
-      case "select-buyer":
-        return (
-          <SelectBuyerPage
-            productId={selectedProductId}
-            onNavigate={handleNavigate}
-          />
-        );
+  /** 하단 네비게이션을 숨겨야 하는 페이지 목록 */
+  const hideBottomNavPaths = [
+    '/login',
+    '/signup',
+    '/chat/',
+    '/product/edit/',
+    '/product/select-buyer/',
+    '/product/register',
+    '/product/location',
+  ];
 
-      case "review-write":
-        return (
-          <ReviewWritePage
-            payload={reviewContext}
-            onNavigate={handleNavigate}
-          />
-        );
 
-      // 채팅 ?�이지
-      case "chat":
-        return <ChatListPage onNavigate={handleNavigate} />;
-      case "chatroom":
-        return (
-          <ChatPage
-            chatId={selectedChatId}
-            onNavigate={handleNavigate}
-          />
-        );
+  const showBottomNav = !hideBottomNavPaths.some(path => location.pathname.startsWith(path));
 
-      // ?�로???�이지
-      case "mypage":
-        return <MyPage onNavigate={handleNavigate} />;
-      case "seller-profile":
-        return (
-          <SellerProfilePage
-            sellerId={selectedSellerId}
-            onNavigate={handleNavigate}
-          />
-        );
-
-      default:
-        return <HomePage onNavigate={handleNavigate} />;
-    }
+  // 현재 페이지 이름 추출 (BottomNav 활성화용)
+  const getCurrentPage = () => {
+    if (location.pathname === '/' || location.pathname === '/home') return 'home';
+    if (location.pathname.startsWith('/resell')) return 'resell';
+    if (location.pathname.startsWith('/chat')) return 'chat';
+    if (location.pathname.startsWith('/mypage')) return 'mypage';
+    return 'home';
   };
 
-  // ============================================
-  // UI ?�시 ?�어
-  // ============================================
-  
-  /** ?�더�??�겨???�는 ?�이지 목록 */
-  const showHeader =
-    currentPage !== "chatroom" &&
-    currentPage !== "seller-profile" &&
-    currentPage !== "resell-detail" &&
-    currentPage !== "product-edit" &&
-    currentPage !== "select-buyer" &&
-    currentPage !== "login" &&
-    currentPage !== "signup";
-
-  /** ?�단 ?�비게이?�을 ?�겨???�는 ?�이지 목록 */
-  const showBottomNav = 
-    currentPage !== "login" && 
-    currentPage !== "signup" &&
-    currentPage !== "chatroom" &&
-    currentPage !== "product-edit" &&
-    currentPage !== "select-buyer" &&
-    currentPage !== "register-normal" &&
-    currentPage !== "register-ai";
+  // 로딩 중
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>
+          <p className="mt-4 text-muted-foreground">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
 
   // ============================================
-  // ?�더�?
+  // 렌더링
+
   // ============================================
-  
+
   return (
     <div className="min-h-screen bg-background">
-      {/* ?�단 ?�더 (검?�바, 로고, 로그?? */}
+      {/* 페이지 이동 시 스크롤 최상단 이동 */}
+      <ScrollToTop />
+
+      {/* 상단 헤더 (검색바, 로고, 로그인) */}
+
       {showHeader && (
         <Header
           onSearch={(query) => {
             setSearchQuery(query);
-            setCurrentPage("home");
+            navigate('/');
           }}
           onLogoClick={() => {
             setSearchQuery("");
-            setCurrentPage("home");
+            navigate('/');
           }}
-          onLoginClick={() => setCurrentPage("login")}
+          onLoginClick={() => navigate('/login')}
         />
       )}
 
-      {/* 메인 콘텐�??�역 */}
-      <main className="w-full">{renderPage()}</main>
+      {/* 메인 콘텐츠 영역 */}
+      <main className="w-full">
+        <Routes>
+          {/* 인증 페이지 */}
+          <Route
+            path="/login"
+            element={<LoginPage onNavigate={(page) => navigate(`/${page}`)} />}
+          />
+          <Route
+            path="/signup"
+            element={<SignupPage onNavigate={(page) => navigate(`/${page}`)} />}
+          />
 
-      {/* ?�단 ?�비게이??�?(?? 리�?, ?�록, 채팅, 마이?�이지) */}
+          {/* 보호된 라우트 - 로그인 필요 */}
+          {isAuthenticated ? (
+            <>
+              {/* 홈 페이지 */}
+              <Route
+                path="/"
+                element={
+                  <HomePage
+                    onNavigate={(page, id) => {
+                      if (page === 'register') {
+                        setShowRegisterDialog(true);
+                      } else if (id) {
+                        navigate(`/${page}/${id}`);
+                      } else {
+                        navigate(`/${page}`);
+                      }
+                    }}
+                    searchQuery={searchQuery}
+                    onClearSearch={handleClearSearch}
+                  />
+                }
+              />
+              <Route path="/home" element={<Navigate to="/" replace />} />
+
+              {/* 리셀 페이지 */}
+              <Route
+                path="/resell"
+                element={
+                  <ResellPage
+                    onNavigate={(page: string, id?: string) => id ? navigate(`/${page}/${id}`) : navigate(`/${page}`)}
+                    products={resellProducts}
+                    onProductsChange={setResellProducts}
+                  />
+                }
+              />
+              <Route
+                path="/resell-detail/:id"
+                element={<ResellDetailWrapper products={resellProducts} />}
+              />
+
+              {/* 상품 페이지 */}
+              <Route
+                path="/detail/:id"
+                element={<ProductDetailWrapper />}
+              />
+              <Route
+                path="/product/register"
+                element={<ProductRegisterPage onNavigate={(page: string) => navigate(`/${page}`)} />}
+              />
+              <Route
+                path="/product/register-ai"
+                element={<ProductRegisterAIPage onNavigate={(page: string) => navigate(`/${page}`)} />}
+              />
+              <Route
+                path="/product/location"
+                element={<LocationSelectPage />}
+              />
+              <Route
+                path="/product-edit/:id"
+                element={<ProductEditWrapper />}
+              />
+              <Route
+                path="/select-buyer/:id"
+                element={<SelectBuyerWrapper />}
+              />
+
+              {/* 리뷰 작성 */}
+              <Route
+                path="/review-write"
+                element={<ReviewWritePage payload={null} onNavigate={(page: string) => navigate(`/${page}`)} />}
+              />
+
+              {/* 채팅 페이지 */}
+              <Route
+                path="/chat"
+                element={<ChatListPage onNavigate={(page: string, id?: string) => id ? navigate(`/${page}/${id}`) : navigate(`/${page}`)} />}
+              />
+              <Route
+                path="/chatroom/:id"
+                element={<ChatRoomWrapper />}
+              />
+
+              {/* 프로필 페이지 */}
+              <Route
+                path="/mypage"
+                element={<MyPage onNavigate={(page: string, id?: string) => id ? navigate(`/${page}/${id}`) : navigate(`/${page}`)} />}
+              />
+              <Route
+                path="/seller-profile/:id"
+                element={<SellerProfileWrapper />}
+              />
+
+              {/* 404 - 홈으로 리다이렉트 */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </>
+          ) : (
+            // 미인증 시 로그인으로 리다이렉트
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          )}
+        </Routes>
+      </main>
+
+      {/* 하단 네비게이션 바 (홈, 리셀, 등록, 채팅, 마이페이지) */}
+
       {showBottomNav && (
         <BottomNav
-          currentPage={currentPage}
+          currentPage={getCurrentPage()}
           onNavigate={(page) => {
-            // ??버튼 ?�릭 ??검?�어 초기??
+            // 홈 버튼 클릭 시 검색어 초기화
+            console.log('[BottomNav] onNavigate called with page:', page);
+
             if (page === "home") {
               setSearchQuery("");
+              navigate('/');
+            } else if (page === "register") {
+              console.log('[BottomNav] Setting showRegisterDialog to true');
+              setShowRegisterDialog(true);
+              console.log('[BottomNav] showRegisterDialog state should be true now');
+            } else {
+              navigate(`/${page}`);
             }
-            handleNavigate(page);
           }}
         />
       )}
 
-      {/* ?�품 ?�록 ?�???�택 Dialog (?�반/AI) */}
+      {/* 상품 등록 타입 선택 Dialog (일반/AI) */}
+
       <RegisterTypeDialog
         open={showRegisterDialog}
         onClose={() => setShowRegisterDialog(false)}
         onSelectType={handleRegisterTypeSelect}
       />
 
-      {/* Toast ?�림 */}
+      {/* Toast 알림 */}
+
       <Toaster />
     </div>
   );
 }
-

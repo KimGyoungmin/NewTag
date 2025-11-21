@@ -67,6 +67,8 @@ export interface Product {
   updatedAt: string;
   sellerId: number;
   categoryId: number;
+  mainImage?: string;
+  thumbnailImage?: string;
 
   // ì¡°ì¸???°ì´??(? íƒ??
   seller?: User;
@@ -85,6 +87,7 @@ export interface ProductImage {
   createdAt: string;
   updatedAt: string;
   productId: number;
+  thumbnailPath?: string;
 }
 
 // Favorite ?€??

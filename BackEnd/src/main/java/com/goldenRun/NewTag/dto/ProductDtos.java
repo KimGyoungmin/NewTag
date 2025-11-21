@@ -62,6 +62,7 @@ public class ProductDtos {
     public static class ListItem {
         private Integer id;
         private String mainImage;
+        private String thumbnailImage;
         private String title;
         private Double price;
         private String locationNm;
@@ -70,6 +71,15 @@ public class ProductDtos {
         private Long favoriteCount;
         private String timeAgo;  // 예: “1시간 전”
         private Boolean isResell;
+        // 판매자 정보 추가 (찜하기 버튼 표시 여부 판단용)
+        private SellerInfo seller;
+    }
+
+    @Getter @Setter @NoArgsConstructor @AllArgsConstructor @Builder
+    public static class SellerInfo {
+        private Integer id;
+        private String nick;
+        private String name;
     }
 
     // =========================================================================
@@ -120,6 +130,7 @@ public class ProductDtos {
         private LocalDateTime createdAt;
         private LocalDateTime updatedAt;
         private Integer productId;
+        private String thumbnailPath;
     }
 
     // =========================================================================
@@ -147,6 +158,7 @@ public class ProductDtos {
         private Long transactionId;
     }
 
+<<<<<<< HEAD
     // =========================================================================
     // 상품 후기 작성 요청 DTO
     // =========================================================================
@@ -156,3 +168,6 @@ public class ProductDtos {
         private String content;   // 후기 내용
     }
 }
+=======
+
+>>>>>>> origin

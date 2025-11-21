@@ -19,6 +19,7 @@ export function SellerProfilePage({ sellerId, onNavigate }: SellerProfilePagePro
   const seller = {
     id: sellerId,
     name: '김민수',
+    nick: 'seller_kim',
     profileImage: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=200',
     location: '강남구 역삼동',
     rating: 4.8,
@@ -41,7 +42,8 @@ export function SellerProfilePage({ sellerId, onNavigate }: SellerProfilePagePro
       likes: 12,
       chatCount: 5,
       status: 'available' as const,
-      category: 'electronics'
+      category: 'electronics',
+      sellerNick: seller.nick
     },
     {
       id: '2',
@@ -53,7 +55,8 @@ export function SellerProfilePage({ sellerId, onNavigate }: SellerProfilePagePro
       likes: 8,
       chatCount: 3,
       status: 'available' as const,
-      category: 'furniture'
+      category: 'furniture',
+      sellerNick: seller.nick
     },
     {
       id: '3',
@@ -65,7 +68,8 @@ export function SellerProfilePage({ sellerId, onNavigate }: SellerProfilePagePro
       likes: 23,
       chatCount: 11,
       status: 'sold' as const,
-      category: 'fashion'
+      category: 'fashion',
+      sellerNick: seller.nick
     },
     {
       id: '4',
@@ -77,7 +81,8 @@ export function SellerProfilePage({ sellerId, onNavigate }: SellerProfilePagePro
       likes: 18,
       chatCount: 9,
       status: 'sold' as const,
-      category: 'electronics'
+      category: 'electronics',
+      sellerNick: seller.nick
     },
   ];
 

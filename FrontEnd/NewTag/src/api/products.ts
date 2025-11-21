@@ -7,6 +7,27 @@ import type {
   ApiResponse,
 } from '../types';
 
+const buildThumbnailPath = (path?: string | null) => {
+  if (!path) return path;
+
+  const normalized = path.replace(/\\/g, '/');
+  const lastSlashIndex = normalized.lastIndexOf('/');
+  const directory = lastSlashIndex >= 0 ? normalized.substring(0, lastSlashIndex + 1) : '';
+  const filename = lastSlashIndex >= 0 ? normalized.substring(lastSlashIndex + 1) : normalized;
+
+  if (filename.startsWith('thumb_')) {
+    return normalized;
+  }
+
+  return `${directory}thumb_${filename}`;
+};
+
+const mapListProducts = (items: any[] = []) =>
+  items.map((item) => ({
+    ...item,
+    thumbnailImage: item.thumbnailImage ?? buildThumbnailPath(item.mainImage),
+  }));
+
 /**
  * 상품 관련 API
  */
@@ -21,7 +42,10 @@ export const productsApi = {
     sortBy?: string;
   }): Promise<any> => {
     const response = await api.get('/products', { params });
-    return response.data;
+    return {
+      ...response.data,
+      products: mapListProducts(response.data?.products),
+    };
   },
 
   /**
@@ -107,7 +131,10 @@ export const productsApi = {
     const response = await api.get('/products/search', {
       params: { keyword, userId, deviceType, page, size },
     });
-    return response.data;
+    return {
+      ...response.data,
+      products: mapListProducts(response.data?.products),
+    };
   },
 
   /**

@@ -1,33 +1,95 @@
 ﻿import { useMemo, useState } from "react";
 import { ChevronLeft, Calendar, TrendingUp, Link as LinkIcon } from "lucide-react";
+import { RESELL_PRODUCTS, ResellProductRecord } from "../data/resellProducts";
 import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
-import { RESELL_PRODUCTS } from "../data/resellProducts";
 
 interface ResellDetailPageProps {
   productId: string;
   onNavigate: (page: string, id?: string) => void;
+  products?: ResellProductRecord[];
 }
 
 interface ChartPoint {
   label: string;
-  actualPrice: number;
+  actualPrice: number | null;
+  predictedPrice: number | null;
 }
 
 const FALLBACK_IMAGE = "/api/v1/static/p_default_img.png";
-const PERIOD_LIMITS: Record<string, number> = {
-  recent: 5,
-  short: 20,
-  mid: 50,
-  long: 100,
-};
+const PERIOD_CONFIG = {
+  week: { label: "7일", days: 7 },
+  month: { label: "30일", days: 30 },
+  year: { label: "1년", days: 365 },
+  all: { label: "전체", days: Number.POSITIVE_INFINITY },
+} as const;
+type PeriodKey = keyof typeof PERIOD_CONFIG;
 
-export function ResellDetailPage({ productId, onNavigate }: ResellDetailPageProps) {
-  const product = useMemo(() => RESELL_PRODUCTS.find((item) => item.id === productId), [productId]);
-  const [selectedPeriod, setSelectedPeriod] = useState<keyof typeof PERIOD_LIMITS>("short");
+function parseHistoryDate(raw?: string): Date | null {
+  if (!raw) {
+    return null;
+  }
+  const normalized = raw.trim();
+  const slashMatch = normalized.match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
+  if (slashMatch) {
+    const [, yy, mm, dd] = slashMatch;
+    const year = 2000 + Number(yy);
+    const candidate = new Date(year, Number(mm) - 1, Number(dd));
+    return Number.isNaN(candidate.getTime()) ? null : candidate;
+  }
+  const parsed = new Date(normalized);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function filterHistoryByPeriod(history: ResellProductRecord["priceHistory"], period: PeriodKey) {
+  const { days } = PERIOD_CONFIG[period];
+  if (!history.length || !Number.isFinite(days) || days === Number.POSITIVE_INFINITY) {
+    return history;
+  }
+  const msWindow = days * 24 * 60 * 60 * 1000;
+  const enriched = history.map((entry) => ({
+    entry,
+    parsedDate: parseHistoryDate(entry.date),
+  }));
+  const referenceDate = [...enriched].reverse().find((item) => item.parsedDate)?.parsedDate;
+  if (!referenceDate) {
+    return history;
+  }
+  const threshold = new Date(referenceDate.getTime() - msWindow);
+  const filtered = enriched
+    .filter((item) => item.parsedDate && item.parsedDate >= threshold)
+    .map((item) => item.entry);
+  return filtered.length ? filtered : history;
+}
+
+function sortHistoryChronologically(history: ResellProductRecord["priceHistory"]) {
+  const enriched = history.map((entry, index) => ({
+    entry,
+    parsedDate: parseHistoryDate(entry.date),
+    index,
+  }));
+  const sorted = enriched.sort((a, b) => {
+    if (a.parsedDate && b.parsedDate) {
+      return a.parsedDate.getTime() - b.parsedDate.getTime();
+    }
+    if (a.parsedDate && !b.parsedDate) {
+      return -1;
+    }
+    if (!a.parsedDate && b.parsedDate) {
+      return 1;
+    }
+    return a.index - b.index;
+  });
+  return sorted.map((item) => item.entry);
+}
+
+export function ResellDetailPage({ productId, onNavigate, products }: ResellDetailPageProps) {
+  const productList = products && products.length ? products : RESELL_PRODUCTS;
+  const product = useMemo(() => productList?.find((item) => item.id === productId), [productId, productList]);
+  const [selectedPeriod, setSelectedPeriod] = useState<PeriodKey>("month");
 
   if (!product) {
     return (
@@ -38,16 +100,48 @@ export function ResellDetailPage({ productId, onNavigate }: ResellDetailPageProp
     );
   }
 
-  const priceHistory = product.priceHistory;
-  const chartLimit = PERIOD_LIMITS[selectedPeriod];
-  const chartData: ChartPoint[] = priceHistory.slice(0, chartLimit).map((entry, index) => ({
-    label: entry.date || `거래 ${index + 1}`,
-    actualPrice: entry.price,
-  }));
+  const priceHistory = useMemo(() => sortHistoryChronologically(product.priceHistory), [product.priceHistory]);
+  const predictions = product.predictions ?? [];
+  const filteredHistory = useMemo(
+    () => filterHistoryByPeriod(priceHistory, selectedPeriod),
+    [priceHistory, selectedPeriod],
+  );
+
+  const chartData: ChartPoint[] = useMemo(() => {
+    const actualSlice = filteredHistory.map((entry, index) => ({
+      label: entry.date || `거래 ${index + 1}`,
+      actualPrice: entry.price,
+      predictedPrice: null,
+    }));
+
+    const predictionSlice = predictions.map((entry) => ({
+      label: `예측 +${entry.horizon}일`,
+      actualPrice: entry.truePrice ?? null,
+      predictedPrice: entry.predictedPrice ?? null,
+    }));
+
+    return [...actualSlice, ...predictionSlice];
+  }, [filteredHistory, predictions]);
+
+  const yDomain = useMemo(() => {
+    const values: number[] = [];
+    chartData.forEach((pt) => {
+      if (typeof pt.actualPrice === "number") values.push(pt.actualPrice);
+      if (typeof pt.predictedPrice === "number") values.push(pt.predictedPrice);
+    });
+    if (!values.length) return [0, "auto"] as const;
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const padding = Math.max((max - min) * 0.1, min * 0.05);
+    const lower = Math.max(min - padding, 0);
+    const upper = max + padding;
+    return [lower, upper] as const;
+  }, [chartData]);
 
   const changePositive = (product.changePercent ?? 0) >= 0;
-  const summaryTransactions = priceHistory.slice(0, 6);
-  const fullTransactions = priceHistory.slice(0, 50);
+  const summaryTransactions = [...priceHistory].slice(-6).reverse();
+  const fullTransactions = [...priceHistory].slice(-50).reverse();
+  const hasPredictions = predictions.length > 0;
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-8">
@@ -107,25 +201,22 @@ export function ResellDetailPage({ productId, onNavigate }: ResellDetailPageProp
         <Card>
           <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <CardTitle>거래 추이</CardTitle>
-              <p className="text-sm text-muted-foreground">model/Best_test JSON에서 추출한 실제 거래 금액</p>
+              <CardTitle>거래 추이 + 예측 결과</CardTitle>
+              <p className="text-sm text-muted-foreground">
+                model/Best_test JSON의 실거래와 predictions_h6.csv의 예측값을 한 그래프에서 확인합니다.
+              </p>
             </div>
             <div className="flex gap-2">
               {(
-                [
-                  { key: "recent", label: "최근 5건" },
-                  { key: "short", label: "최근 20건" },
-                  { key: "mid", label: "최근 50건" },
-                  { key: "long", label: "최대 100건" },
-                ] as const
-              ).map((option) => (
+                Object.entries(PERIOD_CONFIG) as Array<[PeriodKey, { label: string }]>
+              ).map(([key, config]) => (
                 <Button
-                  key={option.key}
-                  variant={selectedPeriod === option.key ? "default" : "outline"}
+                  key={key}
+                  variant={selectedPeriod === key ? "default" : "outline"}
                   size="sm"
-                  onClick={() => setSelectedPeriod(option.key)}
+                  onClick={() => setSelectedPeriod(key)}
                 >
-                  {option.label}
+                  {config.label}
                 </Button>
               ))}
             </div>
@@ -134,10 +225,29 @@ export function ResellDetailPage({ productId, onNavigate }: ResellDetailPageProp
             {chartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData}>
-                  <XAxis dataKey="label" hide={chartData.length > 30} tick={{ fontSize: 12 }} />
-                  <YAxis tickFormatter={(value) => `₩${(value / 1000).toFixed(0)}k`} />
-                  <Tooltip formatter={(value: number) => `₩ ${value.toLocaleString("ko-KR")}`} />
-                  <Line type="monotone" dataKey="actualPrice" stroke="#10b981" strokeWidth={2} dot={false} />
+                  <XAxis
+                    dataKey="label"
+                    tick={{ fontSize: 10, angle: -25, textAnchor: "end" }}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis tickFormatter={(value) => `₩${(value / 1000).toFixed(0)}k`} domain={yDomain} />
+                  <Tooltip
+                    formatter={(value: number | null) =>
+                      value === null ? "데이터 없음" : `₩ ${value.toLocaleString("ko-KR")}`
+                    }
+                  />
+                  <Line type="monotone" dataKey="actualPrice" stroke="#10b981" strokeWidth={2} dot={false} name="실거래" />
+                  {hasPredictions && (
+                    <Line
+                      type="monotone"
+                      dataKey="predictedPrice"
+                      stroke="#6366f1"
+                      strokeWidth={2}
+                      dot={false}
+                      strokeDasharray="6 4"
+                      name="예측"
+                    />
+                  )}
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -153,14 +263,37 @@ export function ResellDetailPage({ productId, onNavigate }: ResellDetailPageProp
             <CardHeader>
               <CardTitle>AI 시세 전망</CardTitle>
               <p className="text-sm text-muted-foreground">
-                예측 모델 연결 준비 중입니다. 실제 데이터만 먼저 제공됩니다.
+                TSMixer 예측 결과를 그대로 노출합니다. 추후 Gemini 설명도 추가할 예정입니다.
               </p>
             </CardHeader>
-            <CardContent className="flex items-center gap-4 text-sm text-muted-foreground">
-              <div className="rounded-full bg-green-500/10 p-3 text-green-500">
-                <TrendingUp className="h-6 w-6" />
-              </div>
-              <p>Gemini 기반 시세 전망이 연결되면 이 영역에서 예상 가격과 변동 폭을 확인할 수 있습니다.</p>
+            <CardContent className="space-y-3 text-sm text-muted-foreground">
+              {hasPredictions ? (
+                predictions.map((entry) => (
+                  <div key={`${product.id}-prediction-${entry.horizon}`} className="flex items-center justify-between">
+                    <div>
+                      <span className="font-medium text-foreground">+{entry.horizon}일</span>
+                      <p className="text-xs">예상가</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-primary">
+                        ₩ {entry.predictedPrice?.toLocaleString("ko-KR") ?? "-"}
+                      </p>
+                      {entry.truePrice && (
+                        <p className="text-xs text-muted-foreground">
+                          비교값: ₩ {entry.truePrice.toLocaleString("ko-KR")}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="flex items-center gap-4">
+                  <div className="rounded-full bg-green-500/10 p-3 text-green-500">
+                    <TrendingUp className="h-6 w-6" />
+                  </div>
+                  <p>예측 데이터가 아직 없습니다. 모델 학습 후 다시 시도해 주세요.</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 

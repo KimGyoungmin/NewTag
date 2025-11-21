@@ -39,6 +39,7 @@ export interface ProductDetailResponse {
     createdAt: string;
     updatedAt: string;
     productId: number;
+    thumbnailPath?: string;
   }>;
   mainImage: string;
   sellerId: number;
