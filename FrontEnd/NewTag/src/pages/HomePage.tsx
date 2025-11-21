@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Plus, MapPin, ArrowUpDown, ChevronLeft } from "lucide-react";
+import { Plus, MapPin, ArrowUpDown, ChevronLeft, Loader2 } from "lucide-react";
 import { ProductCard } from "../components/ProductCard";
 import { CategoryFilter } from "../components/CategoryFilter";
 import { Button } from "../components/ui/button";
@@ -13,6 +13,8 @@ import { productsApi } from "../api/products";
 import { favoriteApi } from "../api/favoriteApi";
 import { authApi } from "../api/auth";
 import { resolveImageUrl } from "../utils/image";
+import { getAddressFromCoords, getCurrentPosition } from "../utils/kakaoMap";
+import { toast } from "sonner";
 
 interface HomePageProps {
   onNavigate: (page: string, productId?: string) => void;
@@ -42,6 +44,8 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
   const [favoriteProductIds, setFavoriteProductIds] = useState<Set<number>>(new Set());
   const [currentPage, setCurrentPage] = useState(0);
   const [hasMore, setHasMore] = useState(true);
+  const [currentLocation, setCurrentLocation] = useState("광주광역시 동구 동명동");
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false);
 
   // 찜한 상품 목록 불러오기
   const fetchFavorites = async (userId?: number | null) => {
@@ -203,6 +207,29 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
     [loading, hasMore, loadMoreProducts]
   );
 
+  const handleUseCurrentLocation = async () => {
+    setIsFetchingLocation(true);
+    try {
+      const position = await getCurrentPosition();
+      const lat = position.coords.latitude;
+      const lng = position.coords.longitude;
+      const address = await getAddressFromCoords(lat, lng);
+
+      // 주소가 빈 문자열이면 직전 값을 유지해 깜빡임을 막는다.
+      const nextLocation = address && address.trim()
+        ? address
+        : currentLocation || "현재 위치";
+
+      setCurrentLocation(nextLocation);
+      toast.success("현재 위치로 설정했어요.");
+    } catch (error) {
+      console.error("현재 위치 가져오기 실패:", error);
+      toast.error(error instanceof Error ? error.message : "위치를 불러오지 못했어요.");
+    } finally {
+      setIsFetchingLocation(false);
+    }
+  };
+
   return (
     <div className="min-h-screen pb-20 md:pb-8">
       {/* Search Result Header */}
@@ -233,9 +260,25 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
       {/* Location Bar */}
       <div className="border-b bg-background">
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <Button variant="ghost" className="h-auto p-0 hover:bg-transparent">
-            <MapPin className="mr-2 h-4 w-4 text-primary" />
-            <span>광주광역시 동구 동명동</span>
+          <Button
+            variant="ghost"
+            className="h-auto p-0 hover:bg-transparent max-w-full"
+            onClick={handleUseCurrentLocation}
+            disabled={isFetchingLocation}
+          >
+            {isFetchingLocation ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin text-primary" />
+                <span>현재 위치 가져오는 중...</span>
+              </>
+            ) : (
+              <>
+                <MapPin className="mr-2 h-4 w-4 text-primary" />
+                <span className="max-w-[70vw] md:max-w-[400px] truncate text-foreground text-sm text-left">
+                  {currentLocation}
+                </span>
+              </>
+            )}
           </Button>
 
           {/* Sort Dropdown */}
