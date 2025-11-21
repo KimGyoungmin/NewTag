@@ -1,5 +1,7 @@
 ﻿import { useMemo, useRef, useState } from "react";
 import { ChevronLeft, X, Camera, MapPin } from "lucide-react";
+import { useEffect } from "react";
+import { useLocation as useRouterLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
@@ -9,7 +11,6 @@ import { CATEGORIES, IMAGE_CONFIG } from "../constants";
 import { postApi } from "../api/postApi";
 import { resolveImageUrl } from "../utils/image";
 import { toast } from "sonner";
-import { LocationPicker } from "../components/LocationPicker";
 
 interface ProductRegisterPageProps {
   onNavigate: (page: string, id?: string) => void;
@@ -30,9 +31,13 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isAutoWriting, setIsAutoWriting] = useState(false);
+  const [latitude, setLatitude] = useState(DEFAULT_LATITUDE);
+  const [longitude, setLongitude] = useState(DEFAULT_LONGITUDE);
 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+  const routerLocation = useRouterLocation();
 
   const categoryOptions = useMemo(
     () =>
@@ -117,8 +122,8 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
       price: priceValue,
       categoryId: Number(categoryId),
       locationNm: location,
-      latitude: DEFAULT_LATITUDE,
-      longitude: DEFAULT_LONGITUDE,
+      latitude,
+      longitude,
       images: imagePayload,
       isResell,
     };
@@ -171,6 +176,32 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
     } finally {
       setIsAutoWriting(false);
     }
+  };
+
+  useEffect(() => {
+    const state = routerLocation.state as {
+      selectedLocation?: { locationName: string; latitude: number; longitude: number };
+    } | null;
+
+    if (state?.selectedLocation) {
+      const { locationName, latitude, longitude } = state.selectedLocation;
+      setLocation(locationName);
+      setLatitude(latitude);
+      setLongitude(longitude);
+      navigate("/product/register", { replace: true });
+    }
+  }, [routerLocation.state, navigate]);
+
+  const handleLocationChange = () => {
+    navigate("/product/location", {
+      state: {
+        currentLocation: {
+          locationName: location,
+          latitude,
+          longitude,
+        },
+      },
+    });
   };
 
   return (
@@ -333,7 +364,7 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
             <MapPin className="h-5 w-5 text-primary" />
 
             <span>{location}</span>
-            <Button variant="link" size="sm" className="ml-auto" disabled>
+            <Button variant="link" size="sm" className="ml-auto" onClick={handleLocationChange}>
               변경
             </Button>
           </div>
