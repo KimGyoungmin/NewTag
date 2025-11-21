@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { Sparkles, PenLine } from "lucide-react";
 import {
   Dialog,
@@ -15,8 +16,21 @@ interface RegisterTypeDialogProps {
 }
 
 export function RegisterTypeDialog({ open, onClose, onSelectType }: RegisterTypeDialogProps) {
+  useEffect(() => {
+    console.log('[RegisterTypeDialog] open prop changed to:', open);
+  }, [open]);
+
+  const handleOpenChange = (isOpen: boolean) => {
+    console.log('[RegisterTypeDialog] onOpenChange called with:', isOpen);
+    // open prop과 isOpen이 다를 때만 onClose 호출
+    if (open && !isOpen) {
+      console.log('[RegisterTypeDialog] Closing dialog');
+      onClose();
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>판매글 작성 방법 선택</DialogTitle>

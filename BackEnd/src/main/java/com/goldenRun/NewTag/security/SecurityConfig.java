@@ -44,9 +44,10 @@ public class SecurityConfig {
                 // CORS preflight 요청 (OPTIONS) 모두 허용
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // 정적 리소스 (이미지 등) 접근 허용
-                .requestMatchers("/api/v1/uploads/images/**").permitAll()
                 .requestMatchers("/api/v1/static/**").permitAll()
                 .requestMatchers("/static/**").permitAll()
+                // 이미지 업로드 (모든 메서드 임시 허용 - 개발용)
+                .requestMatchers("/api/v1/uploads/**").permitAll()
                 // 공개 엔드포인트
                 .requestMatchers("/api/auth/**", "/api/health", "/api/test", "/api/encode-password", "/api/v1/login", "/api/v1/signup", "/api/v1/emailMatch", "/api/v1/idMatch", "/api/v1/auth/refresh").permitAll()
                 // 상품 관련 공개 API (로그인 없이 조회 가능)

@@ -184,9 +184,9 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex flex-col h-[100dvh] bg-background md:h-screen relative">
       {/* Header */}
-      <div className="sticky top-0 z-50 flex items-center justify-between border-b bg-background px-4 h-14">
+      <div className="flex items-center justify-between border-b bg-background px-4 h-14 shrink-0">
         <div className="flex items-center gap-3 flex-1">
           <Button variant="ghost" size="icon" onClick={() => onNavigate("chat")}>
             <ChevronLeft className="h-5 w-5" />
@@ -229,7 +229,7 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
 
       {/* Product Info Card */}
       {room && (
-        <div className="border-b bg-card px-4 py-3">
+        <div className="border-b bg-card px-4 py-3 shrink-0">
           <div className="flex items-center gap-3">
             <div
               className="h-12 w-12 overflow-hidden rounded-lg border shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
@@ -253,7 +253,7 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
       )}
 
       {/* Messages */}
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-4 mb-[72px] md:mb-4">
         {messages.map((msg) => {
           const isMine = currentUser && msg.senderId === currentUser.id;
           return (
@@ -294,7 +294,7 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
       </div>
 
       {/* Input Area */}
-      <div className="border-t bg-background p-4">
+      <div className="fixed bottom-16 left-0 right-0 md:relative md:bottom-auto border-t bg-background p-4 z-40">
         <div className="flex items-center gap-2">
           <Input
             type="text"
