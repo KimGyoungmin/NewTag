@@ -212,10 +212,10 @@ public class FileStorageService {
                 return;
             }
             Path tempFile = Files.createTempFile("opt_", getFileExtension(originalPath.getFileName().toString()));
-            Thumbnails.Builder<Path> builder = Thumbnails.of(originalPath)
+            Thumbnails.of(originalPath.toFile())
                     .size(OPTIMIZE_MAX_WIDTH, OPTIMIZE_MAX_HEIGHT)
-                    .outputQuality(OPTIMIZE_QUALITY);
-            builder.toFile(tempFile.toFile());
+                    .outputQuality(OPTIMIZE_QUALITY)
+                    .toFile(tempFile.toFile());
             Files.move(tempFile, originalPath, StandardCopyOption.REPLACE_EXISTING);
         } catch (Exception e) {
             log.warn("⚠️ Failed to optimize image {}: {}", originalPath, e.getMessage());
@@ -229,7 +229,7 @@ public class FileStorageService {
             }
             String thumbnailName = buildThumbnailFileName(originalPath.getFileName().toString());
             Path thumbnailPath = originalPath.getParent().resolve(thumbnailName);
-            Thumbnails.of(originalPath)
+            Thumbnails.of(originalPath.toFile())
                     .crop(Positions.CENTER)
                     .size(THUMBNAIL_SIZE, THUMBNAIL_SIZE)
                     .outputQuality(OPTIMIZE_QUALITY)

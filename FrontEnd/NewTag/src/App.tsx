@@ -105,6 +105,13 @@ export default function App() {
   }, [navigate, location.pathname]);
 
   // ============================================
+  // Debug - showRegisterDialog 상태 변화 로깅
+  // ============================================
+  useEffect(() => {
+    console.log('[App] showRegisterDialog changed to:', showRegisterDialog);
+  }, [showRegisterDialog]);
+
+  // ============================================
 
   // 네비게이션 핸들러
   // ============================================
@@ -231,8 +238,13 @@ export default function App() {
                 element={
                   <HomePage
                     onNavigate={(page, id) => {
-                      if (id) navigate(`/${page}/${id}`);
-                      else navigate(`/${page}`);
+                      if (page === 'register') {
+                        setShowRegisterDialog(true);
+                      } else if (id) {
+                        navigate(`/${page}/${id}`);
+                      } else {
+                        navigate(`/${page}`);
+                      }
                     }}
                     searchQuery={searchQuery}
                     onClearSearch={handleClearSearch}
@@ -322,12 +334,15 @@ export default function App() {
           currentPage={getCurrentPage()}
           onNavigate={(page) => {
             // 홈 버튼 클릭 시 검색어 초기화
+            console.log('[BottomNav] onNavigate called with page:', page);
 
             if (page === "home") {
               setSearchQuery("");
               navigate('/');
             } else if (page === "register") {
+              console.log('[BottomNav] Setting showRegisterDialog to true');
               setShowRegisterDialog(true);
+              console.log('[BottomNav] showRegisterDialog state should be true now');
             } else {
               navigate(`/${page}`);
             }
