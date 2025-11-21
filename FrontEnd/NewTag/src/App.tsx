@@ -17,6 +17,7 @@ import { SignupPage } from "./pages/SignupPage";
 import { ReviewWritePage } from "./pages/ReviewWritePage";
 import { authApi } from "./api/auth";
 import type { ResellProductRecord } from "./data/resellProducts";
+import { LocationSelectPage } from "./pages/LocationSelectPage";
 import {
   ProductDetailWrapper,
   ProductEditWrapper,
@@ -164,6 +165,7 @@ export default function App() {
     '/product/edit/',
     '/product/select-buyer/',
     '/product/register',
+    '/product/location',
   ];
 
 
@@ -281,6 +283,10 @@ export default function App() {
               <Route
                 path="/product/register-ai"
                 element={<ProductRegisterAIPage onNavigate={(page: string) => navigate(`/${page}`)} />}
+              />
+              <Route
+                path="/product/location"
+                element={<LocationSelectPage />}
               />
               <Route
                 path="/product-edit/:id"
