@@ -177,8 +177,8 @@ public class FileStorageService {
         }
 
         String extension = getFileExtension(file.getOriginalFilename()).toLowerCase();
-        if (!extension.matches("\\.(jpg|jpeg|png|gif|webp)")) {
-            throw new IllegalArgumentException("지원하지 않는 확장자입니다. (jpg, jpeg, png, gif, webp)");
+        if (!extension.matches("\\.(jpg|jpeg|jfif|png|gif|webp|bmp|tiff|tif)")) {
+            throw new IllegalArgumentException("지원하지 않는 이미지 파일 형식입니다. (jpg, jpeg, jfif, png, gif, webp, bmp, tiff만 지원)");
         }
     }
 
