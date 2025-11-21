@@ -15,6 +15,7 @@ import { ResellPage } from "./pages/ResellPage";
 import { LoginPage } from "./pages/LoginPage";
 import { SignupPage } from "./pages/SignupPage";
 import { ReviewWritePage } from "./pages/ReviewWritePage";
+import { KakaoCallbackPage } from "./pages/KakaoCallbackPage";
 import { authApi } from "./api/auth";
 import type { ResellProductRecord } from "./data/resellProducts";
 import { LocationSelectPage } from "./pages/LocationSelectPage";
@@ -229,6 +230,11 @@ export default function App() {
           <Route
             path="/signup"
             element={<SignupPage onNavigate={(page) => navigate(`/${page}`)} />}
+          />
+          {/* 카카오 로그인 콜백 */}
+          <Route
+            path="/auth/kakao/callback"
+            element={<KakaoCallbackPage />}
           />
 
           {/* 보호된 라우트 - 로그인 필요 */}
