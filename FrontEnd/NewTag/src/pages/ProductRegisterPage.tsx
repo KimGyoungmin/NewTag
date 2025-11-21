@@ -16,6 +16,18 @@ interface ProductRegisterPageProps {
   onNavigate: (page: string, id?: string) => void;
 }
 
+type RegisterFormState = {
+  title: string;
+  categoryId: string;
+  price: string;
+  description: string;
+  images: string[];
+  isResell: boolean;
+  location: string;
+  latitude: number;
+  longitude: number;
+};
+
 const DEFAULT_LATITUDE = 37.4979;
 const DEFAULT_LONGITUDE = 127.0276;
 
@@ -38,6 +50,10 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   const routerLocation = useRouterLocation();
+  const locationState = routerLocation.state as {
+    selectedLocation?: { locationName: string; latitude: number; longitude: number };
+    formState?: RegisterFormState;
+  } | null;
 
   const categoryOptions = useMemo(
     () =>
@@ -179,22 +195,46 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
   };
 
   useEffect(() => {
-    const state = routerLocation.state as {
-      selectedLocation?: { locationName: string; latitude: number; longitude: number };
-    } | null;
+    const formState = locationState?.formState;
+    if (!formState) return;
 
-    if (state?.selectedLocation) {
-      const { locationName, latitude, longitude } = state.selectedLocation;
+    setTitle(formState.title ?? "");
+    setCategoryId(formState.categoryId ?? "");
+    setPrice(formState.price ?? "");
+    setDescription(formState.description ?? "");
+    setImages(formState.images ?? []);
+    setIsResell(!!formState.isResell);
+    setLocation(formState.location ?? location);
+    setLatitude(formState.latitude ?? DEFAULT_LATITUDE);
+    setLongitude(formState.longitude ?? DEFAULT_LONGITUDE);
+  }, [locationState?.formState]);
+
+  useEffect(() => {
+    if (locationState?.selectedLocation) {
+      const { locationName, latitude, longitude } = locationState.selectedLocation;
       setLocation(locationName);
       setLatitude(latitude);
       setLongitude(longitude);
       navigate("/product/register", { replace: true });
     }
-  }, [routerLocation.state, navigate]);
+  }, [locationState?.selectedLocation, navigate]);
 
   const handleLocationChange = () => {
+    const formState: RegisterFormState = {
+      title,
+      categoryId,
+      price,
+      description,
+      images,
+      isResell,
+      location,
+      latitude,
+      longitude,
+    };
+
     navigate("/product/location", {
       state: {
+        formState,
         currentLocation: {
           locationName: location,
           latitude,

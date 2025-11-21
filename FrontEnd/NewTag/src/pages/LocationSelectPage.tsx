@@ -10,18 +10,32 @@ import { toast } from "sonner";
 const DEFAULT_LATITUDE = 37.5665;
 const DEFAULT_LONGITUDE = 126.978;
 
+interface RegisterFormState {
+  title: string;
+  categoryId: string;
+  price: string;
+  description: string;
+  images: string[];
+  isResell: boolean;
+  location: string;
+  latitude: number;
+  longitude: number;
+}
+
 interface LocationSelectState {
   currentLocation?: {
     locationName: string;
     latitude: number;
     longitude: number;
   };
+  formState?: RegisterFormState;
 }
 
 export function LocationSelectPage() {
   const navigate = useNavigate();
   const routerLocation = useLocation();
   const locationState = routerLocation.state as LocationSelectState | null;
+  const formState = locationState?.formState;
 
   const [latitude, setLatitude] = useState(locationState?.currentLocation?.latitude ?? DEFAULT_LATITUDE);
   const [longitude, setLongitude] = useState(locationState?.currentLocation?.longitude ?? DEFAULT_LONGITUDE);
@@ -115,7 +129,9 @@ export function LocationSelectPage() {
           latitude,
           longitude,
         },
+        formState,
       },
+      replace: true,
     });
   };
 
