@@ -1,4 +1,15 @@
-import { ChevronRight, Settings, Heart, Package, ShoppingBag, Star, Bell, HelpCircle, FileText, ArrowLeft, Trash2, MoreVertical, TrendingUp } from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  ChevronRight,
+  Settings,
+  Heart,
+  ShoppingBag,
+  Star,
+  Bell,
+  HelpCircle,
+  FileText,
+  ArrowLeft,
+} from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
 import { Button } from "../components/ui/button";
 import { Separator } from "../components/ui/separator";
@@ -18,86 +29,343 @@ import {
   AlertDialogTitle,
 } from "../components/ui/alert-dialog";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "../components/ui/dropdown-menu";
-import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from "../components/ui/select";
-import { useState, useEffect } from "react";
-import {
-  getUserProfile,
-  setUserProfile,
-  getFavorites,
-  getProductStatus,
-  setProductStatus,
-  deleteProduct,
-  isProductDeleted,
-  ProductStatus,
-  getAllProducts,
-  getRegisteredProducts,
-  getTimeAgo,
-  toggleProductVisibility,
-  isProductHidden,
-  getSaleHistory,
-} from "../utils/localStorage";
+import { api } from "../api/client";
+import { favoriteApi } from "../api/favoriteApi";
+import { productApi } from "../api/productApi";
+import { reviewApi } from "../api/reviewApi";
 import { authApi } from "../api/auth";
+import { resolveImageUrl } from "../utils/image";
+import {
+  UserProfile,
+  getUserProfile,
+  isProductHidden,
+  setUserProfile,
+  toggleProductVisibility,
+} from "../utils/localStorage";
+import type { ProductStatus as ApiProductStatus, RatingSummary } from "../types";
 import { toast } from "sonner";
 
 interface MyPageProps {
   onNavigate: (page: string, productId?: string) => void;
 }
 
+type UiProductStatus = "available" | "reserved" | "sold";
+
+interface WishlistItem {
+  id: string;
+  image: string;
+  title: string;
+  price: number;
+  location: string;
+  timeAgo: string;
+  likes: number;
+  chatCount: number;
+  status: UiProductStatus;
+  sellerNick?: string;
+}
+
+interface PurchaseHistoryItem {
+  id: string;
+  image: string;
+  title: string;
+  price: number;
+  purchaseDate: string;
+  sellerName?: string;
+}
+
+interface ReceivedReview {
+  id: string;
+  reviewer: string;
+  reviewerImage?: string;
+  rating: number;
+  comment?: string;
+  productTitle?: string;
+  date: string;
+}
+
+const toUiStatus = (status?: ApiProductStatus | string | null): UiProductStatus => {
+  switch (status) {
+    case "RESERVED":
+      return "reserved";
+    case "SOLD_OUT":
+      return "sold";
+    default:
+      return "available";
+  }
+};
+
+const toApiStatus = (status: UiProductStatus): ApiProductStatus => {
+  switch (status) {
+    case "reserved":
+      return "RESERVED";
+    case "sold":
+      return "SOLD_OUT";
+    default:
+      return "ON_SELL";
+  }
+};
+
+const formatTimeAgo = (dateInput?: string | number | Date) => {
+  if (!dateInput) return "";
+  const now = new Date();
+  const date = new Date(dateInput);
+  const diffMs = now.getTime() - date.getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (minutes < 1) return "방금 전";
+  if (minutes < 60) return `${minutes}분 전`;
+  if (hours < 24) return `${hours}시간 전`;
+  if (days < 7) return `${days}일 전`;
+  if (days < 30) return `${Math.floor(days / 7)}주 전`;
+  if (days < 365) return `${Math.floor(days / 30)}개월 전`;
+  return `${Math.floor(days / 365)}년 전`;
+};
+
+const buildProfileFromAuth = (fallback?: UserProfile): UserProfile => {
+  const authUser = authApi.getCurrentUser();
+  if (authUser) {
+    return {
+      name: authUser.name || authUser.nick || fallback?.name || "사용자",
+      nickname: authUser.nick || fallback?.nickname || "",
+      profileImage: resolveImageUrl(authUser.profileImg),
+      email: authUser.email || fallback?.email || "",
+    };
+  }
+  return fallback || getUserProfile();
+};
+
 export function MyPage({ onNavigate }: MyPageProps) {
   const [activeSection, setActiveSection] = useState<string | null>(null);
-  const [userProfile, setUserProfileState] = useState(getUserProfile());
+  const [userProfile, setUserProfileState] = useState<UserProfile>(() => buildProfileFromAuth());
   const [showProfileEdit, setShowProfileEdit] = useState(false);
   const [showReviewDialog, setShowReviewDialog] = useState(false);
-  const [selectedPurchase, setSelectedPurchase] = useState<any>(null);
+  const [selectedPurchase, setSelectedPurchase] = useState<PurchaseHistoryItem | null>(null);
   const [productToDelete, setProductToDelete] = useState<string | null>(null);
-  const [favoriteIds, setFavoriteIds] = useState<string[]>(getFavorites());
-  const [productStatuses, setProductStatuses] = useState<Record<string, ProductStatus>>({});
-  const [dateFilter, setDateFilter] = useState<'all' | '1month' | '3months' | '6months' | '1year'>('all');
+  const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
+  const [wishlistLoading, setWishlistLoading] = useState(false);
+  const [myProducts, setMyProducts] = useState<WishlistItem[]>([]);
+  const [myProductsLoading, setMyProductsLoading] = useState(false);
+  const [purchaseHistory, setPurchaseHistory] = useState<PurchaseHistoryItem[]>([]);
+  const [purchaseLoading, setPurchaseLoading] = useState(false);
+  const [reviews, setReviews] = useState<ReceivedReview[]>([]);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+  const [ratingSummary, setRatingSummary] = useState<RatingSummary | null>(null);
+  const [dateFilter, setDateFilter] = useState<"all" | "1month" | "3months" | "6months" | "1year">(
+    "all"
+  );
   const [showLogoutDialog, setShowLogoutDialog] = useState(false);
 
-  // Load product statuses on mount
   useEffect(() => {
-    const statuses: Record<string, ProductStatus> = {};
-    myProducts.forEach(product => {
-      statuses[product.id] = getProductStatus(product.id);
-    });
-    setProductStatuses(statuses);
+    const loadData = () => {
+      const sessionProfile = buildProfileFromAuth(userProfile);
+      setUserProfileState(sessionProfile);
+
+      const userId = authApi.getCurrentUser()?.id;
+      if (!userId) {
+        setWishlistItems([]);
+        setMyProducts([]);
+        setPurchaseHistory([]);
+        setReviews([]);
+        setRatingSummary(null);
+        return;
+      }
+
+      fetchWishlist(userId);
+      fetchMyProducts(userId);
+      fetchPurchaseHistory(userId);
+      fetchReviews(userId);
+      fetchRatingSummary(userId);
+    };
+
+    loadData();
+    window.addEventListener("auth-change", loadData);
+    return () => window.removeEventListener("auth-change", loadData);
   }, []);
 
-  // Update favorites count
-  useEffect(() => {
-    setFavoriteIds(getFavorites());
-  }, [activeSection]);
+  const fetchWishlist = async (userId: number) => {
+    setWishlistLoading(true);
+    try {
+      const productIds = await favoriteApi.getMyFavoriteProducts(userId);
+      const products = await Promise.all(
+        productIds.map(async (id) => {
+          const detail = await productApi.getById(id, userId);
+          if (!detail) return null;
+          return {
+            id: detail.id.toString(),
+            image: resolveImageUrl(detail.thumbnailImage ?? detail.mainImage),
+            title: detail.title,
+            price: detail.price,
+            location: detail.locationNm,
+            timeAgo: formatTimeAgo(detail.createdAt),
+            likes: detail.favoriteCount ?? 0,
+            chatCount: detail.viewCount,
+            status: toUiStatus(detail.status),
+            sellerNick: detail.seller?.nick,
+          } as WishlistItem;
+        })
+      );
 
-  const handleProfileSave = (profile: typeof userProfile) => {
+      setWishlistItems(products.filter(Boolean) as WishlistItem[]);
+    } catch (error) {
+      console.error("Failed to load wishlist:", error);
+      setWishlistItems([]);
+    } finally {
+      setWishlistLoading(false);
+    }
+  };
+
+  const fetchMyProducts = async (userId: number) => {
+    setMyProductsLoading(true);
+    try {
+      const response = await api.get(`/products/seller/${userId}`, {
+        params: { page: 0, size: 50 },
+      });
+      const listItems: any[] = response.data?.products ?? [];
+
+      const products = await Promise.all(
+        listItems.map(async (item) => {
+          const detail = await productApi.getById(Number(item.id), userId);
+          const image =
+            item.thumbnailImage ??
+            item.mainImage ??
+            detail?.thumbnailImage ??
+            detail?.mainImage;
+
+          return {
+            id: String(item.id ?? detail?.id),
+            image: resolveImageUrl(image),
+            title: item.title ?? detail?.title ?? "상품",
+            price: Number(item.price ?? detail?.price ?? 0),
+            location: item.locationNm ?? detail?.locationNm ?? "",
+            timeAgo: item.timeAgo ?? formatTimeAgo(detail?.createdAt),
+            likes: Number(item.favoriteCount ?? detail?.favoriteCount ?? 0),
+            chatCount: Number(item.viewCount ?? detail?.viewCount ?? 0),
+            status: toUiStatus(detail?.status),
+            sellerNick: detail?.seller?.nick,
+          } as WishlistItem;
+        })
+      );
+
+      setMyProducts(products.filter((p) => p && p.id) as WishlistItem[]);
+    } catch (error) {
+      console.error("Failed to load my products:", error);
+      setMyProducts([]);
+    } finally {
+      setMyProductsLoading(false);
+    }
+  };
+
+  const fetchPurchaseHistory = async (userId: number) => {
+    setPurchaseLoading(true);
+    try {
+      const response = await api.get("/transactions/my", {
+        params: { userId },
+      });
+      const items: any[] = response.data?.transactions ?? [];
+      const mapped = items.map((item) => ({
+        id: String(item.transactionId ?? item.id ?? Date.now()),
+        image: resolveImageUrl(
+          item.productImage || item.thumbnailImage || item.mainImage
+        ),
+        title: item.title || item.productTitle || "구매 상품",
+        price: Number(item.price ?? 0),
+        purchaseDate:
+          item.transactionDate ||
+          new Date(item.createdAt || Date.now()).toLocaleDateString("ko-KR"),
+        sellerName: item.partnerNick || item.sellerName,
+      }));
+      setPurchaseHistory(mapped);
+    } catch (error) {
+      console.warn("구매 내역 API가 없어 비어 있는 상태입니다.");
+      setPurchaseHistory([]);
+    } finally {
+      setPurchaseLoading(false);
+    }
+  };
+
+  const fetchReviews = async (userId: number) => {
+    setReviewsLoading(true);
+    try {
+      const response = await reviewApi.getUserReviews(userId, { page: 0, size: 20 });
+      const mapped: ReceivedReview[] = response.content.map((review) => ({
+        id: review.id.toString(),
+        reviewer: review.writerName || review.writerNick || "구매자",
+        reviewerImage: resolveImageUrl(review.writerProfileImg),
+        rating: review.rating,
+        comment: review.content,
+        productTitle: review.productTitle,
+        date: new Date(review.createdAt).toLocaleDateString("ko-KR"),
+      }));
+      setReviews(mapped);
+    } catch (error) {
+      console.error("Failed to load reviews:", error);
+      setReviews([]);
+    } finally {
+      setReviewsLoading(false);
+    }
+  };
+
+  const fetchRatingSummary = async (userId: number) => {
+    try {
+      const summary = await reviewApi.getRatingSummary(userId);
+      setRatingSummary(summary);
+    } catch (error) {
+      console.error("Failed to load rating summary:", error);
+      setRatingSummary(null);
+    }
+  };
+
+  const handleProfileSave = (profile: UserProfile) => {
     setUserProfile(profile);
     setUserProfileState(profile);
   };
 
-  const handleStatusChange = (productId: string, newStatus: ProductStatus) => {
-    setProductStatus(productId, newStatus);
-    setProductStatuses(prev => ({
-      ...prev,
-      [productId]: newStatus
-    }));
+  const handleStatusChange = async (productId: string, newStatus: UiProductStatus) => {
+    const numericId = Number(productId);
+    if (Number.isNaN(numericId)) return;
+
+    try {
+      const updated = await productApi.updateStatus(numericId, toApiStatus(newStatus));
+      setMyProducts((prev) =>
+        prev.map((product) =>
+          product.id === productId
+            ? { ...product, status: toUiStatus(updated?.status ?? toApiStatus(newStatus)) }
+            : product
+        )
+      );
+      toast.success("상품 상태를 변경했어요.");
+    } catch (error) {
+      console.error("Failed to update status", error);
+      toast.error("상태를 변경하지 못했어요.");
+    }
   };
 
-  const handleDeleteProduct = (productId: string) => {
-    deleteProduct(productId);
-    setProductToDelete(null);
-    // Force re-render
-    setProductStatuses(prev => ({ ...prev }));
+  const handleDeleteProduct = async (productId: string) => {
+    const numericId = Number(productId);
+    if (Number.isNaN(numericId)) return;
+
+    try {
+      const success = await productApi.delete(numericId);
+      if (success) {
+        setMyProducts((prev) => prev.filter((product) => product.id !== productId));
+        toast.success("상품을 삭제했어요.");
+      } else {
+        toast.error("상품 삭제에 실패했어요.");
+      }
+    } catch (error) {
+      console.error("Failed to delete product", error);
+      toast.error("상품 삭제 중 오류가 발생했어요.");
+    } finally {
+      setProductToDelete(null);
+    }
   };
 
   const handleLogoutConfirm = async () => {
@@ -106,126 +374,24 @@ export function MyPage({ onNavigate }: MyPageProps) {
       toast.success("로그아웃되었습니다.");
     } catch (error) {
       console.error("Failed to logout", error);
-      toast.error("로그아웃 중 오류가 발생했습니다.");
+      toast.error("로그아웃에 실패했어요.");
     }
     setShowLogoutDialog(false);
-    onNavigate('login');
+    onNavigate("login");
   };
-
-  // Mock data
-  const user = {
-    name: '김철수',
-    image: 'https://images.unsplash.com/photo-1640960543409-dbe56ccc30e2?w=200',
-    rating: 4.8,
-    reviewCount: 23,
-    location: '강남구 역삼동',
-  };
-
-  // 내가 등록한 상품 (실제 데이터)
-  const myProductsList = getRegisteredProducts().filter(p => !isProductDeleted(p.id));
-  const myProducts = myProductsList.map(p => ({
-    ...p,
-    timeAgo: getTimeAgo(p.createdAt),
-  }));
-
-  // 찜한 상품 (실제 데이터)
-  const allProducts = getAllProducts();
-  const wishlistItems = allProducts.filter(p => favoriteIds.includes(p.id)).map(p => ({
-    ...p,
-    timeAgo: getTimeAgo(p.createdAt),
-  }));
-
-  // 구매 내역 데이터
-  const purchaseHistory = [
-    {
-      id: '7',
-      image: 'https://images.unsplash.com/photo-1585386959984-a4155224a1ad?w=400',
-      title: '맥북 에어 M1',
-      price: 950000,
-      location: '강남구 삼성동',
-      timeAgo: '3일 전',
-      likes: 0,
-      chatCount: 0,
-      status: 'sold' as const,
-      purchaseDate: '2025.11.03',
-    },
-    {
-      id: '8',
-      image: 'https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=400',
-      title: '에어팟 프로 2세대',
-      price: 210000,
-      location: '서초구 서초동',
-      timeAgo: '1주일 전',
-      likes: 0,
-      chatCount: 0,
-      status: 'sold' as const,
-      purchaseDate: '2025.10.30',
-    },
-    {
-      id: '9',
-      image: 'https://images.unsplash.com/photo-1611186871348-b1ce696e52c9?w=400',
-      title: '아이폰 14 Pro',
-      price: 850000,
-      location: '강남구 논현동',
-      timeAgo: '2주일 전',
-      likes: 0,
-      chatCount: 0,
-      status: 'sold' as const,
-      purchaseDate: '2025.10.23',
-    },
-  ];
-
-  // 받은 후기 데이터
-  const reviews = [
-    {
-      id: '1',
-      reviewer: '박민수',
-      reviewerImage: 'https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=200',
-      rating: 5,
-      comment: '친절하시고 물건 상태도 완벽했어요! 좋은 거래 감사합니다.',
-      productTitle: '아이패드 프로 11인치',
-      date: '2025.11.04',
-    },
-    {
-      id: '2',
-      reviewer: '최지혜',
-      reviewerImage: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200',
-      rating: 5,
-      comment: '설명한 것과 동일하고 깨끗하게 사용하신 흔적이 보여요. 추천합니다!',
-      productTitle: '북유럽 스타일 원목 책상',
-      date: '2025.11.01',
-    },
-    {
-      id: '3',
-      reviewer: '이준호',
-      reviewerImage: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200',
-      rating: 4,
-      comment: '빠른 응답과 배송 감사합니다. 잘 사용하겠습니다.',
-      productTitle: '맥북 프로 13인치',
-      date: '2025.10.28',
-    },
-    {
-      id: '4',
-      reviewer: '강서윤',
-      reviewerImage: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=200',
-      rating: 5,
-      comment: '매너 좋으시고 가격도 합리적이에요. 또 거래하고 싶습니다!',
-      productTitle: '소니 헤드폰',
-      date: '2025.10.25',
-    },
-  ];
 
   const menuItems = [
-    { icon: Heart, label: '관심 목록', count: wishlistItems.length, id: 'wishlist' },
-    { icon: ShoppingBag, label: '구매 내역', count: purchaseHistory.length, id: 'purchase' },
-    { icon: Star, label: '받은 후기', count: reviews.length, id: 'reviews' },
+    { icon: Heart, label: "관심 목록", count: wishlistItems.length, id: "wishlist" },
+    { icon: ShoppingBag, label: "구매 내역", count: purchaseHistory.length, id: "purchase" },
+    { icon: ShoppingBag, label: "판매 중인 상품", count: myProducts.length, id: "my-products" },
+    { icon: Star, label: "받은 후기", count: reviews.length, id: "reviews" },
   ];
 
   const settingItems = [
-    { icon: Bell, label: '알림 설정' },
-    { icon: HelpCircle, label: '고객센터' },
-    { icon: FileText, label: '이용약관' },
-    { icon: Settings, label: '설정' },
+    { icon: Bell, label: "알림 설정" },
+    { icon: HelpCircle, label: "고객센터" },
+    { icon: FileText, label: "이용약관" },
+    { icon: Settings, label: "설정" },
   ];
 
   return (
@@ -239,9 +405,10 @@ export function MyPage({ onNavigate }: MyPageProps) {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <h1>
-                {activeSection === 'wishlist' && '관심 목록'}
-                {activeSection === 'purchase' && '구매 내역'}
-                {activeSection === 'reviews' && '받은 후기'}
+                {activeSection === "wishlist" && "관심 목록"}
+                {activeSection === "purchase" && "구매 내역"}
+                {activeSection === "my-products" && "판매 중인 상품"}
+                {activeSection === "reviews" && "받은 후기"}
               </h1>
             </div>
           </div>
@@ -249,38 +416,46 @@ export function MyPage({ onNavigate }: MyPageProps) {
       </div>
 
       <div className="container mx-auto max-w-4xl">
-        {/* 관심 목록 섹션 */}
-        {activeSection === 'wishlist' && (
+        {/* 관심 목록 */}
+        {activeSection === "wishlist" && (
           <div className="bg-card px-4 py-6">
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {wishlistItems.map((product) => (
-                <ProductCard
-                  key={product.id}
-                  {...product}
-                  onClick={() => onNavigate('detail')}
-                />
-              ))}
-            </div>
-            {wishlistItems.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground">
-                관심 목록이 비어있습니다
+            {wishlistLoading ? (
+              <div className="text-center py-12 text-muted-foreground">관심 목록을 불러오는 중입니다...</div>
+            ) : wishlistItems.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {wishlistItems.map((product) => (
+                  <ProductCard
+                    key={product.id}
+                    {...product}
+                    isLikedByMe={true}
+                    onFavoriteChange={(id, isFavorited) => {
+                      if (!isFavorited) {
+                        setWishlistItems((prev) => prev.filter((p) => p.id !== id));
+                      }
+                    }}
+                    onClick={() => onNavigate("detail", product.id)}
+                    onNavigate={onNavigate}
+                  />
+                ))}
               </div>
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">관심 목록이 비어 있습니다.</div>
             )}
           </div>
         )}
 
-        {/* 구매 내역 섹션 */}
-        {activeSection === 'purchase' && (
+        {/* 구매 내역 */}
+        {activeSection === "purchase" && (
           <div className="bg-card">
             <div className="px-4 py-4">
               <Select onValueChange={setDateFilter} value={dateFilter}>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="기간 선택">
-                    {dateFilter === 'all' && '전체'}
-                    {dateFilter === '1month' && '1개월'}
-                    {dateFilter === '3months' && '3개월'}
-                    {dateFilter === '6months' && '6개월'}
-                    {dateFilter === '1year' && '1년'}
+                    {dateFilter === "all" && "전체"}
+                    {dateFilter === "1month" && "1개월"}
+                    {dateFilter === "3months" && "3개월"}
+                    {dateFilter === "6months" && "6개월"}
+                    {dateFilter === "1year" && "1년"}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
@@ -292,104 +467,143 @@ export function MyPage({ onNavigate }: MyPageProps) {
                 </SelectContent>
               </Select>
             </div>
-            {purchaseHistory.map((item) => (
-              <div key={item.id} className="px-4 py-4 border-b last:border-b-0">
-                <div className="flex gap-3">
-                  <img 
-                    src={item.image} 
-                    alt={item.title}
-                    className="w-20 h-20 object-cover rounded-lg"
-                  />
-                  <div className="flex-1">
-                    <p className="text-sm text-muted-foreground mb-1">
-                      {item.purchaseDate} 구매완료
-                    </p>
-                    <p className="mb-1">{item.title}</p>
-                    <p className="text-emerald-600">{item.price.toLocaleString()}원</p>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <Button variant="outline" size="sm" onClick={() => {
-                      setSelectedPurchase(item);
-                      setShowReviewDialog(true);
-                    }}>
-                      후기 작성
-                    </Button>
-                    <Button variant="ghost" size="sm">
-                      다시 구매
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            ))}
-            {purchaseHistory.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground">
-                구매 내역이 없습니다
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* 받은 후기 섹션 */}
-        {activeSection === 'reviews' && (
-          <div className="bg-card">
-            {reviews.map((review) => (
-              <div key={review.id} className="px-4 py-4 border-b last:border-b-0">
-                <div className="flex gap-3 mb-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarImage src={review.reviewerImage} />
-                    <AvatarFallback>{review.reviewer[0]}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span>{review.reviewer}</span>
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <Star
-                            key={i}
-                            className={`h-4 w-4 ${
-                              i < review.rating
-                                ? 'fill-yellow-400 text-yellow-400'
-                                : 'text-gray-300'
-                            }`}
-                          />
-                        ))}
-                      </div>
+            {purchaseLoading ? (
+              <div className="text-center py-12 text-muted-foreground">구매 내역을 불러오는 중입니다...</div>
+            ) : purchaseHistory.length > 0 ? (
+              purchaseHistory.map((item) => (
+                <div key={item.id} className="px-4 py-4 border-b last:border-b-0">
+                  <div className="flex gap-3">
+                    <img
+                      src={item.image}
+                      alt={item.title}
+                      className="w-20 h-20 object-cover rounded-lg"
+                    />
+                    <div className="flex-1">
+                      <p className="text-sm text-muted-foreground mb-1">
+                        {item.purchaseDate} 구매 완료
+                      </p>
+                      <p className="mb-1">{item.title}</p>
+                      <p className="text-emerald-600">{item.price.toLocaleString()}원</p>
                     </div>
-                    <p className="text-sm text-muted-foreground">{review.date}</p>
+                    <div className="flex flex-col gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          setSelectedPurchase(item);
+                          setShowReviewDialog(true);
+                        }}
+                      >
+                        후기 작성
+                      </Button>
+                      <Button variant="ghost" size="sm">
+                        다시 구매
+                      </Button>
+                    </div>
                   </div>
                 </div>
-                <p className="mb-2">{review.comment}</p>
-                <p className="text-sm text-muted-foreground">상품: {review.productTitle}</p>
-              </div>
-            ))}
-            {reviews.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground">
-                받은 후기가 없습니다
-              </div>
+              ))
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">구매 내역이 아직 없습니다.</div>
             )}
           </div>
         )}
 
-        {/* 기본 마이페이지 뷰 */}
+        {/* 판매 중인 상품 (전체 목록 뷰) 
+        {activeSection === "my-products" && (
+          <div className="bg-card px-4 py-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3>판매 중인 상품</h3>
+            </div>
+            {myProductsLoading ? (
+              <div className="text-center py-10 text-muted-foreground">내 상품을 불러오는 중입니다...</div>
+            ) : myProducts.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {myProducts.map((product) => (
+                  <MyProductCard
+                    key={product.id}
+                    {...product}
+                    status={product.status}
+                    isHidden={isProductHidden(product.id)}
+                    onClick={() => onNavigate("detail", product.id)}
+                    onEdit={(id) => onNavigate("product-edit", id)}
+                    onStatusChange={handleStatusChange}
+                    onDelete={setProductToDelete}
+                    onToggleVisibility={(id) => {
+                      toggleProductVisibility(id);
+                      setMyProducts((prev) => [...prev]);
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-10 text-muted-foreground">판매 중인 상품이 없습니다.</div>
+            )}
+          </div>
+        )}*/}
+
+        {/* 받은 후기 */}
+        {activeSection === "reviews" && (
+          <div className="bg-card">
+            {reviewsLoading ? (
+              <div className="text-center py-12 text-muted-foreground">후기를 불러오는 중입니다...</div>
+            ) : reviews.length > 0 ? (
+              reviews.map((review) => (
+                <div key={review.id} className="px-4 py-4 border-b last:border-b-0">
+                  <div className="flex gap-3 mb-3">
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={review.reviewerImage} />
+                      <AvatarFallback>{review.reviewer[0]}</AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span>{review.reviewer}</span>
+                        <div className="flex">
+                          {[...Array(5)].map((_, i) => (
+                            <Star
+                              key={i}
+                              className={`h-4 w-4 ${
+                                i < review.rating
+                                  ? "fill-yellow-400 text-yellow-400"
+                                  : "text-gray-300"
+                              }`}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                      <p className="text-sm text-muted-foreground">{review.date}</p>
+                    </div>
+                  </div>
+                  {review.comment && <p className="mb-2">{review.comment}</p>}
+                  {review.productTitle && (
+                    <p className="text-sm text-muted-foreground">상품: {review.productTitle}</p>
+                  )}
+                </div>
+              ))
+            ) : (
+              <div className="text-center py-12 text-muted-foreground">받은 후기가 아직 없습니다.</div>
+            )}
+          </div>
+        )}
+
+        {/* 기본 마이페이지 */}
         {!activeSection && (
           <>
             {/* Profile Section */}
             <div className="bg-card px-4 py-6">
               <div className="flex items-center gap-4">
                 <Avatar className="h-20 w-20">
-                  <AvatarImage src={user.image} />
-                  <AvatarFallback>{user.name[0]}</AvatarFallback>
+                  <AvatarImage src={userProfile.profileImage} />
+                  <AvatarFallback>{userProfile.name?.[0] ?? "U"}</AvatarFallback>
                 </Avatar>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <h2>{user.name}</h2>
+                    <h2>{userProfile.name}</h2>
                     <Badge variant="secondary" className="text-xs">
-                      ⭐ {user.rating}
+                      신뢰도 {ratingSummary?.averageRating?.toFixed(1) ?? "0.0"}
                     </Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    {user.location}
-                  </p>
+                  <p className="text-sm text-muted-foreground mb-2">@{userProfile.nickname}</p>
                   <Button variant="outline" size="sm" onClick={() => setShowProfileEdit(true)}>
                     프로필 수정
                   </Button>
@@ -405,14 +619,16 @@ export function MyPage({ onNavigate }: MyPageProps) {
                 const Icon = item.icon;
                 return (
                   <div key={item.label}>
-                    <button className="flex w-full items-center justify-between px-4 py-4 transition-colors hover:bg-muted/50"
-                            onClick={() => setActiveSection(item.id)}>
+                    <button
+                      className="flex w-full items-center justify-between px-4 py-4 transition-colors hover:bg-muted/50"
+                      onClick={() => setActiveSection(item.id)}
+                    >
                       <div className="flex items-center gap-3">
                         <Icon className="h-5 w-5 text-muted-foreground" />
                         <span>{item.label}</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        {item.count && (
+                        {typeof item.count === "number" && item.count > 0 && (
                           <Badge variant="secondary">{item.count}</Badge>
                         )}
                         <ChevronRight className="h-5 w-5 text-muted-foreground" />
@@ -426,33 +642,36 @@ export function MyPage({ onNavigate }: MyPageProps) {
 
             <div className="h-2 bg-muted"></div>
 
-            {/* My Products */}
+            {/* My Products (요약) 
             <div className="bg-card px-4 py-6">
               <div className="flex items-center justify-between mb-4">
                 <h3>판매 중인 상품</h3>
-                <Button variant="link" size="sm">
-                  전체보기
-                </Button>
               </div>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {myProducts.filter(p => !isProductDeleted(p.id)).map((product) => (
-                  <MyProductCard
-                    key={product.id}
-                    {...product}
-                    status={productStatuses[product.id] || product.status}
-                    isHidden={isProductHidden(product.id)}
-                    onClick={() => onNavigate('detail', product.id)}
-                    onEdit={(id) => onNavigate('product-edit', id)}
-                    onStatusChange={handleStatusChange}
-                    onDelete={setProductToDelete}
-                    onToggleVisibility={(id) => {
-                      toggleProductVisibility(id);
-                      setProductStatuses(prev => ({ ...prev }));
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
+              {myProductsLoading ? (
+                <div className="text-center py-10 text-muted-foreground">내 상품을 불러오는 중입니다...</div>
+              ) : myProducts.length > 0 ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {myProducts.map((product) => (
+                    <MyProductCard
+                      key={product.id}
+                      {...product}
+                      status={product.status}
+                      isHidden={isProductHidden(product.id)}
+                      onClick={() => onNavigate("detail", product.id)}
+                      onEdit={(id) => onNavigate("product-edit", id)}
+                      onStatusChange={handleStatusChange}
+                      onDelete={setProductToDelete}
+                      onToggleVisibility={(id) => {
+                        toggleProductVisibility(id);
+                        setMyProducts((prev) => [...prev]);
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-10 text-muted-foreground">판매 중인 상품이 없습니다.</div>
+              )}
+            </div>*/}
 
             <div className="h-2 bg-muted"></div>
 
@@ -500,9 +719,9 @@ export function MyPage({ onNavigate }: MyPageProps) {
       <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>상품 삭제 확인</AlertDialogTitle>
+            <AlertDialogTitle>상품 삭제</AlertDialogTitle>
             <AlertDialogDescription>
-              이 상품을 삭제하시겠습니까? 삭제된 상품은 복구할 수 없습니다.
+              상품을 삭제하시겠습니까? 삭제 후에는 복구할 수 없습니다.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -523,9 +742,9 @@ export function MyPage({ onNavigate }: MyPageProps) {
           setShowReviewDialog(false);
           setSelectedPurchase(null);
         }}
-        productId={selectedPurchase?.id || ''}
-        productTitle={selectedPurchase?.title || ''}
-        sellerName="판매자"
+        productId={selectedPurchase?.id || ""}
+        productTitle={selectedPurchase?.title || ""}
+        sellerName={selectedPurchase?.sellerName || "판매자"}
         sellerImage="https://images.unsplash.com/photo-1599566150163-29194dcaad36?w=200"
       />
 
@@ -535,7 +754,7 @@ export function MyPage({ onNavigate }: MyPageProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>로그아웃</AlertDialogTitle>
             <AlertDialogDescription>
-              정말 로그아웃하시겠습니까?
+              로그아웃하시겠습니까?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
