@@ -22,14 +22,8 @@ export const CLAUDE_API_CONFIG = {
   model: 'claude-sonnet-4-20250514',
 };
 
-// 카테고리
-export const CATEGORIES = [
-  { id: 1, name: '디지털기기', emoji: '📱' },
-  { id: 2, name: '가구/인테리어', emoji: '🛋️' },
-  { id: 3, name: '의류/패션잡화', emoji: '👗' },
-  { id: 4, name: '스포츠/레저', emoji: '⚽' },
-  { id: 5, name: '도서/티켓/음반', emoji: '📚' },
-];
+// 카테고리는 이제 API에서 동적으로 가져옵니다
+// import { categoryApi } from '../api/categoryApi'
 
 // 제품 상태
 export const PRODUCT_STATUS = {

@@ -3,12 +3,10 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from "react-router-
 
 import { Header } from "./components/Header";
 import { BottomNav } from "./components/BottomNav";
-import { RegisterTypeDialog } from "./components/RegisterTypeDialog";
 import { ScrollToTop } from "./components/ScrollToTop";
 import { Toaster } from "./components/ui/sonner";
 import { HomePage } from "./pages/HomePage";
 import { ProductRegisterPage } from "./pages/ProductRegisterPage";
-import { ProductRegisterAIPage } from "./pages/ProductRegisterAIPage";
 import { ChatListPage } from "./pages/ChatListPage";
 import { MyPage } from "./pages/MyPage";
 import { ResellPage } from "./pages/ResellPage";
@@ -43,10 +41,6 @@ export default function App() {
 
   /** 검색어 */
   const [searchQuery, setSearchQuery] = useState<string>("");
-
-  /** 상품 등록 타입 선택 Dialog 표시 여부 */
-
-  const [showRegisterDialog, setShowRegisterDialog] = useState(false);
 
   /** 인증 상태 */
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -107,38 +101,15 @@ export default function App() {
   }, [navigate, location.pathname]);
 
   // ============================================
-  // Debug - showRegisterDialog 상태 변화 로깅
-  // ============================================
-  useEffect(() => {
-    console.log('[App] showRegisterDialog changed to:', showRegisterDialog);
-  }, [showRegisterDialog]);
-
-  // ============================================
-
   // 네비게이션 핸들러
   // ============================================
 
   /**
    * 검색어 초기화 후 홈으로 이동
-
    */
   const handleClearSearch = () => {
     setSearchQuery("");
     navigate('/');
-  };
-
-  /**
-   * 상품 등록 타입 선택 (일반/AI)
-   * @param type 등록 타입
-
-   */
-  const handleRegisterTypeSelect = (type: "normal" | "ai") => {
-    setShowRegisterDialog(false);
-    if (type === "normal") {
-      navigate('/product/register');
-    } else {
-      navigate('/product/register-ai');
-    }
   };
 
   // ============================================
@@ -247,7 +218,7 @@ export default function App() {
                   <HomePage
                     onNavigate={(page, id) => {
                       if (page === 'register') {
-                        setShowRegisterDialog(true);
+                        navigate('/product/register');
                       } else if (id) {
                         navigate(`/${page}/${id}`);
                       } else {
@@ -285,10 +256,6 @@ export default function App() {
               <Route
                 path="/product/register"
                 element={<ProductRegisterPage onNavigate={(page: string) => navigate(`/${page}`)} />}
-              />
-              <Route
-                path="/product/register-ai"
-                element={<ProductRegisterAIPage onNavigate={(page: string) => navigate(`/${page}`)} />}
               />
               <Route
                 path="/product/location"
@@ -352,23 +319,14 @@ export default function App() {
               setSearchQuery("");
               navigate('/');
             } else if (page === "register") {
-              console.log('[BottomNav] Setting showRegisterDialog to true');
-              setShowRegisterDialog(true);
-              console.log('[BottomNav] showRegisterDialog state should be true now');
+              console.log('[BottomNav] Navigating to register page');
+              navigate('/product/register');
             } else {
               navigate(`/${page}`);
             }
           }}
         />
       )}
-
-      {/* 상품 등록 타입 선택 Dialog (일반/AI) */}
-
-      <RegisterTypeDialog
-        open={showRegisterDialog}
-        onClose={() => setShowRegisterDialog(false)}
-        onSelectType={handleRegisterTypeSelect}
-      />
 
       {/* Toast 알림 */}
 
