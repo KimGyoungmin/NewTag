@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   ChevronRight,
   Settings,
@@ -71,12 +72,15 @@ interface WishlistItem {
 }
 
 interface PurchaseHistoryItem {
-  id: string;
+  id: string; // transactionId
   image: string;
   title: string;
   price: number;
   purchaseDate: string;
   sellerName?: string;
+  sellerNick?: string;
+  sellerId?: number;
+  productId?: number;
 }
 
 interface ReceivedReview {
@@ -143,6 +147,7 @@ const buildProfileFromAuth = (fallback?: UserProfile): UserProfile => {
 };
 
 export function MyPage({ onNavigate }: MyPageProps) {
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [userProfile, setUserProfileState] = useState<UserProfile>(() => buildProfileFromAuth());
   const [showProfileEdit, setShowProfileEdit] = useState(false);
@@ -155,6 +160,7 @@ export function MyPage({ onNavigate }: MyPageProps) {
   const [myProductsLoading, setMyProductsLoading] = useState(false);
   const [purchaseHistory, setPurchaseHistory] = useState<PurchaseHistoryItem[]>([]);
   const [purchaseLoading, setPurchaseLoading] = useState(false);
+  const [purchaseReviewStatus, setPurchaseReviewStatus] = useState<Record<string, boolean>>({});
   const [reviews, setReviews] = useState<ReceivedReview[]>([]);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [ratingSummary, setRatingSummary] = useState<RatingSummary | null>(null);
@@ -180,7 +186,7 @@ export function MyPage({ onNavigate }: MyPageProps) {
 
       fetchWishlist(userId);
       fetchMyProducts(userId);
-      fetchPurchaseHistory(userId);
+      fetchPurchaseHistory();
       fetchReviews(userId);
       fetchRatingSummary(userId);
     };
@@ -254,7 +260,11 @@ export function MyPage({ onNavigate }: MyPageProps) {
         })
       );
 
-      setMyProducts(products.filter((p) => p && p.id) as WishlistItem[]);
+      const filtered = products
+        .filter((p) => p && p.id)
+        // 판매 완료(SOLD_OUT) 상품은 제외
+        .filter((p) => p.status !== "sold") as WishlistItem[];
+      setMyProducts(filtered);
     } catch (error) {
       console.error("Failed to load my products:", error);
       setMyProducts([]);
@@ -263,33 +273,69 @@ export function MyPage({ onNavigate }: MyPageProps) {
     }
   };
 
-  const fetchPurchaseHistory = async (userId: number) => {
+  const fetchPurchaseHistory = async () => {
+    const currentUser = authApi.getCurrentUser();
+    if (!currentUser?.id) {
+      setPurchaseHistory([]);
+      return;
+    }
+
     setPurchaseLoading(true);
     try {
-      const response = await api.get("/transactions/my", {
-        params: { userId },
-      });
-      const items: any[] = response.data?.transactions ?? [];
+      const response = await api.get("/purchase");
+      const items: any[] = response.data?.purchases ?? [];
       const mapped = items.map((item) => ({
         id: String(item.transactionId ?? item.id ?? Date.now()),
         image: resolveImageUrl(
           item.productImage || item.thumbnailImage || item.mainImage
         ),
-        title: item.title || item.productTitle || "구매 상품",
+        title: item.productTitle || item.title || "?? ??",
         price: Number(item.price ?? 0),
-        purchaseDate:
-          item.transactionDate ||
-          new Date(item.createdAt || Date.now()).toLocaleDateString("ko-KR"),
-        sellerName: item.partnerNick || item.sellerName,
+        purchaseDate: item.transactionAt
+          ? new Date(item.transactionAt).toLocaleDateString("ko-KR")
+          : new Date().toLocaleDateString("ko-KR"),
+        sellerName: item.sellerNick || item.partnerNick || item.sellerName,
+        sellerNick: item.sellerNick || item.partnerNick,
+        sellerId: item.sellerId,
+        productId: item.productId,
       }));
       setPurchaseHistory(mapped);
     } catch (error) {
-      console.warn("구매 내역 API가 없어 비어 있는 상태입니다.");
+      console.error("Failed to load purchase history:", error);
       setPurchaseHistory([]);
     } finally {
       setPurchaseLoading(false);
     }
   };
+
+  // 구매 내역에 대한 리뷰 작성 여부 확인 (중복 방지)
+  useEffect(() => {
+    const checkReviews = async () => {
+      const ids = purchaseHistory
+        .map((p) => p.id)
+        .filter((id) => purchaseReviewStatus[id] === undefined);
+      if (ids.length === 0) return;
+
+      try {
+        const entries = await Promise.all(
+          ids.map(async (id) => {
+            const exists = await reviewApi.existsReview(Number(id));
+            return [id, exists] as const;
+          })
+        );
+        setPurchaseReviewStatus((prev) => {
+          const next = { ...prev };
+          for (const [id, exists] of entries) {
+            next[id] = exists;
+          }
+          return next;
+        });
+      } catch (error) {
+        console.error("Failed to check purchase review existence:", error);
+      }
+    };
+    checkReviews();
+  }, [purchaseHistory, purchaseReviewStatus]);
 
   const fetchReviews = async (userId: number) => {
     setReviewsLoading(true);
@@ -371,7 +417,7 @@ export function MyPage({ onNavigate }: MyPageProps) {
   const handleLogoutConfirm = async () => {
     try {
       await authApi.logout();
-      toast.success("로그아웃되었습니다.");
+      toast.success("로그아웃했어요.");
     } catch (error) {
       console.error("Failed to logout", error);
       toast.error("로그아웃에 실패했어요.");
@@ -381,7 +427,7 @@ export function MyPage({ onNavigate }: MyPageProps) {
   };
 
   const menuItems = [
-    { icon: Heart, label: "관심 목록", count: wishlistItems.length, id: "wishlist" },
+    { icon: Heart, label: "관심목록", count: wishlistItems.length, id: "wishlist" },
     { icon: ShoppingBag, label: "구매 내역", count: purchaseHistory.length, id: "purchase" },
     { icon: ShoppingBag, label: "판매 중인 상품", count: myProducts.length, id: "my-products" },
     { icon: Star, label: "받은 후기", count: reviews.length, id: "reviews" },
@@ -405,7 +451,7 @@ export function MyPage({ onNavigate }: MyPageProps) {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
               <h1>
-                {activeSection === "wishlist" && "관심 목록"}
+                {activeSection === "wishlist" && "관심목록"}
                 {activeSection === "purchase" && "구매 내역"}
                 {activeSection === "my-products" && "판매 중인 상품"}
                 {activeSection === "reviews" && "받은 후기"}
@@ -416,11 +462,11 @@ export function MyPage({ onNavigate }: MyPageProps) {
       </div>
 
       <div className="container mx-auto max-w-4xl">
-        {/* 관심 목록 */}
+        {/* 관심목록 */}
         {activeSection === "wishlist" && (
           <div className="bg-card px-4 py-6">
             {wishlistLoading ? (
-              <div className="text-center py-12 text-muted-foreground">관심 목록을 불러오는 중입니다...</div>
+              <div className="text-center py-12 text-muted-foreground">관심목록을 불러오는 중입니다...</div>
             ) : wishlistItems.length > 0 ? (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {wishlistItems.map((product) => (
@@ -439,7 +485,7 @@ export function MyPage({ onNavigate }: MyPageProps) {
                 ))}
               </div>
             ) : (
-              <div className="text-center py-12 text-muted-foreground">관심 목록이 비어 있습니다.</div>
+              <div className="text-center py-12 text-muted-foreground">관심목록이 비어 있습니다.</div>
             )}
           </div>
         )}
@@ -449,9 +495,9 @@ export function MyPage({ onNavigate }: MyPageProps) {
           <div className="bg-card">
             <div className="px-4 py-4">
               <Select
-  value={dateFilter}
-  onValueChange={(value) => setDateFilter(value as "all" | "1month" | "3months" | "6months" | "1year")}
->
+                value={dateFilter}
+                onValueChange={(value) => setDateFilter(value as "all" | "1month" | "3months" | "6months" | "1year")}
+              >
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="기간 선택">
                     {dateFilter === "all" && "전체"}
@@ -492,15 +538,32 @@ export function MyPage({ onNavigate }: MyPageProps) {
                       <Button
                         variant="outline"
                         size="sm"
+                        className="w-28"
+                        disabled={purchaseReviewStatus[item.id] === true}
                         onClick={() => {
-                          setSelectedPurchase(item);
-                          setShowReviewDialog(true);
+                          if (purchaseReviewStatus[item.id]) return;
+                          const payload = {
+                            transactionId: Number(item.id),
+                            targetId: item.sellerId ?? undefined,
+                            productId: item.productId,
+                            productTitle: item.title,
+                            sellerName: item.sellerName,
+                            sellerNick: item.sellerNick,
+                            sellerProfileImg: item.image,
+                            buyerId: authApi.getCurrentUser()?.id,
+                          };
+                          navigate("/review-write", { state: { payload } });
                         }}
                       >
-                        후기 작성
+                        {purchaseReviewStatus[item.id] ? "후기 작성 완료" : "후기 작성"}
                       </Button>
-                      <Button variant="ghost" size="sm">
-                        다시 구매
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="w-28"
+                        onClick={() => item.productId && navigate(`/detail/${item.productId}`)}
+                      >
+                        판매글 보기
                       </Button>
                     </div>
                   </div>
@@ -512,7 +575,7 @@ export function MyPage({ onNavigate }: MyPageProps) {
           </div>
         )}
 
-        {/* 판매 중인 상품 (전체 목록 뷰) 
+        {/* 판매 중인 상품 */}
         {activeSection === "my-products" && (
           <div className="bg-card px-4 py-6">
             <div className="flex items-center justify-between mb-4">
@@ -543,7 +606,7 @@ export function MyPage({ onNavigate }: MyPageProps) {
               <div className="text-center py-10 text-muted-foreground">판매 중인 상품이 없습니다.</div>
             )}
           </div>
-        )}*/}
+        )}
 
         {/* 받은 후기 */}
         {activeSection === "reviews" && (
@@ -645,36 +708,8 @@ export function MyPage({ onNavigate }: MyPageProps) {
 
             <div className="h-2 bg-muted"></div>
 
-            {/* My Products (요약) 
-            <div className="bg-card px-4 py-6">
-              <div className="flex items-center justify-between mb-4">
-                <h3>판매 중인 상품</h3>
-              </div>
-              {myProductsLoading ? (
-                <div className="text-center py-10 text-muted-foreground">내 상품을 불러오는 중입니다...</div>
-              ) : myProducts.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {myProducts.map((product) => (
-                    <MyProductCard
-                      key={product.id}
-                      {...product}
-                      status={product.status}
-                      isHidden={isProductHidden(product.id)}
-                      onClick={() => onNavigate("detail", product.id)}
-                      onEdit={(id) => onNavigate("product-edit", id)}
-                      onStatusChange={handleStatusChange}
-                      onDelete={setProductToDelete}
-                      onToggleVisibility={(id) => {
-                        toggleProductVisibility(id);
-                        setMyProducts((prev) => [...prev]);
-                      }}
-                    />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center py-10 text-muted-foreground">판매 중인 상품이 없습니다.</div>
-              )}
-            </div>*/}
+            {/* My Products (예시) */}
+            {/* ... */}
 
             <div className="h-2 bg-muted"></div>
 
