@@ -12,7 +12,6 @@ import { MyPage } from "./pages/MyPage";
 import { ResellPage } from "./pages/ResellPage";
 import { LoginPage } from "./pages/LoginPage";
 import { SignupPage } from "./pages/SignupPage";
-import { ReviewWritePage } from "./pages/ReviewWritePage";
 import { KakaoCallbackPage } from "./pages/KakaoCallbackPage";
 import { authApi } from "./api/auth";
 import type { ResellProductRecord } from "./data/resellProducts";
@@ -25,6 +24,7 @@ import {
   ChatRoomWrapper,
   SellerProfileWrapper,
   ResellDetailWrapper,
+  ReviewWriteWrapper,
 } from "./components/RouteWrappers";
 
 /**
@@ -279,7 +279,7 @@ export default function App() {
               {/* 리뷰 작성 */}
               <Route
                 path="/review-write"
-                element={<ReviewWritePage payload={null} onNavigate={(page: string) => navigate(`/${page}`)} />}
+                element={<ReviewWriteWrapper />}
               />
 
               {/* 채팅 페이지 */}

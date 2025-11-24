@@ -24,6 +24,7 @@ import { chatService } from "../services/firebase/chatService";
 import { db } from "../services/firebase/config";
 import { doc, getDoc } from "firebase/firestore";
 import { authApi } from "../api/auth";
+import { reviewApi } from "../services/api/reviewApi";
 import type { AuthUser, ChatMessage, ChatRoom, ReviewNavigationPayload } from "../types";
 
 interface ChatPageProps {
@@ -38,24 +39,24 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
+  const [reviewStatus, setReviewStatus] = useState<Record<number, boolean>>({});
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const firstScrollDone = useRef(false);
 
-  // 채팅방이 바뀔 때마다 스크롤 상태를 초기화해 첫 렌더에서 즉시 맨 아래로 이동
+  // 채팅방이 바뀔 때마다 스크롤 초기화
   useEffect(() => {
     firstScrollDone.current = false;
   }, [chatId]);
 
+  // 로그인 사용자 동기화
   useEffect(() => {
-    const updateUser = () => {
-      setCurrentUser(authApi.getCurrentUser());
-    };
-
+    const updateUser = () => setCurrentUser(authApi.getCurrentUser());
     updateUser();
     window.addEventListener("auth-change", updateUser);
     return () => window.removeEventListener("auth-change", updateUser);
   }, []);
 
+  // 채팅방 정보 불러오기
   useEffect(() => {
     (async () => {
       try {
@@ -87,6 +88,7 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
     })();
   }, [chatId]);
 
+  // 메시지 구독
   useEffect(() => {
     const unsub = chatService.subscribeToMessages(chatId, (list) => {
       setMessages(list);
@@ -94,42 +96,75 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
     return () => unsub();
   }, [chatId]);
 
+  // 새 메시지에 맞춰 스크롤
   useLayoutEffect(() => {
     const el = messagesContainerRef.current;
     if (!el) return;
     const isInitial = !firstScrollDone.current;
     if (isInitial) {
-      // 첫 렌더에서는 즉시 맨 아래로 이동
       el.scrollTop = el.scrollHeight;
       firstScrollDone.current = true;
     } else {
-      // 이후에는 부드럽게 최신 메시지로 이동
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     }
   }, [messages]);
 
+  // 읽음 처리
   useEffect(() => {
     if (currentUser) {
-      chatService.markAsRead(chatId, currentUser.id).catch((e) =>
-        console.error("markAsRead failed", e)
-      );
+      chatService.markAsRead(chatId, currentUser.id).catch((e) => console.error("markAsRead failed", e));
     }
   }, [chatId, currentUser, messages.length]);
 
+  // 리뷰 작성 여부 조회 (중복 작성 방지)
+  useEffect(() => {
+    const fetchStatuses = async () => {
+      if (!currentUser) return;
+      const ids = Array.from(
+        new Set(
+          messages
+            .map((m) => m.reviewPayload?.transactionId)
+            .filter((id): id is number => typeof id === "number")
+        )
+      ).filter((id) => reviewStatus[id] === undefined);
+      if (ids.length === 0) return;
+
+      try {
+        const entries = await Promise.all(
+          ids.map(async (id) => {
+            const exists = await reviewApi.existsReview(id);
+            return [id, exists] as const;
+          })
+        );
+        setReviewStatus((prev) => {
+          const next = { ...prev };
+          for (const [id, exists] of entries) next[id] = exists;
+          return next;
+        });
+      } catch (e) {
+        console.error("Failed to check review existence", e);
+      }
+    };
+    fetchStatuses();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, currentUser]);
+
   const peer = useMemo(() => {
     if (!currentUser || !room) return { nick: "", img: "" };
-    const isSeller = currentUser.id === room.sellerId;
+    const seller = currentUser.id === room.sellerId;
     return {
-      nick: isSeller ? room.buyerNick : room.sellerNick,
-      img: isSeller ? room.buyerProfileImg : room.sellerProfileImg,
+      nick: seller ? room.buyerNick : room.sellerNick,
+      img: seller ? room.buyerProfileImg : room.sellerProfileImg,
     };
   }, [currentUser, room]);
+
+  const isBuyer = currentUser && room ? currentUser.id === room.buyerId : false;
+  const isSeller = currentUser && room ? currentUser.id === room.sellerId : false;
 
   const handleSend = async () => {
     const text = message.trim();
     if (!text || !currentUser) return;
 
-    // Optimistic update so 메시지가 바로 보이도록 한다.
     const optimistic: ChatMessage = {
       id: `temp-${Date.now()}`,
       chatRoomId: chatId,
@@ -143,13 +178,7 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
     setMessages((prev) => [...prev, optimistic]);
 
     try {
-      await chatService.sendMessage(
-        chatId,
-        currentUser.id,
-        currentUser.nick,
-        currentUser.profileImg || "",
-        text
-      );
+      await chatService.sendMessage(chatId, currentUser.id, currentUser.nick, currentUser.profileImg || "", text);
       setMessage("");
     } catch (e) {
       console.error("Failed to send message", e);
@@ -184,9 +213,9 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
   };
 
   return (
-    <div className="flex flex-col h-[100dvh] bg-background md:h-screen relative">
+    <div className="flex flex-col h-[100dvh] md:h-screen bg-background overflow-hidden relative">
       {/* Header */}
-      <div className="flex items-center justify-between border-b bg-background px-4 h-14 shrink-0">
+      <div className="flex items-center justify-between border-b bg-background px-4 h-14 shrink-0 sticky top-0 z-40">
         <div className="flex items-center gap-3 flex-1">
           <Button variant="ghost" size="icon" onClick={() => onNavigate("chat")}>
             <ChevronLeft className="h-5 w-5" />
@@ -214,7 +243,7 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
             <AlertDialogHeader>
               <AlertDialogTitle>채팅방을 나갈까요?</AlertDialogTitle>
               <AlertDialogDescription>
-                "채팅방 나가기"를 선택하면 이전 대화 내용이 모두 삭제되고 채팅 목록에서도 사라집니다.
+                채팅방을 나가면 이전 대화 내용이 모두 삭제되고 채팅 목록에서 사라집니다.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -227,96 +256,115 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
         </AlertDialog>
       </div>
 
-      {/* Product Info Card */}
-      {room && (
-        <div className="border-b bg-card px-4 py-3 shrink-0">
-          <div className="flex items-center gap-3">
-            <div
-              className="h-12 w-12 overflow-hidden rounded-lg border shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => onNavigate("detail", String(room.productId))}
-            >
-              <ImageWithFallback
-                src={room.productImage}
-                alt={room.productTitle}
-                className="h-full w-full object-cover"
-              />
-            </div>
-            <div
-              className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => onNavigate("detail", String(room.productId))}
-            >
-              <p className="truncate text-sm">{room.productTitle}</p>
-              <p className="text-sm">{room.productPrice?.toLocaleString()}원</p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Messages */}
-      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-4 mb-[72px] md:mb-4">
-        {messages.map((msg) => {
-          const isMine = currentUser && msg.senderId === currentUser.id;
-          return (
-            <div key={msg.id} className={`flex gap-2 ${isMine ? "justify-end" : "justify-start"}`}>
-              {!isMine && (
-                <Avatar className="h-8 w-8 shrink-0">
-                  <AvatarImage src={peer.img} />
-                  <AvatarFallback>{peer.nick?.[0] || "?"}</AvatarFallback>
-                </Avatar>
-              )}
+      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        {/* Product Info Card */}
+        {room && (
+          <div className="border-b bg-card px-4 py-3 shrink-0">
+            <div className="flex items-center gap-3">
               <div
-                className={`max-w-[70%] rounded-2xl px-4 py-2 ${
-                  isMine ? "bg-primary text-white rounded-br-sm" : "bg-secondary text-foreground rounded-bl-sm"
-                }`}
+                className="h-12 w-12 overflow-hidden rounded-lg border shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => onNavigate("detail", String(room.productId))}
               >
-                <p className="break-words">{msg.message}</p>
-                {msg.messageType === 'review_link' &&
-                  !isMine &&
-                  msg.reviewPayload &&
-                  currentUser?.id === msg.reviewPayload.buyerId && (
-                    <div className="mt-2">
-                      <Button
-                        size="sm"
-                        className="bg-white text-primary hover:bg-white/90"
-                        onClick={() => handleReviewLink(msg.reviewPayload!)}
-                      >
-                        리뷰 작성하기
-                      </Button>
-                    </div>
-                  )}
-                <p className={`mt-1 text-xs ${isMine ? "text-white/70" : "text-muted-foreground"}`}>
-                  {formatTime(msg.createdAt)}
-                </p>
+                <ImageWithFallback
+                  src={room.productImage}
+                  alt={room.productTitle}
+                  className="h-full w-full object-cover"
+                />
+              </div>
+              <div
+                className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => onNavigate("detail", String(room.productId))}
+              >
+                <p className="truncate text-sm">{room.productTitle}</p>
+                <p className="text-sm">{room.productPrice?.toLocaleString()}원</p>
               </div>
             </div>
-          );
-        })}
-      </div>
+          </div>
+        )}
 
-      {/* Input Area */}
-      <div className="fixed bottom-16 left-0 right-0 md:relative md:bottom-auto border-t bg-background p-4 z-40">
-        <div className="flex items-center gap-2">
-          <Input
-            type="text"
-            placeholder="메시지를 입력하세요"
-            value={message}
-            onChange={(e) => setMessage(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSend();
-            }}
-            className="flex-1 bg-secondary border-0"
-          />
-          <Button
-            size="icon"
-            className="shrink-0 bg-primary hover:bg-primary/90"
-            onClick={handleSend}
-            disabled={!message.trim()}
-          >
-            <Send className="h-5 w-5" />
-          </Button>
+        {/* Messages */}
+        <div
+          ref={messagesContainerRef}
+          className="flex-1 overflow-y-auto px-4 py-6 space-y-4 mb-[72px] md:mb-4"
+        >
+          {messages.map((msg) => {
+            const isMine = currentUser && msg.senderId === currentUser.id;
+            const reviewed =
+              msg.reviewPayload?.reviewCompleted === true ||
+              msg.reviewPayload?.isReviewed === true ||
+              (typeof msg.reviewPayload?.transactionId === "number" &&
+                reviewStatus[msg.reviewPayload.transactionId] === true);
+            return (
+              <div key={msg.id} className={`flex gap-2 ${isMine ? "justify-end" : "justify-start"}`}>
+                {!isMine && (
+                  <Avatar className="h-8 w-8 shrink-0">
+                    <AvatarImage src={peer.img} />
+                    <AvatarFallback>{peer.nick?.[0] || "?"}</AvatarFallback>
+                  </Avatar>
+                )}
+                <div
+                  className={`max-w-[70%] rounded-2xl px-4 py-2 ${
+                    isMine ? "bg-primary text-white rounded-br-sm" : "bg-secondary text-foreground rounded-bl-sm"
+                  }`}
+                >
+                  <p className="break-words">{msg.message}</p>
+                  {msg.messageType === "review_link" &&
+                    !isMine &&
+                    msg.reviewPayload &&
+                    (isBuyer || isSeller) && (
+                      <div className="mt-2">
+                        <Button
+                          size="sm"
+                          className="bg-white text-primary hover:bg-white/90 disabled:opacity-70 disabled:cursor-not-allowed"
+                          disabled={reviewed}
+                          onClick={() =>
+                            handleReviewLink(
+                              isBuyer
+                                ? msg.reviewPayload!
+                                : {
+                                    ...msg.reviewPayload!,
+                                    targetId: msg.reviewPayload!.buyerId, // 판매자가 구매자에게 후기 작성
+                                  }
+                            )
+                          }
+                        >
+                          {reviewed ? "후기 작성 완료" : "후기 작성하기"}
+                        </Button>
+                      </div>
+                    )}
+                  <p className={`mt-1 text-xs ${isMine ? "text-white/70" : "text-muted-foreground"}`}>
+                    {formatTime(msg.createdAt)}
+                  </p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Input Area */}
+        <div className="fixed bottom-16 left-0 right-0 md:relative md:bottom-auto border-t bg-background p-4 z-40">
+          <div className="flex items-center gap-2">
+            <Input
+              type="text"
+              placeholder="메시지를 입력하세요"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSend();
+              }}
+              className="flex-1 bg-secondary border-0"
+            />
+            <Button
+              size="icon"
+              className="shrink-0 bg-primary hover:bg-primary/90"
+              onClick={handleSend}
+              disabled={!message.trim()}
+            >
+              <Send className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
       </div>
     </div>
   );
 }
-
