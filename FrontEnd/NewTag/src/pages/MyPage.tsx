@@ -448,7 +448,10 @@ export function MyPage({ onNavigate }: MyPageProps) {
         {activeSection === "purchase" && (
           <div className="bg-card">
             <div className="px-4 py-4">
-              <Select onValueChange={setDateFilter} value={dateFilter}>
+              <Select
+  value={dateFilter}
+  onValueChange={(value) => setDateFilter(value as "all" | "1month" | "3months" | "6months" | "1year")}
+>
                 <SelectTrigger className="w-full">
                   <SelectValue placeholder="기간 선택">
                     {dateFilter === "all" && "전체"}
