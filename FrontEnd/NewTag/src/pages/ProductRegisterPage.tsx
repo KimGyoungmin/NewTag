@@ -7,10 +7,11 @@ import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { CATEGORIES, IMAGE_CONFIG } from "../constants";
+import { IMAGE_CONFIG } from "../constants";
 import { postApi } from "../api/postApi";
 import { resolveImageUrl } from "../utils/image";
 import { toast } from "sonner";
+import { categoryApi, Category } from "../api/categoryApi";
 
 interface ProductRegisterPageProps {
   onNavigate: (page: string, id?: string) => void;
@@ -45,6 +46,8 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
   const [isAutoWriting, setIsAutoWriting] = useState(false);
   const [latitude, setLatitude] = useState(DEFAULT_LATITUDE);
   const [longitude, setLongitude] = useState(DEFAULT_LONGITUDE);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -57,12 +60,30 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
 
   const categoryOptions = useMemo(
     () =>
-      CATEGORIES.map(({ id, name, emoji }) => ({
-        value: id.toString(),
-        label: `${emoji ?? ""} ${name}`.trim(),
+      categories.map((cat) => ({
+        value: cat.id.toString(),
+        label: cat.categoryNm,
       })),
-    []
+    [categories]
   );
+
+  // 카테고리 데이터 가져오기
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setLoadingCategories(true);
+        const data = await categoryApi.getAllCategories();
+        setCategories(data);
+      } catch (error) {
+        console.error('Failed to fetch categories:', error);
+        toast.error('카테고리 목록을 불러오는데 실패했습니다.');
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   const handleImageButtonClick = () => {
     if (images.length >= 10) {

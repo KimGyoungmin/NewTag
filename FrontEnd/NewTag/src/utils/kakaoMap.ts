@@ -149,7 +149,9 @@ export const getAddressFromCoords = async (
 };
 
 /**
- * 주소를 좌표로 변환 (Geocoder 정변환)
+ * 주소를 좌표로 변환 (Geocoder 정변환 + 키워드 검색)
+ * 1. 먼저 주소 검색 시도 (행정구역)
+ * 2. 실패 시 키워드 검색 시도 (장소, 건물, 지하철역 등)
  */
 export const getCoordsFromAddress = async (
   address: string
@@ -159,18 +161,29 @@ export const getCoordsFromAddress = async (
   return new Promise((resolve, reject) => {
     const geocoder = new window.kakao.maps.services.Geocoder();
 
+    // 1. 먼저 주소 검색 시도
     geocoder.addressSearch(address, (result: any[], status: any) => {
-      if (status === window.kakao.maps.services.Status.OK) {
-        if (result[0]) {
-          resolve({
-            lat: parseFloat(result[0].y),
-            lng: parseFloat(result[0].x),
-          });
-        } else {
-          reject(new Error('좌표를 찾을 수 없습니다.'));
-        }
+      if (status === window.kakao.maps.services.Status.OK && result[0]) {
+        const coords = {
+          lat: parseFloat(result[0].y),
+          lng: parseFloat(result[0].x),
+        };
+        resolve(coords);
       } else {
-        reject(new Error('좌표 변환에 실패했습니다.'));
+        // 2. 주소 검색 실패 시 키워드 검색 시도 (Places 서비스 사용)
+        const places = new window.kakao.maps.services.Places();
+
+        places.keywordSearch(address, (keywordResult: any[], keywordStatus: any) => {
+          if (keywordStatus === window.kakao.maps.services.Status.OK && keywordResult[0]) {
+            const coords = {
+              lat: parseFloat(keywordResult[0].y),
+              lng: parseFloat(keywordResult[0].x),
+            };
+            resolve(coords);
+          } else {
+            reject(new Error('검색 결과를 찾을 수 없습니다.'));
+          }
+        });
       }
     });
   });
