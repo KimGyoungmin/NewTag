@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { Plus, MapPin, ArrowUpDown, ChevronLeft, Loader2 } from "lucide-react";
 import { ProductCard } from "../components/ProductCard";
 import { CategoryFilter } from "../components/CategoryFilter";
+import { LocationSelectModal } from "../components/LocationSelectModal";
 import { Button } from "../components/ui/button";
 import {
   DropdownMenu,
@@ -12,8 +13,10 @@ import {
 import { productsApi } from "../api/products";
 import { favoriteApi } from "../api/favoriteApi";
 import { authApi } from "../api/auth";
+import { addressApi, type Address } from "../api/addressApi";
 import { resolveImageUrl } from "../utils/image";
 import { getAddressFromCoords, getCurrentPosition } from "../utils/kakaoMap";
+import { calculateDistance } from "../utils/distance";
 import { toast } from "sonner";
 
 interface HomePageProps {
@@ -29,6 +32,8 @@ interface Product {
   title: string;
   price: number;
   locationNm: string;
+  latitude?: number;
+  longitude?: number;
   createdAt: string;
   viewCount: number;
   favoriteCount: number;
@@ -44,6 +49,7 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [sortBy, setSortBy] = useState<'latest' | 'price-low' | 'price-high' | 'popular'>('latest');
   const [products, setProducts] = useState<Product[]>([]);
+  const [allProducts, setAllProducts] = useState<Product[]>([]); // 필터링 전 전체 상품
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +58,42 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
   const [hasMore, setHasMore] = useState(true);
   const [currentLocation, setCurrentLocation] = useState("광주광역시 동구 동명동");
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
+  const [myAddresses, setMyAddresses] = useState<Address[]>([]);
+  const [addressesLoaded, setAddressesLoaded] = useState(false); // 주소 로드 완료 플래그
+  const MAX_DISTANCE_KM = 10; // 최대 거리 10km
+
+  // 위치 기반 상품 필터링 함수
+  const filterProductsByLocation = (products: Product[], address: Address | null): Product[] => {
+    console.log('[HomePage] Filtering products - address:', address, 'total products:', products.length);
+
+    // 주소가 선택되지 않았으면 모든 상품 반환
+    if (!address || !address.latitude || !address.longitude) {
+      console.log('[HomePage] No address selected, returning all products');
+      return products;
+    }
+
+    // 선택된 주소로부터 MAX_DISTANCE_KM 이내의 상품만 필터링
+    const filtered = products.filter(product => {
+      // 상품에 위치 정보가 없으면 제외
+      if (!product.latitude || !product.longitude) {
+        return false;
+      }
+
+      const distance = calculateDistance(
+        address.latitude,
+        address.longitude,
+        product.latitude,
+        product.longitude
+      );
+
+      return distance <= MAX_DISTANCE_KM;
+    });
+
+    console.log('[HomePage] Filtered products:', filtered.length, 'out of', products.length);
+    return filtered;
+  };
 
   // 찜한 상품 목록 불러오기
   const fetchFavorites = async (userId?: number | null) => {
@@ -104,7 +146,11 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
       }
 
       const newProducts = response.products || [];
-      setProducts(newProducts);
+      setAllProducts(newProducts);
+
+      // 위치 필터링 적용
+      const filtered = filterProductsByLocation(newProducts, selectedAddress);
+      setProducts(filtered);
 
       // 30개 미만이면 더 이상 로드할 데이터가 없음
       if (newProducts.length < 30) {
@@ -155,7 +201,12 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
       const newProducts = response.products || [];
 
       if (newProducts.length > 0) {
-        setProducts(prev => [...prev, ...newProducts]);
+        const updatedAll = [...allProducts, ...newProducts];
+        setAllProducts(updatedAll);
+
+        // 위치 필터링 적용
+        const filtered = filterProductsByLocation(updatedAll, selectedAddress);
+        setProducts(filtered);
         setCurrentPage(nextPage);
       }
 
@@ -187,9 +238,21 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
   }, []);
 
   // 카테고리, 정렬 옵션, 검색어 변경 시 상품 목록 다시 불러오기
+  // 단, 초기 로딩 시에는 주소가 로드될 때까지 대기
   useEffect(() => {
-    fetchProducts();
-  }, [selectedCategory, sortBy, searchQuery]);
+    if (addressesLoaded) {
+      console.log('[HomePage] Fetching products (addressesLoaded=true)');
+      fetchProducts();
+    } else {
+      console.log('[HomePage] Waiting for addresses to load...');
+    }
+  }, [selectedCategory, sortBy, searchQuery, addressesLoaded]);
+
+  // 선택된 주소 변경 시 필터링 다시 적용
+  useEffect(() => {
+    const filtered = filterProductsByLocation(allProducts, selectedAddress);
+    setProducts(filtered);
+  }, [selectedAddress]);
 
   // 무한 스크롤을 위한 observer ref
   const observer = useRef<IntersectionObserver | null>(null);
@@ -213,6 +276,47 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
     [loading, hasMore, loadMoreProducts]
   );
 
+  // 저장된 주소 목록 불러오기
+  const loadMyAddresses = async () => {
+    const user = authApi.getCurrentUser();
+    if (!user) {
+      setAddressesLoaded(true);
+      return;
+    }
+
+    try {
+      console.log('[HomePage] Loading addresses...');
+      const addresses = await addressApi.getMyAddresses();
+      console.log('[HomePage] Addresses loaded:', addresses);
+      setMyAddresses(addresses);
+
+      // 기본 주소를 자동 선택 (isDefault가 true인 주소)
+      const defaultAddress = addresses.find(addr => addr.isDefault);
+      if (defaultAddress) {
+        console.log('[HomePage] Auto-selecting default address:', defaultAddress);
+        setSelectedAddress(defaultAddress);
+        setCurrentLocation(defaultAddress.locationNm);
+      } else if (addresses.length > 0 && !selectedAddress) {
+        // 기본 주소가 없으면 첫 번째 주소 선택
+        console.log('[HomePage] No default address, selecting first:', addresses[0]);
+        setSelectedAddress(addresses[0]);
+        setCurrentLocation(addresses[0].locationNm);
+      }
+      setAddressesLoaded(true);
+    } catch (error) {
+      console.error('주소 목록 로드 실패:', error);
+      setAddressesLoaded(true);
+    }
+  };
+
+  // 선택된 위치 변경 핸들러
+  const handleLocationChange = (address: Address | null) => {
+    setSelectedAddress(address);
+    if (address) {
+      setCurrentLocation(address.locationNm);
+    }
+  };
+
   const handleUseCurrentLocation = async () => {
     setIsFetchingLocation(true);
     try {
@@ -235,6 +339,32 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
       setIsFetchingLocation(false);
     }
   };
+
+  // 로그인 시 주소 목록 로드 (auth-change 이벤트 listen)
+  useEffect(() => {
+    const handleAuthChange = () => {
+      const user = authApi.getCurrentUser();
+      const isAuth = authApi.isAuthenticated();
+
+      console.log('[HomePage] Auth changed - user:', user, 'isAuth:', isAuth);
+
+      if (user && isAuth) {
+        loadMyAddresses();
+      } else {
+        // 로그아웃 시 주소 목록 초기화
+        setMyAddresses([]);
+        setSelectedAddress(null);
+        setCurrentLocation("광주광역시 동구 동명동");
+      }
+    };
+
+    // 초기 로드
+    handleAuthChange();
+
+    // auth-change 이벤트 구독
+    window.addEventListener('auth-change', handleAuthChange);
+    return () => window.removeEventListener('auth-change', handleAuthChange);
+  }, []);
 
   return (
     <div className="min-h-screen pb-20 md:pb-8">
@@ -269,22 +399,20 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
           <Button
             variant="ghost"
             className="h-auto p-0 hover:bg-transparent max-w-full"
-            onClick={handleUseCurrentLocation}
-            disabled={isFetchingLocation}
+            onClick={() => {
+              const user = authApi.getCurrentUser();
+              if (!user) {
+                toast.error('로그인 후 이용해주세요.');
+                onNavigate('login');
+                return;
+              }
+              setShowLocationModal(true);
+            }}
           >
-            {isFetchingLocation ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin text-primary" />
-                <span>현재 위치 가져오는 중...</span>
-              </>
-            ) : (
-              <>
-                <MapPin className="mr-2 h-4 w-4 text-primary" />
-                <span className="max-w-[70vw] md:max-w-[400px] truncate text-foreground text-sm text-left">
-                  {currentLocation}
-                </span>
-              </>
-            )}
+            <MapPin className="mr-2 h-4 w-4 text-primary" />
+            <span className="max-w-[70vw] md:max-w-[400px] truncate text-foreground text-sm text-left">
+              {currentLocation}
+            </span>
           </Button>
 
           {/* Sort Dropdown */}
@@ -428,6 +556,14 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
       >
         <Plus className="h-6 w-6" />
       </button>
+
+      {/* Location Select Modal */}
+      <LocationSelectModal
+        open={showLocationModal}
+        onClose={() => setShowLocationModal(false)}
+        onLocationChange={handleLocationChange}
+        onNavigateToLocationSelect={() => onNavigate('address/add')}
+      />
     </div>
   );
 }

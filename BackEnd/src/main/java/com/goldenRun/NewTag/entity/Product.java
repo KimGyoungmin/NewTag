@@ -58,6 +58,18 @@ public class Product {
     @Builder.Default
     private List<ProductImage> images = new ArrayList<>();
 
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Favorite> favorites = new ArrayList<>();
+
+    @OneToMany(mappedBy = "product", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Transaction> transactions = new ArrayList<>();
+
+    @OneToMany(mappedBy = "clickedProduct", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<SearchLog> searchLogs = new ArrayList<>();
+
     public void increaseView(){ this.view_count = (this.view_count == null ? 1 : this.view_count + 1); }
 
     @PrePersist void prePersist(){

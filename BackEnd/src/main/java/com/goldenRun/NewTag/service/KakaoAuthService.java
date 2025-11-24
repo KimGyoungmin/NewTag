@@ -216,7 +216,7 @@ public class KakaoAuthService {
                 .profileImg(profileImg)
                 .role(Role.USER)
                 .isDelete(false)
-                .trust(50.0)  // 기본 신뢰도
+                .trust(0.0)  // 기본 신뢰도
                 .emailVerified(kakaoUserInfo.getEmail() != null)  // 이메일이 있으면 인증된 것으로 간주
                 .phoneVerified(false)  // 카카오에서는 전화번호 정보 제공 안함
                 .build();

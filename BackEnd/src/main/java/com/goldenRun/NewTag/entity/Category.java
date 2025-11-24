@@ -3,6 +3,8 @@ package com.goldenRun.NewTag.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter @Setter @Builder
 @NoArgsConstructor @AllArgsConstructor
@@ -20,6 +22,10 @@ public class Category {
 
     @Column(nullable=false)
     private LocalDateTime updatedAt;
+
+    @OneToMany(mappedBy = "category", cascade = CascadeType.PERSIST)
+    @Builder.Default
+    private List<Product> products = new ArrayList<>();
 
     @PrePersist void prePersist(){ createdAt = updatedAt = LocalDateTime.now(); }
     @PreUpdate void preUpdate(){ updatedAt = LocalDateTime.now(); }

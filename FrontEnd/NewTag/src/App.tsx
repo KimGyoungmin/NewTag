@@ -17,6 +17,7 @@ import { KakaoCallbackPage } from "./pages/KakaoCallbackPage";
 import { authApi } from "./api/auth";
 import type { ResellProductRecord } from "./data/resellProducts";
 import { LocationSelectPage } from "./pages/LocationSelectPage";
+import { AddressAddPage } from "./pages/AddressAddPage";
 import {
   ProductDetailWrapper,
   ProductEditWrapper,
@@ -138,6 +139,7 @@ export default function App() {
     '/product/select-buyer/',
     '/product/register',
     '/product/location',
+    '/address/add',
   ];
 
 
@@ -260,6 +262,10 @@ export default function App() {
               <Route
                 path="/product/location"
                 element={<LocationSelectPage />}
+              />
+              <Route
+                path="/address/add"
+                element={<AddressAddPage />}
               />
               <Route
                 path="/product-edit/:id"

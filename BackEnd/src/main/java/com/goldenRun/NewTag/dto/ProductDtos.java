@@ -50,6 +50,8 @@ public class ProductDtos {
         private String title;
         private Double price;
         private String locationNm;
+        private Double latitude;
+        private Double longitude;
         private LocalDateTime createdAt;
         private Integer viewCount;
         private Long favoriteCount;
