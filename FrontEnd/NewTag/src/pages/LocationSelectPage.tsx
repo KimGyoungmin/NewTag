@@ -92,26 +92,42 @@ export function LocationSelectPage() {
   };
 
   const handleSearch = async () => {
+    console.log('[LocationSelect] handleSearch called');
     const query = searchQuery.trim();
+    console.log('[LocationSelect] Search query:', query);
+
     if (!query) {
+      console.log('[LocationSelect] Empty query, showing error');
       toast.error("검색어를 입력해 주세요.");
       return;
     }
 
+    console.log('[LocationSelect] Starting search...');
     setIsSearching(true);
     try {
+      console.log('[LocationSelect] Calling getCoordsFromAddress with:', query);
       const coords = await getCoordsFromAddress(query);
+      console.log('[LocationSelect] Got coords:', coords);
+
+      console.log('[LocationSelect] Calling getAddressFromCoords with:', coords.lat, coords.lng);
       const address = await getAddressFromCoords(coords.lat, coords.lng);
+      console.log('[LocationSelect] Got address:', address);
 
       setLatitude(coords.lat);
       setLongitude(coords.lng);
       setLocationName(address || query);
+      console.log('[LocationSelect] Search successful, location set to:', address || query);
       toast.success("검색한 위치로 이동했습니다.");
     } catch (error) {
-      console.error("Search failed:", error);
+      console.error('[LocationSelect] Search failed with error:', error);
+      console.error('[LocationSelect] Error details:', {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined
+      });
       toast.error("검색 결과를 찾지 못했습니다.");
     } finally {
       setIsSearching(false);
+      console.log('[LocationSelect] Search completed, isSearching set to false');
     }
   };
 
