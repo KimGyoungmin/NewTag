@@ -23,6 +23,10 @@ public class Address {
     @Column(precision = 10, scale = 7, nullable = false)
     private BigDecimal longitude;
 
+    @Column(name = "is_default", nullable = false, columnDefinition = "BOOLEAN DEFAULT FALSE")
+    @Builder.Default
+    private Boolean isDefault = false;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "user_id", nullable = false,
             foreignKey = @ForeignKey(name = "FK_user_TO_address"))

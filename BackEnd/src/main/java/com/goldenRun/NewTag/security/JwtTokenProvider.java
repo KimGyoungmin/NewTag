@@ -10,6 +10,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import com.goldenRun.NewTag.Repository.UserRepository;
@@ -76,7 +77,14 @@ public class JwtTokenProvider {
 		List<GrantedAuthority> authorities = new ArrayList<>();
 		authorities.add(new SimpleGrantedAuthority("ROLE_" + user.getRole().name()));
 
-		return new UsernamePasswordAuthenticationToken(nick, null, authorities);
+		// Spring Security의 UserDetails 객체 생성
+		UserDetails userDetails = org.springframework.security.core.userdetails.User.builder()
+				.username(nick)
+				.password("") // 비밀번호는 JWT 인증에서 사용하지 않으므로 빈 문자열
+				.authorities(authorities)
+				.build();
+
+		return new UsernamePasswordAuthenticationToken(userDetails, null, authorities);
 	}
 
 	public String getUserPk(String token) {

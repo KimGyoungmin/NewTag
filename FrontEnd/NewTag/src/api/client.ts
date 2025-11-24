@@ -30,16 +30,14 @@ const refreshAccessToken = async (): Promise<string | null> => {
     refreshPromise = refreshClient
       .post('/auth/refresh')
       .then((response) => {
-        const { token, user } = response.data || {};
+        const { token } = response.data || {};
         if (token) {
-          // Access Token만 갱신 (사용자 정보는 기존 것 유지)
-          if (user) {
-            tokenManager.setSession(token, user);
-          } else {
-            tokenManager.setAccessToken(token);
-          }
+          // Access Token만 갱신 (auth-change 이벤트 발생시키지 않음)
+          console.log('[API] Token refreshed successfully');
+          tokenManager.setAccessToken(token);
           return token as string;
         }
+        console.warn('[API] No token in refresh response');
         tokenManager.clearSession();
         return null;
       })
@@ -58,8 +56,14 @@ const refreshAccessToken = async (): Promise<string | null> => {
 apiClient.interceptors.request.use(
   (config) => {
     const token = tokenManager.getAccessToken();
+    console.log('[API Client] Request interceptor - URL:', config.url);
+    console.log('[API Client] Token from tokenManager:', token ? `${token.substring(0, 20)}...` : 'null');
+
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
+      console.log('[API Client] Authorization header set');
+    } else {
+      console.log('[API Client] No token or no headers - Authorization not set');
     }
     return config;
   },

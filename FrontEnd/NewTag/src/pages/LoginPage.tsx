@@ -51,6 +51,9 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
         password,
       });
 
+      console.log('[Login] Response:', response);
+      console.log('[Login] Token stored:', localStorage.getItem('access_token'));
+
       if (response.success) {
         toast.success("로그인에 성공했어요!");
         onNavigate("home");
