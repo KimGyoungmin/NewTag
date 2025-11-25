@@ -160,6 +160,58 @@ public class UserService {
 	    }
 	}
 
+	public ResponseEntity<?> updateUser(UserDtos.UpdateRequest request, String currentUserNick) {
+		if (!StringUtils.hasText(currentUserNick)) {
+			return unauthorizedResponse();
+		}
+
+		User user = repository.findByNick(currentUserNick);
+		if (user == null) {
+			return unauthorizedResponse();
+		}
+
+		// 닉네임 변경 시 중복 검사
+		if (StringUtils.hasText(request.getNick()) && !request.getNick().equals(user.getNick())) {
+			if (repository.existsByNick(request.getNick())) {
+				return ResponseEntity.status(HttpStatus.CONFLICT)
+						.body(Map.of("success", false, "message", "이미 사용중인 닉네임입니다."));
+			}
+			user.setNick(request.getNick());
+		}
+
+		// 이메일 변경 시 중복 검사
+		if (StringUtils.hasText(request.getEmail()) && !request.getEmail().equals(user.getEmail())) {
+			if (repository.existsByEmail(request.getEmail())) {
+				return ResponseEntity.status(HttpStatus.CONFLICT)
+						.body(Map.of("success", false, "message", "이미 사용중인 이메일입니다."));
+			}
+			user.setEmail(request.getEmail());
+		}
+
+		if (StringUtils.hasText(request.getName())) {
+			user.setName(request.getName());
+		}
+
+		if (StringUtils.hasText(request.getPhone())) {
+			user.setPhone(request.getPhone());
+		}
+
+		if (request.getBirth() != null) {
+			user.setBirth(request.getBirth());
+		}
+
+		if (StringUtils.hasText(request.getProfileImg())) {
+			user.setProfileImg(request.getProfileImg());
+		}
+
+		User saved = repository.save(user);
+
+		return ResponseEntity.ok(Map.of(
+				"success", true,
+				"user", UserDtos.SimpleResponse.from(saved)
+		));
+	}
+
 	private ResponseCookie buildRefreshTokenCookie(String value, long maxAgeMillis) {
 		// ResponseCookie.Builder builder = ResponseCookie.from(REFRESH_TOKEN_COOKIE, value)
 		ResponseCookieBuilder builder = ResponseCookie.from(REFRESH_TOKEN_COOKIE, value)

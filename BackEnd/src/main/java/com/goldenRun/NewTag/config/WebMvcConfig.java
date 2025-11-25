@@ -16,6 +16,12 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Value("${app.upload.base-dir:BackEnd/src/main/resources/static}")
     private String uploadBaseDir;
 
+    @Value("${app.upload.profile-base-dir:BackEnd/src/main/resources/userprofile}")
+    private String profileBaseDir;
+
+    @Value("${app.upload.profile-dir:userprofile}")
+    private String profileDir;
+
     private static final Logger log = LoggerFactory.getLogger(WebMvcConfig.class);
 
     @Override
@@ -28,5 +34,15 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .setCachePeriod(3600);
 
         log.info("Static resources configured: /api/v1/static/** -> {}, classpath:/static/", fileLocation);
+
+        Path profilePath = Paths.get(profileBaseDir).toAbsolutePath().normalize();
+        String profileLocation = profilePath.toUri().toString();
+        String profilePattern = "/api/v1/" + profileDir + "/**";
+
+        registry.addResourceHandler(profilePattern)
+                .addResourceLocations(profileLocation)
+                .setCachePeriod(3600);
+
+        log.info("Profile resources configured: {} -> {}", profilePattern, profileLocation);
     }
 }
