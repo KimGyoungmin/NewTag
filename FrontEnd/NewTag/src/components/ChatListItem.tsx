@@ -1,5 +1,4 @@
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { Badge } from "./ui/badge";
 import { ImageWithFallback } from "./figma/ImageWithFallback";
 
 interface ChatListItemProps {
@@ -45,12 +44,12 @@ export function ChatListItem({
 
       <div className="flex-1 min-w-0">
         <div className="flex items-center justify-between mb-1">
-          <span className={unreadCount > 0 ? '' : 'text-muted-foreground'}>
+          <span className={`${unreadCount > 0 ? 'font-bold text-foreground' : 'text-muted-foreground'}`}>
             {userName}
           </span>
           <span className="text-xs text-muted-foreground">{lastMessageTime}</span>
         </div>
-        <p className={`truncate text-sm ${unreadCount > 0 ? '' : 'text-muted-foreground'}`}>
+        <p className={`truncate text-sm ${unreadCount > 0 ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
           {lastMessage}
         </p>
       </div>

@@ -41,6 +41,7 @@ import { favoriteApi } from "../api/favoriteApi";
 import { productApi } from "../api/productApi";
 import { reviewApi } from "../api/reviewApi";
 import { authApi } from "../api/auth";
+import { userApi } from "../api/userApi";
 import { resolveImageUrl } from "../utils/image";
 import {
   UserProfile,
@@ -140,6 +141,7 @@ const buildProfileFromAuth = (fallback?: UserProfile): UserProfile => {
       name: authUser.name || authUser.nick || fallback?.name || "사용자",
       nickname: authUser.nick || fallback?.nickname || "",
       profileImage: resolveImageUrl(authUser.profileImg),
+      phone: authUser.phone || fallback?.phone || "",
       email: authUser.email || fallback?.email || "",
     };
   }
@@ -369,9 +371,30 @@ export function MyPage({ onNavigate }: MyPageProps) {
     }
   };
 
-  const handleProfileSave = (profile: UserProfile) => {
-    setUserProfile(profile);
-    setUserProfileState(profile);
+  const handleProfileSave = async (profile: UserProfile) => {
+    try {
+      const response = await userApi.updateProfile({
+        name: profile.name,
+        nickname: profile.nickname,
+        phone: profile.phone,
+        profileImage: profile.profileImage,
+        email: profile.email,
+      });
+      const updated = {
+        ...profile,
+        profileImage: resolveImageUrl(response?.user?.profileImg) || profile.profileImage,
+        phone: response?.user?.phone || profile.phone,
+        nickname: response?.user?.nick || profile.nickname,
+        name: response?.user?.name || profile.name,
+        email: response?.user?.email || profile.email,
+      };
+      setUserProfile(updated);
+      setUserProfileState(updated);
+      toast.success("프로필이 수정되었습니다.");
+    } catch (error) {
+      console.error("Failed to update profile", error);
+      toast.error("프로필 수정에 실패했습니다.");
+    }
   };
 
   const handleStatusChange = async (productId: string, newStatus: UiProductStatus) => {

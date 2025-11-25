@@ -133,6 +133,31 @@ public class ProductDtos {
         private DetailResponse product;
         private Long transactionId;
     }
+
+    // DTO Projection 인터페이스 (N+1 최적화)
+    public interface ProductListProjection {
+        Long getId();
+        String getTitle();
+        Double getPrice();
+        String getLocationNm();
+        Double getLatitude();
+        Double getLongitude();
+        LocalDateTime getCreatedAt();
+        Integer getViewCount();
+        Boolean getIsResell();
+
+        // Seller 정보
+        Long getSellerId();
+        String getSellerNick();
+        String getSellerName();
+
+        // Category 정보
+        Long getCategoryId();
+        String getCategoryName();
+
+        // Main Image 정보
+        String getMainImagePath();
+    }
 }
 
 

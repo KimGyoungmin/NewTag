@@ -56,7 +56,7 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
     return () => window.removeEventListener("auth-change", updateUser);
   }, []);
 
-  // 채팅방 정보 불러오기
+  // 채팅방 정보 로드
   useEffect(() => {
     (async () => {
       try {
@@ -104,6 +104,9 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
     if (isInitial) {
       el.scrollTop = el.scrollHeight;
       firstScrollDone.current = true;
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight;
+      });
     } else {
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     }
@@ -116,7 +119,7 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
     }
   }, [chatId, currentUser, messages.length]);
 
-  // 리뷰 작성 여부 조회 (중복 작성 방지)
+  // 리뷰 작성 여부 조회
   useEffect(() => {
     const fetchStatuses = async () => {
       if (!currentUser) return;
@@ -214,8 +217,8 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
 
   return (
     <div className="fixed inset-0 flex flex-col bg-background overflow-hidden">
-      {/* Header (뷰포트 고정) */}
-      <div className="sticky top-0 flex items-center justify-between border-b bg-background px-4 h-14 shrink-0 z-50">
+      {/* Header */}
+      <div className="flex items-center justify-between border-b bg-background px-4 h-14 shrink-0 z-50">
         <div className="flex items-center gap-3 flex-1">
           <Button variant="ghost" size="icon" onClick={() => onNavigate("chat")}>
             <ChevronLeft className="h-5 w-5" />
@@ -256,8 +259,8 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
         </AlertDialog>
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col">
-        {/* Product Info Card */}
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden pb-24">
+        {/* Product Info */}
         {room && (
           <div className="border-b bg-card px-4 py-3 shrink-0">
             <div className="flex items-center gap-3">
@@ -323,7 +326,7 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
                                 ? msg.reviewPayload!
                                 : {
                                     ...msg.reviewPayload!,
-                                    targetId: msg.reviewPayload!.buyerId, // 판매자가 구매자에게 후기 작성
+                                    targetId: msg.reviewPayload!.buyerId,
                                   }
                             )
                           }
@@ -342,8 +345,8 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
         </div>
       </div>
 
-      {/* Input Area (화면 하단 고정) */}
-      <div className="shrink-0 border-t bg-background p-4">
+      {/* Input */}
+      <div className="fixed bottom-0 left-0 right-0 border-t bg-background p-4 z-50">
         <div className="flex items-center gap-2">
           <Input
             type="text"

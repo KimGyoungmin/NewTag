@@ -115,6 +115,23 @@ export function ResellPage({ onNavigate, products, onProductsChange }: ResellPag
     return deduped.length ? deduped : ["dataset"];
   }, [normalizedProducts]);
 
+  const { topGainers, topLosers } = useMemo(() => {
+    const withPrediction = normalizedProducts
+      .map((p) => {
+        const next = p.predictions && p.predictions[0]?.predictedPrice;
+        if (typeof next !== "number" || p.currentPrice <= 0) return null;
+        const change = ((next - p.currentPrice) / p.currentPrice) * 100;
+        return { ...p, displayName: (p as any).displayName || p.name, predictedChange: change, nextPrice: next };
+      })
+      .filter((p): p is ResellProductRecord & { displayName: string; predictedChange: number; nextPrice: number } => !!p);
+
+    const sorted = [...withPrediction].sort((a, b) => b.predictedChange - a.predictedChange);
+    return {
+      topGainers: sorted.slice(0, 3),
+      topLosers: sorted.slice(-3).reverse(),
+    };
+  }, [normalizedProducts]);
+
   const toggleBrand = (brand: string) => {
     setSelectedBrands((prev) =>
       prev.includes(brand) ? prev.filter((item) => item !== brand) : [...prev, brand],
@@ -162,6 +179,68 @@ export function ResellPage({ onNavigate, products, onProductsChange }: ResellPag
       </div>
 
       <div className="container mx-auto max-w-6xl px-4 py-6 space-y-6">
+        {(topGainers.length > 0 || topLosers.length > 0) && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="p-4 bg-white">
+              <p className="text-sm font-semibold text-emerald-600 mb-2">오늘의 급등 예측 TOP 3</p>
+              <div className="space-y-3">
+                {topGainers.length === 0 && <p className="text-sm text-muted-foreground">예측 데이터가 없습니다.</p>}
+                {topGainers.map((item) => (
+                  <div
+                    key={`up-${item.id}`}
+                    className="flex items-center justify-between rounded-lg bg-white px-3 py-2 shadow-sm cursor-pointer hover:shadow transition border"
+                    onClick={() => onNavigate("resell-detail", item.id)}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="h-12 w-12 rounded-lg overflow-hidden bg-muted border">
+                        <ImageWithFallback src={item.image} alt={item.displayName} className="h-full w-full object-cover" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{item.displayName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          현재 ₩{item.currentPrice.toLocaleString("ko-KR")} → 예측 ₩{item.nextPrice.toLocaleString("ko-KR")}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right text-emerald-600 text-sm font-semibold">
+                      +{item.predictedChange.toFixed(1)}%
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            <Card className="p-4 bg-white">
+              <p className="text-sm font-semibold text-rose-600 mb-2">오늘의 급락 예측 TOP 3</p>
+              <div className="space-y-3">
+                {topLosers.length === 0 && <p className="text-sm text-muted-foreground">예측 데이터가 없습니다.</p>}
+                {topLosers.map((item) => (
+                  <div
+                    key={`down-${item.id}`}
+                    className="flex items-center justify-between rounded-lg bg-white px-3 py-2 shadow-sm cursor-pointer hover:shadow transition border"
+                    onClick={() => onNavigate("resell-detail", item.id)}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="h-12 w-12 rounded-lg overflow-hidden bg-muted border">
+                        <ImageWithFallback src={item.image} alt={item.displayName} className="h-full w-full object-cover" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium">{item.displayName}</p>
+                        <p className="text-xs text-muted-foreground">
+                          현재 ₩{item.currentPrice.toLocaleString("ko-KR")} → 예측 ₩{item.nextPrice.toLocaleString("ko-KR")}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right text-rose-600 text-sm font-semibold">
+                      {item.predictedChange.toFixed(1)}%
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredProducts.map((product) => {
             const priceHistory = product.priceHistory.slice(0, MAX_HISTORY_LIMIT);

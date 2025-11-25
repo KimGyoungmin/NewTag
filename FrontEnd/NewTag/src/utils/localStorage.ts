@@ -47,7 +47,8 @@ export interface UserProfile {
   name: string;
   nickname: string;
   profileImage: string;
-  email: string;
+  phone?: string;
+  email?: string;
 }
 
 /** 채팅 메시지 인터페이스 */
@@ -237,6 +238,7 @@ export const getUserProfile = (): UserProfile => {
     name: '홍길동',
     nickname: '길동이',
     profileImage: 'https://images.unsplash.com/photo-1640960543409-dbe56ccc30e2?w=200',
+    phone: '010-0000-0000',
     email: 'user@newtag.com'
   };
 };
