@@ -46,6 +46,7 @@ public class SecurityConfig {
                 // 정적 리소스 (이미지 등) 접근 허용
                 .requestMatchers("/api/v1/static/**").permitAll()
                 .requestMatchers("/static/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/userprofile/**").permitAll()
                 // 이미지 업로드 (모든 메서드 임시 허용 - 개발용)
                 .requestMatchers("/api/v1/uploads/**").permitAll()
                 // 공개 엔드포인트
