@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from process_images import (
@@ -21,7 +21,29 @@ from process_images import (
 
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parent.parent
-STATIC_ROOT = Path(os.getenv("STATIC_ROOT", PROJECT_ROOT / "static")).resolve()
+
+# 환경 변수 확인 로그
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# .env 파일 명시적으로 로드
+from process_images import bootstrap_env
+bootstrap_env()
+
+# STATIC_ROOT 동적 계산: 환경 변수가 없으면 프로젝트 구조 기반으로 자동 설정
+static_env = os.getenv("STATIC_ROOT")
+if static_env:
+    STATIC_ROOT = Path(static_env).resolve()
+    logger.info(f"[Startup] STATIC_ROOT from env: {STATIC_ROOT}")
+else:
+    # PROJECT_ROOT/BackEnd/src/main/resources/static 경로 자동 계산
+    STATIC_ROOT = (PROJECT_ROOT / "BackEnd" / "src" / "main" / "resources" / "static").resolve()
+    logger.info(f"[Startup] STATIC_ROOT auto-detected: {STATIC_ROOT}")
+
+logger.info(f"[Startup] BASE_DIR: {BASE_DIR}")
+logger.info(f"[Startup] PROJECT_ROOT: {PROJECT_ROOT}")
+logger.info(f"[Startup] STATIC_ROOT final: {STATIC_ROOT}")
 
 app = FastAPI(title="Image Listing Generator", version="1.0.0")
 
@@ -96,8 +118,34 @@ def _startup() -> None:
     _PIPELINE_CONFIG = _build_config()
 
 
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    import logging
+    logger = logging.getLogger("uvicorn")
+
+    if request.url.path == "/auto-listing":
+        body = await request.body()
+        logger.info(f"[Middleware] Raw request body: {body.decode('utf-8')}")
+        logger.info(f"[Middleware] Content-Type: {request.headers.get('content-type')}")
+        logger.info(f"[Middleware] Headers: {dict(request.headers)}")
+
+        # Body를 다시 사용할 수 있도록 request를 재구성
+        async def receive():
+            return {"type": "http.request", "body": body}
+
+        request._receive = receive
+
+    response = await call_next(request)
+    return response
+
+
 @app.post("/auto-listing", response_model=AutoListingResponse)
-def auto_listing(payload: AutoListingRequest) -> AutoListingResponse:
+async def auto_listing(payload: AutoListingRequest) -> AutoListingResponse:
+    import logging
+    logger = logging.getLogger("uvicorn")
+    logger.info(f"[AutoListing] Received payload: {payload}")
+    logger.info(f"[AutoListing] Image paths: {payload.image_paths}")
+
     if not _PIPELINE_CONFIG:
         raise HTTPException(status_code=500, detail="Pipeline not initialized.")
 

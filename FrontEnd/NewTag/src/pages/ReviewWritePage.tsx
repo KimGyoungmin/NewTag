@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+﻿import { useMemo, useState } from "react";
 import { ChevronLeft, Star } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Textarea } from "../components/ui/textarea";
@@ -18,19 +18,16 @@ export function ReviewWritePage({ payload, onNavigate }: ReviewWritePageProps) {
   const [content, setContent] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
-  const productImage = useMemo(
-    () => resolveImageUrl(payload?.sellerProfileImg),
-    [payload]
-  );
+  const productImage = useMemo(() => resolveImageUrl(payload?.sellerProfileImg), [payload]);
 
   const handleSubmit = async () => {
     if (!payload?.transactionId || !payload?.targetId) {
-      toast.error("리뷰 정보를 확인할 수 없습니다.");
+      toast.error("필수 정보가 없어 리뷰를 저장할 수 없습니다.");
       return;
     }
 
     if (!content.trim()) {
-      toast.error("리뷰 내용을 입력해 주세요.");
+      toast.error("내용을 입력해 주세요.");
       return;
     }
 
@@ -42,7 +39,7 @@ export function ReviewWritePage({ payload, onNavigate }: ReviewWritePageProps) {
         rating,
         content: content.trim(),
       });
-      toast.success("리뷰가 등록되었습니다.");
+      toast.success("리뷰가 저장되었습니다.");
       if (payload.chatId) {
         onNavigate("chatroom", payload.chatId);
       } else if (payload.productId) {
@@ -52,7 +49,7 @@ export function ReviewWritePage({ payload, onNavigate }: ReviewWritePageProps) {
       }
     } catch (error) {
       console.error("Failed to submit review", error);
-      toast.error("리뷰 등록 중 문제가 발생했습니다.");
+      toast.error("리뷰 저장 중 오류가 발생했습니다.");
     } finally {
       setSubmitting(false);
     }
@@ -69,7 +66,7 @@ export function ReviewWritePage({ payload, onNavigate }: ReviewWritePageProps) {
           <div className="w-10" />
         </div>
         <div className="flex flex-col items-center justify-center flex-1 p-8 text-center gap-4">
-          <p className="text-muted-foreground">리뷰 정보를 불러올 수 없습니다.</p>
+          <p className="text-muted-foreground">리뷰를 작성할 정보를 찾을 수 없습니다.</p>
           <Button onClick={() => onNavigate("home")}>홈으로 돌아가기</Button>
         </div>
       </div>
@@ -127,9 +124,9 @@ export function ReviewWritePage({ payload, onNavigate }: ReviewWritePageProps) {
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-2 block">리뷰 내용을 작성해 주세요</label>
+            <label className="text-sm font-medium mb-2 block">거래 후기를 작성해 주세요</label>
             <Textarea
-              placeholder="친절한 거래 경험을 공유해 주세요."
+              placeholder="좋았던 점이나 개선이 필요한 점을 적어 주세요."
               value={content}
               onChange={(e) => setContent(e.target.value)}
               className="min-h-[180px] resize-none"
@@ -148,7 +145,7 @@ export function ReviewWritePage({ payload, onNavigate }: ReviewWritePageProps) {
               취소
             </Button>
             <Button onClick={handleSubmit} disabled={submitting}>
-              {submitting ? "등록 중..." : "리뷰 등록"}
+              {submitting ? "저장 중..." : "리뷰 저장"}
             </Button>
           </div>
         </div>

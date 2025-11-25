@@ -1,5 +1,6 @@
 import { apiClient } from '../services/api/client';
 import { Review, RatingSummary, PaginatedResponse } from '../types';
+import { reviewApi as internalReviewApi } from '../services/api/reviewApi';
 
 interface GetReviewsParams {
   page?: number;
@@ -47,6 +48,17 @@ export const reviewApi = {
         rating2Count: 0,
         rating1Count: 0,
       };
+    }
+  },
+
+  // 특정 거래에 대해 현재 사용자가 이미 리뷰를 작성했는지 확인
+  existsReview: async (transactionId: number): Promise<boolean> => {
+    try {
+      // 내부 공용 API 클라이언트 활용
+      return await internalReviewApi.existsReview(transactionId);
+    } catch (error) {
+      console.error("Failed to check review existence:", error);
+      return false;
     }
   },
 };

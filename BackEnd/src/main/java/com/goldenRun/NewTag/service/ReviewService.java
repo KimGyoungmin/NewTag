@@ -104,6 +104,25 @@ public class ReviewService {
     }
 
     /**
+     * 해당 거래에 대해 현재 사용자가 이미 리뷰를 작성했는지 확인
+     */
+    public boolean hasReview(Long transactionId, String currentUserNick) {
+        if (!StringUtils.hasText(currentUserNick)) {
+            throw new AccessDeniedException("로그인이 필요합니다.");
+        }
+        if (transactionId == null) {
+            throw new IllegalArgumentException("거래 정보가 필요합니다.");
+        }
+
+        User writer = userRepository.findByNick(currentUserNick);
+        if (writer == null) {
+            throw new AccessDeniedException("사용자 정보를 찾을 수 없습니다.");
+        }
+
+        return reviewRepository.existsByTransactionIdAndWriterId(transactionId, writer.getId());
+    }
+
+    /**
      * 리뷰 생성
      */
     @Transactional
