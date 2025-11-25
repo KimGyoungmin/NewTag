@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -193,9 +194,9 @@ public class ProductController {
     @PostMapping
     public ResponseEntity<ProductDtos.DetailResponse> createProduct(
             @RequestBody ProductDtos.CreateRequest request,
-            @AuthenticationPrincipal String currentUserNick
+            @AuthenticationPrincipal UserDetails userDetails
     ) {
-        ProductDtos.DetailResponse created = productService.createProduct(request, currentUserNick);
+        ProductDtos.DetailResponse created = productService.createProduct(request, userDetails.getUsername());
         return ResponseEntity.status(201).body(created);
     }
 
@@ -206,9 +207,9 @@ public class ProductController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> deleteProduct(
             @PathVariable Long id,
-            @AuthenticationPrincipal String currentUserNick
+            @AuthenticationPrincipal UserDetails userDetails
     ) {
-        productService.deleteProduct(id, currentUserNick);
+        productService.deleteProduct(id, userDetails.getUsername());
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "상품이 삭제되었습니다."
@@ -219,12 +220,12 @@ public class ProductController {
     public ResponseEntity<ProductDtos.DetailResponse> updateStatus(
             @PathVariable Long id,
             @RequestBody ProductDtos.StatusUpdateRequest request,
-            @AuthenticationPrincipal String currentUserNick
+            @AuthenticationPrincipal UserDetails userDetails
     ) {
         if (request.getStatus() == null) {
             throw new IllegalArgumentException("변경할 상태를 선택해주세요.");
         }
-        ProductDtos.DetailResponse updated = productService.updateProductStatus(id, request.getStatus(), currentUserNick);
+        ProductDtos.DetailResponse updated = productService.updateProductStatus(id, request.getStatus(), userDetails.getUsername());
         return ResponseEntity.ok(updated);
     }
 
@@ -232,9 +233,9 @@ public class ProductController {
     public ResponseEntity<ProductDtos.CompleteSaleResponse> completeSale(
             @PathVariable Long id,
             @RequestBody ProductDtos.CompleteSaleRequest request,
-            @AuthenticationPrincipal String currentUserNick
+            @AuthenticationPrincipal UserDetails userDetails
     ) {
-        ProductDtos.CompleteSaleResponse response = productService.completeSale(id, request.getBuyerId(), currentUserNick);
+        ProductDtos.CompleteSaleResponse response = productService.completeSale(id, request.getBuyerId(), userDetails.getUsername());
         return ResponseEntity.ok(response);
     }
 }
