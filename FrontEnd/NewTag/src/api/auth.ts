@@ -96,4 +96,32 @@ export const authApi = {
     handleAuthSuccess(response.data);
     return response.data;
   },
+
+  /**
+   * 구글 로그인 - 인증 URL로 리다이렉트
+   */
+  loginWithGoogle: (): void => {
+    // @ts-ignore - Vite env
+    const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    const REDIRECT_URI = `${window.location.origin}/auth/google/callback`;
+
+    if (!GOOGLE_CLIENT_ID) {
+      throw new Error('구글 클라이언트 ID가 설정되지 않았습니다.');
+    }
+
+    // 구글 OAuth 인증 페이지로 리다이렉트
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=openid%20email%20profile`;
+    window.location.href = googleAuthUrl;
+  },
+
+  /**
+   * 구글 로그인 콜백 처리 - 인증 코드를 백엔드로 전송
+   */
+  handleGoogleCallback: async (code: string): Promise<LoginResponse> => {
+    const response = await api.get<LoginResponse>('/auth/google/callback', {
+      params: { code },
+    });
+    handleAuthSuccess(response.data);
+    return response.data;
+  },
 };

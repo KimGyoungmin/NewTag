@@ -50,7 +50,7 @@ public class SecurityConfig {
                 // 이미지 업로드 (모든 메서드 임시 허용 - 개발용)
                 .requestMatchers("/api/v1/uploads/**").permitAll()
                 // 공개 엔드포인트
-                .requestMatchers("/api/auth/**", "/api/health", "/api/test", "/api/encode-password", "/api/v1/login", "/api/v1/signup", "/api/v1/emailMatch", "/api/v1/idMatch", "/api/v1/auth/refresh", "/api/v1/auth/kakao/callback").permitAll()
+                .requestMatchers("/api/auth/**", "/api/health", "/api/test", "/api/encode-password", "/api/v1/login", "/api/v1/signup", "/api/v1/emailMatch", "/api/v1/idMatch", "/api/v1/auth/refresh", "/api/v1/auth/kakao/callback", "/api/v1/auth/google/callback").permitAll()
                 // 상품 관련 공개 API (로그인 없이 조회 가능)
                 .requestMatchers(HttpMethod.GET, "/api/v1/products", "/api/v1/products/**").permitAll()
                 // 리뷰 조회 공개 API (로그인 없이 조회 가능)
