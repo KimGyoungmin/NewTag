@@ -101,10 +101,17 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
     const el = messagesContainerRef.current;
     if (!el) return;
     const isInitial = !firstScrollDone.current;
+
     if (isInitial) {
+      // 초기 진입 시 즉시 맨 아래로 (애니메이션 없이)
       el.scrollTop = el.scrollHeight;
       firstScrollDone.current = true;
+      // DOM 렌더링 후 다시 한 번 확인
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight;
+      });
     } else {
+      // 새 메시지 시 부드럽게 스크롤
       el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
     }
   }, [messages]);
@@ -213,9 +220,12 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
   };
 
   return (
-    <div className="flex flex-col h-[100dvh] md:h-screen bg-background overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b bg-background px-4 h-14 shrink-0 sticky top-0 z-40">
+    <div className="flex flex-col h-[100dvh] md:h-screen bg-background">
+      {/* Empty Header Spacer - for fixed headers (user header 56px + product card ~68px) */}
+      <div className="h-[7.5rem] shrink-0"></div>
+
+      {/* User Header - Fixed below app header */}
+      <div className="flex items-center justify-between border-b bg-background px-4 h-14 shrink-0 fixed top-14 left-0 right-0 z-40">
         <div className="flex items-center gap-3 flex-1">
           <Button variant="ghost" size="icon" onClick={() => onNavigate("chat")}>
             <ChevronLeft className="h-5 w-5" />
@@ -256,34 +266,33 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
         </AlertDialog>
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-        {/* Product Info Card */}
-        {room && (
-          <div className="border-b bg-card px-4 py-3 shrink-0">
-            <div className="flex items-center gap-3">
-              <div
-                className="h-12 w-12 overflow-hidden rounded-lg border shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={() => onNavigate("detail", String(room.productId))}
-              >
-                <ImageWithFallback
-                  src={room.productImage}
-                  alt={room.productTitle}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <div
-                className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={() => onNavigate("detail", String(room.productId))}
-              >
-                <p className="truncate text-sm">{room.productTitle}</p>
-                <p className="text-sm">{room.productPrice?.toLocaleString()}원</p>
-              </div>
+      {/* Product Info Card - Fixed below user header */}
+      {room && (
+        <div className="border-b bg-card px-4 py-3 shrink-0 fixed top-28 left-0 right-0 z-30">
+          <div className="flex items-center gap-3">
+            <div
+              className="h-12 w-12 overflow-hidden rounded-lg border shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => onNavigate("detail", String(room.productId))}
+            >
+              <ImageWithFallback
+                src={room.productImage}
+                alt={room.productTitle}
+                className="h-full w-full object-cover"
+              />
+            </div>
+            <div
+              className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => onNavigate("detail", String(room.productId))}
+            >
+              <p className="truncate text-sm">{room.productTitle}</p>
+              <p className="text-sm">{room.productPrice?.toLocaleString()}원</p>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Messages */}
-        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+      {/* Messages */}
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 pt-2 pb-52 md:pb-6 space-y-4">
           {messages.map((msg) => {
             const isMine = currentUser && msg.senderId === currentUser.id;
             const reviewed =
@@ -338,28 +347,27 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
           })}
         </div>
 
-        {/* Input Area */}
-        <div className="border-t bg-background p-4 shrink-0 sticky bottom-0">
-          <div className="flex items-center gap-2">
-            <Input
-              type="text"
-              placeholder="메시지를 입력하세요"
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleSend();
-              }}
-              className="flex-1 bg-secondary border-0"
-            />
-            <Button
-              size="icon"
-              className="shrink-0 bg-primary hover:bg-primary/90"
-              onClick={handleSend}
-              disabled={!message.trim()}
-            >
-              <Send className="h-5 w-5" />
-            </Button>
-          </div>
+      {/* Input Area - Fixed above bottom nav */}
+      <div className="fixed bottom-14 md:relative md:bottom-0 left-0 right-0 border-t bg-background p-4 shrink-0 z-30">
+        <div className="flex items-center gap-2 max-w-screen-md mx-auto">
+          <Input
+            type="text"
+            placeholder="메시지를 입력하세요"
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleSend();
+            }}
+            className="flex-1 bg-secondary border-0"
+          />
+          <Button
+            size="icon"
+            className="shrink-0 bg-primary hover:bg-primary/90"
+            onClick={handleSend}
+            disabled={!message.trim()}
+          >
+            <Send className="h-5 w-5" />
+          </Button>
         </div>
       </div>
     </div>

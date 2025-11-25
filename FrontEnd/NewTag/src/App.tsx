@@ -14,6 +14,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { SignupPage } from "./pages/SignupPage";
 import { KakaoCallbackPage } from "./pages/KakaoCallbackPage";
 import { authApi } from "./api/auth";
+import { chatService } from "./services/firebase/chatService";
 import type { ResellProductRecord } from "./data/resellProducts";
 import { LocationSelectPage } from "./pages/LocationSelectPage";
 import { AddressAddPage } from "./pages/AddressAddPage";
@@ -49,6 +50,9 @@ export default function App() {
 
   /** 리셀 상품 데이터 (ResellPage와 ResellDetailPage 공유) */
   const [resellProducts, setResellProducts] = useState<ResellProductRecord[]>([]);
+
+  /** 안읽은 채팅 개수 */
+  const [unreadChatCount, setUnreadChatCount] = useState<number>(0);
 
   const navigate = useNavigate();
   const location = useLocation();
@@ -89,6 +93,7 @@ export default function App() {
         navigate('/login');
 
         setSearchQuery("");
+        setUnreadChatCount(0);
       }
     };
 
@@ -100,6 +105,37 @@ export default function App() {
       window.removeEventListener('auth-change', handleAuthChange);
     };
   }, [navigate, location.pathname]);
+
+  // ============================================
+  // 안읽은 채팅 개수 실시간 구독
+  // ============================================
+  useEffect(() => {
+    if (!isAuthenticated) {
+      console.log('[App] Not authenticated, setting unread count to 0');
+      setUnreadChatCount(0);
+      return;
+    }
+
+    const user = authApi.getCurrentUser();
+    if (!user) {
+      console.log('[App] No user found');
+      return;
+    }
+
+    console.log('[App] Subscribing to real-time unread count for user:', user.id);
+
+    // 실시간 구독 시작
+    const unsubscribe = chatService.subscribeToTotalUnreadCount(user.id, (count) => {
+      console.log('[App] Real-time unread count updated:', count);
+      setUnreadChatCount(count);
+    });
+
+    // 컴포넌트 언마운트 시 구독 해제
+    return () => {
+      console.log('[App] Unsubscribing from unread count');
+      unsubscribe();
+    };
+  }, [isAuthenticated]);
 
   // ============================================
   // 네비게이션 핸들러
@@ -331,6 +367,7 @@ export default function App() {
               navigate(`/${page}`);
             }
           }}
+          unreadChatCount={unreadChatCount}
         />
       )}
 
