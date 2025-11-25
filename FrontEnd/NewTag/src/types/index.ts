@@ -1,5 +1,5 @@
-// ============================================
-// ?�???�의 (DDL.sql 기반)
+﻿// ============================================
+// ????뺤쓽 (DDL.sql 湲곕컲)
 // ============================================
 
 export type UserRole = 'USER' | 'ADMIN';
@@ -7,7 +7,7 @@ export type SocialProvider = 'LOCAL' | 'GOOGLE' | 'KAKAO' | 'NAVER';
 export type ProductStatus = 'ON_SELL' | 'SOLD_OUT' | 'RESERVED';
 export type TransactionStatus = 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 
-// User ?�??
+// User ???
 export interface User {
   id: number;
   name: string;
@@ -27,13 +27,13 @@ export interface User {
   updatedAt: string;
   profileImg: string;
 
-  // ?�매???�점 ?�보 (?�품 ?�세?�서 ?�용)
+  // ?먮ℓ???됱젏 ?뺣낫 (?곹뭹 ?곸꽭?먯꽌 ?ъ슜)
   sellerRatingAvg?: number;
   sellerRatingCount?: number;
   sellerGrade?: string;
 }
 
-// Address ?�??
+// Address ???
 export interface Address {
   id: number;
   locationNm: string;
@@ -42,7 +42,7 @@ export interface Address {
   userId: number;
 }
 
-// Category ?�??
+// Category ???
 export interface Category {
   id: number;
   categoryNm: string;
@@ -50,7 +50,7 @@ export interface Category {
   updatedAt: string;
 }
 
-// Product ?�??
+// Product ???
 export interface Product {
   id: number;
   price: number;
@@ -67,17 +67,19 @@ export interface Product {
   updatedAt: string;
   sellerId: number;
   categoryId: number;
+  mainImage?: string;
+  thumbnailImage?: string;
 
-  // 조인???�이??(?�택??
+  // 議곗씤???곗씠??(?좏깮??
   seller?: User;
   category?: Category;
   images?: ProductImage[];
   isFavorite?: boolean;
   favoriteCount?: number;
-  likedByMe?: boolean; // ?�재 ?�용?��? 찜했?��? ?��?
+  likedByMe?: boolean; // ?꾩옱 ?ъ슜?먭? 李쒗뻽?붿? ?щ?
 }
 
-// Product Image ?�??
+// Product Image ???
 export interface ProductImage {
   id: number;
   pImg: string;
@@ -85,9 +87,10 @@ export interface ProductImage {
   createdAt: string;
   updatedAt: string;
   productId: number;
+  thumbnailPath?: string;
 }
 
-// Favorite ?�??
+// Favorite ???
 export interface Favorite {
   id: number;
   createdAt: string;
@@ -97,7 +100,7 @@ export interface Favorite {
   product?: Product;
 }
 
-// Transaction ?�??
+// Transaction ???
 export interface Transaction {
   id: number;
   status: TransactionStatus;
@@ -107,13 +110,13 @@ export interface Transaction {
   buyerId: number;
   sellerId: number;
 
-  // 조인???�이??
+  // 議곗씤???곗씠??
   product?: Product;
   buyer?: User;
   seller?: User;
 }
 
-// Review ?�??
+// Review ???
 export interface Review {
   id: number;
   rating: number; // 1 ~ 5
@@ -124,7 +127,7 @@ export interface Review {
   writerId: number;
   targetId: number;
 
-  // 조인???�이??
+  // 議곗씤???곗씠??
   transaction?: Transaction;
   writer?: User;
   target?: User;
@@ -134,7 +137,7 @@ export interface Review {
   productTitle?: string;
 }
 
-// ?�점 ?�약 ?�??
+// ?됱젏 ?붿빟 ???
 export interface RatingSummary {
   averageRating: number;
   totalCount: number;
@@ -146,11 +149,11 @@ export interface RatingSummary {
 }
 
 // ============================================
-// Firebase Firestore Ÿ��(ä��)
+// Firebase Firestore 타입(채팅)
 // ============================================
 
 export interface ReviewNavigationPayload {
-  transactionId: number;
+    transactionId: number;
   targetId: number;
   productId?: number;
   productTitle?: string;
@@ -159,6 +162,8 @@ export interface ReviewNavigationPayload {
   sellerProfileImg?: string;
   buyerId: number;
   chatId?: string;
+  reviewCompleted?: boolean;
+  isReviewed?: boolean;
 }
 
 export interface ChatMessage {
@@ -194,7 +199,7 @@ export interface ChatRoom {
 }
 
 // ============================================
-// ?�림 ?�??
+// ?뚮┝ ???
 // ============================================
 
 export interface Notification {
@@ -209,10 +214,10 @@ export interface Notification {
 }
 
 // ============================================
-// API ?�청/?�답 ?�??
+// API ?붿껌/?묐떟 ???
 // ============================================
 
-// ?�원가???�청
+// ?뚯썝媛???붿껌
 export interface SignupRequest {
   name: string;
   nick: string;
@@ -222,17 +227,17 @@ export interface SignupRequest {
   birth?: string;
 }
 
-// 로그???�청
+// 濡쒓렇???붿껌
 export interface LoginRequest {
-  nick: string;  // 백엔?�는 nick 기반 로그??
+  nick: string;  // 諛깆뿏?쒕뒗 nick 湲곕컲 濡쒓렇??
   password: string;
 }
 
-// 로그???�션 ?�용??
+// 濡쒓렇???몄뀡 ?ъ슜??
 export type AuthUser = User;
 
 
-// 로그???�답 (백엔???�답 ?�식??맞춤)
+// 濡쒓렇???묐떟 (諛깆뿏???묐떟 ?뺤떇??留욎땄)
 export interface LoginResponse {
   success: boolean;
   message: string;
@@ -240,7 +245,7 @@ export interface LoginResponse {
   user?: AuthUser;
 }
 
-// ?�품 ?�록 ?�청
+// ?곹뭹 ?깅줉 ?붿껌
 export interface ProductCreateRequest {
   title: string;
   content: string;
@@ -252,7 +257,7 @@ export interface ProductCreateRequest {
   images: File[];
 }
 
-// ?�품 ?�정 ?�청
+// ?곹뭹 ?섏젙 ?붿껌
 export interface ProductUpdateRequest {
   title?: string;
   content?: string;
@@ -261,7 +266,7 @@ export interface ProductUpdateRequest {
   status?: ProductStatus;
 }
 
-// ?�기 ?�성 ?�청
+// ?꾧린 ?묒꽦 ?붿껌
 export interface ReviewCreateRequest {
   transactionId: number;
   targetId: number;
@@ -269,7 +274,7 @@ export interface ReviewCreateRequest {
   content?: string;
 }
 
-// API ?�답 공통 ?�??
+// API ?묐떟 怨듯넻 ???
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
@@ -277,7 +282,7 @@ export interface ApiResponse<T> {
   error?: string;
 }
 
-// ?�이지?�이???�답
+// ?섏씠吏?ㅼ씠???묐떟
 export interface PaginatedResponse<T> {
   content: T[];
   totalElements: number;
@@ -287,7 +292,7 @@ export interface PaginatedResponse<T> {
 }
 
 // ============================================
-// UI ?�태 ?�??
+// UI ?곹깭 ???
 // ============================================
 
 export type Screen =
@@ -314,3 +319,4 @@ export interface ReviewTarget {
   productId: number;
   transactionId?: number;
 }
+

@@ -68,4 +68,32 @@ export const authApi = {
   isAuthenticated: (): boolean => {
     return !!tokenManager.getAccessToken();
   },
+
+  /**
+   * 카카오 로그인 - 인증 URL로 리다이렉트
+   */
+  loginWithKakao: (): void => {
+    // @ts-ignore - Vite env
+    const KAKAO_JS_KEY = import.meta.env.VITE_KAKAO_MAP_APP_KEY;
+    const REDIRECT_URI = `${window.location.origin}/auth/kakao/callback`;
+
+    if (!KAKAO_JS_KEY) {
+      throw new Error('카카오 JavaScript 키가 설정되지 않았습니다.');
+    }
+
+    // 카카오 OAuth 인증 페이지로 리다이렉트
+    const kakaoAuthUrl = `https://kauth.kakao.com/oauth/authorize?client_id=${KAKAO_JS_KEY}&redirect_uri=${REDIRECT_URI}&response_type=code`;
+    window.location.href = kakaoAuthUrl;
+  },
+
+  /**
+   * 카카오 로그인 콜백 처리 - 인증 코드를 백엔드로 전송
+   */
+  handleKakaoCallback: async (code: string): Promise<LoginResponse> => {
+    const response = await api.get<LoginResponse>('/auth/kakao/callback', {
+      params: { code },
+    });
+    handleAuthSuccess(response.data);
+    return response.data;
+  },
 };

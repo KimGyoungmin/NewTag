@@ -12,6 +12,7 @@ interface Product {
   likes: number;
   chatCount: number;
   status?: 'available' | 'reserved' | 'sold';
+  sellerNick?: string;
 }
 
 interface ProductSectionProps {

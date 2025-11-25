@@ -82,6 +82,37 @@ public class SearchLogService {
     }
 
     /**
+     * 특정 검색어 삭제
+     * 사용자의 특정 검색어에 대한 모든 검색 기록을 삭제합니다.
+     */
+    public void deleteRecentKeyword(Long userId, String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            throw new IllegalArgumentException("검색어가 비어있습니다.");
+        }
+
+        // 사용자 존재 확인
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+        // 해당 사용자의 특정 키워드 검색 기록 삭제
+        List<SearchLog> searchLogs = searchLogRepository.findByUserIdAndKeyword(userId, keyword);
+        searchLogRepository.deleteAll(searchLogs);
+    }
+
+    /**
+     * 사용자의 모든 검색 기록 삭제
+     */
+    public void deleteAllRecentKeywords(Long userId) {
+        // 사용자 존재 확인
+        userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("사용자를 찾을 수 없습니다."));
+
+        // 해당 사용자의 모든 검색 기록 삭제
+        List<SearchLog> searchLogs = searchLogRepository.findByUserOrderByCreatedAtDesc(userId);
+        searchLogRepository.deleteAll(searchLogs);
+    }
+
+    /**
      * DeviceType 파싱
      */
     private DeviceType parseDeviceType(String deviceType) {

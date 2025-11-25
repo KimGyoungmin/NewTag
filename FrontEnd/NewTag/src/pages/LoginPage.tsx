@@ -51,6 +51,9 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
         password,
       });
 
+      console.log('[Login] Response:', response);
+      console.log('[Login] Token stored:', localStorage.getItem('access_token'));
+
       if (response.success) {
         toast.success("로그인에 성공했어요!");
         onNavigate("home");
@@ -69,11 +72,17 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
   };
 
   const handleSocialLogin = (provider: string) => {
-
-    console.log("Social login:", provider);
-
-    toast.info("?? ???? ?? ?? ????.");
-
+    if (provider === 'kakao') {
+      try {
+        authApi.loginWithKakao();
+      } catch (error) {
+        toast.error('카카오 로그인 중 오류가 발생했습니다.');
+        console.error('Kakao login error:', error);
+      }
+    } else {
+      console.log("Social login:", provider);
+      toast.info(`${provider} 로그인은 준비 중입니다.`);
+    }
   };
 
 

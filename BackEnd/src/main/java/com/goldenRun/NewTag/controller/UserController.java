@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.goldenRun.NewTag.entity.User;
+import com.goldenRun.NewTag.service.KakaoAuthService;
 import com.goldenRun.NewTag.service.UserService;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,6 +25,9 @@ public class UserController {
 
 	@Autowired
 	private UserService service;
+
+	@Autowired
+	private KakaoAuthService kakaoAuthService;
 
 	@PostMapping("/login")
 	public ResponseEntity<Map<String, Object>> login(@RequestBody User loginUser) {
@@ -51,5 +55,13 @@ public class UserController {
 	@GetMapping("/idMatch")
 	public ResponseEntity<?> idMatch(@RequestParam String nick){
 		return service.idMatch(nick);
+	}
+
+	/**
+	 * 카카오 로그인 콜백 처리
+	 */
+	@GetMapping("/auth/kakao/callback")
+	public ResponseEntity<Map<String, Object>> kakaoCallback(@RequestParam String code) {
+		return kakaoAuthService.processKakaoLogin(code);
 	}
 }

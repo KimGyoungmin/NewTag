@@ -23,9 +23,15 @@ public interface SearchLogRepository extends JpaRepository<SearchLog, Long> {
            "ORDER BY cnt DESC")
     List<Object[]> findPopularKeywords(@Param("startDate") LocalDateTime startDate);
 
-    // 사용자별 최근 검색어 조회 (중복 제거)
-    @Query("SELECT DISTINCT s.keyword FROM SearchLog s " +
+    // 사용자별 최근 검색어 조회 (중복 제거, 최신순)
+    @Query("SELECT s.keyword FROM SearchLog s " +
            "WHERE s.user.id = :userId " +
+           "AND s.createdAt = (SELECT MAX(s2.createdAt) FROM SearchLog s2 " +
+           "                   WHERE s2.user.id = :userId AND s2.keyword = s.keyword) " +
            "ORDER BY s.createdAt DESC")
     List<String> findRecentKeywordsByUser(@Param("userId") Long userId);
+
+    // 사용자 ID와 키워드로 검색 로그 조회
+    @Query("SELECT s FROM SearchLog s WHERE s.user.id = :userId AND s.keyword = :keyword")
+    List<SearchLog> findByUserIdAndKeyword(@Param("userId") Long userId, @Param("keyword") String keyword);
 }

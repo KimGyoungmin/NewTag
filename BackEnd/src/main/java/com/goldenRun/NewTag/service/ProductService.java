@@ -142,6 +142,68 @@ public class ProductService {
         return products.map(product -> convertToListItem(product, favoriteCountMap));
     }
 
+    /**
+     * 관련 상품 추천
+     */
+    public List<ProductDtos.ListItem> getRelatedProducts(Long productId, int limit) {
+        Product baseProduct = productRepository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
+
+        if (baseProduct.getCategory() == null) {
+            return List.of();
+        }
+
+        int pageSize = Math.max(limit, 1);
+        Pageable pageable = PageRequest.of(0, pageSize);
+        List<Product> relatedProducts = productRepository
+                .findRelatedProducts(baseProduct.getCategory().getId(), productId, pageable)
+                .getContent();
+
+        if (relatedProducts.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> productIds = relatedProducts.stream()
+                .map(Product::getId)
+                .collect(Collectors.toList());
+        Map<Long, Long> favoriteCountMap = favoriteService.getFavoriteCounts(productIds);
+
+        return relatedProducts.stream()
+                .map(product -> convertToListItem(product, favoriteCountMap))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * 판매자의 다른 상품 조회 (현재 상품 제외)
+     */
+    public List<ProductDtos.ListItem> getOtherProductsBySeller(Long productId, int limit) {
+        Product baseProduct = productRepository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
+
+        if (baseProduct.getSeller() == null) {
+            return List.of();
+        }
+
+        int pageSize = Math.max(limit, 1);
+        Pageable pageable = PageRequest.of(0, pageSize);
+        List<Product> otherProducts = productRepository
+                .findOtherProductsBySeller(baseProduct.getSeller().getId(), productId, pageable)
+                .getContent();
+
+        if (otherProducts.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> productIds = otherProducts.stream()
+                .map(Product::getId)
+                .collect(Collectors.toList());
+        Map<Long, Long> favoriteCountMap = favoriteService.getFavoriteCounts(productIds);
+
+        return otherProducts.stream()
+                .map(product -> convertToListItem(product, favoriteCountMap))
+                .collect(Collectors.toList());
+    }
+
     @Transactional
     public ProductDtos.DetailResponse updateProductStatus(Long productId, ProductStatus newStatus, String currentUserNick) {
         if (currentUserNick == null || currentUserNick.isBlank()) {
@@ -276,21 +338,40 @@ public class ProductService {
                 .findFirst()
                 .map(img -> resolveImagePath(img.getPath()))
                 .orElse(resolveImagePath(null));
+        String thumbnailImage = product.getImages().stream()
+                .filter(ProductImage::getIs_main)
+                .findFirst()
+                .map(img -> resolveThumbnailPath(img.getPath()))
+                .orElse(resolveThumbnailPath(null));
 
         // Map에서 Favorite count 조회 (이미 한 번에 가져온 데이터)
         long favoriteCount = favoriteCountMap.getOrDefault(product.getId(), 0L);
 
+        // 판매자 정보
+        ProductDtos.SellerInfo sellerInfo = null;
+        if (product.getSeller() != null) {
+            sellerInfo = ProductDtos.SellerInfo.builder()
+                    .id(product.getSeller().getId().intValue())
+                    .nick(product.getSeller().getNick())
+                    .name(product.getSeller().getName())
+                    .build();
+        }
+
         return ProductDtos.ListItem.builder()
                 .id(product.getId().intValue())
                 .mainImage(mainImage)
+                .thumbnailImage(thumbnailImage)
                 .title(product.getTitle())
                 .price(product.getPrice().doubleValue())
                 .locationNm(product.getLocation_nm())
+                .latitude(product.getLatitude() != null ? product.getLatitude().doubleValue() : null)
+                .longitude(product.getLongitude() != null ? product.getLongitude().doubleValue() : null)
                 .createdAt(product.getCreatedAt())
                 .viewCount(product.getView_count())
                 .favoriteCount(favoriteCount)
                 .timeAgo(getTimeAgo(product.getCreatedAt()))
                 .isResell(product.getIsResell())
+                .seller(sellerInfo)
                 .build();
     }
 
@@ -303,21 +384,40 @@ public class ProductService {
                 .findFirst()
                 .map(img -> resolveImagePath(img.getPath()))
                 .orElse(resolveImagePath(null));
+        String thumbnailImage = product.getImages().stream()
+                .filter(ProductImage::getIs_main)
+                .findFirst()
+                .map(img -> resolveThumbnailPath(img.getPath()))
+                .orElse(resolveThumbnailPath(null));
 
         // Favorite count 조회
         long favoriteCount = favoriteService.getFavoriteCount(product.getId());
 
+        // 판매자 정보
+        ProductDtos.SellerInfo sellerInfo = null;
+        if (product.getSeller() != null) {
+            sellerInfo = ProductDtos.SellerInfo.builder()
+                    .id(product.getSeller().getId().intValue())
+                    .nick(product.getSeller().getNick())
+                    .name(product.getSeller().getName())
+                    .build();
+        }
+
         return ProductDtos.ListItem.builder()
                 .id(product.getId().intValue())
                 .mainImage(mainImage)
+                .thumbnailImage(thumbnailImage)
                 .title(product.getTitle())
                 .price(product.getPrice().doubleValue())
                 .locationNm(product.getLocation_nm())
+                .latitude(product.getLatitude() != null ? product.getLatitude().doubleValue() : null)
+                .longitude(product.getLongitude() != null ? product.getLongitude().doubleValue() : null)
                 .createdAt(product.getCreatedAt())
                 .viewCount(product.getView_count())
                 .favoriteCount(favoriteCount)
                 .timeAgo(getTimeAgo(product.getCreatedAt()))
                 .isResell(product.getIsResell())
+                .seller(sellerInfo)
                 .build();
     }
 
@@ -337,6 +437,7 @@ public class ProductService {
                         .createdAt(img.getCreatedAt())
                         .updatedAt(img.getUpdatedAt())
                         .productId(product.getId().intValue())
+                        .thumbnailPath(resolveThumbnailPath(img.getPath()))
                         .build())
                 .collect(Collectors.toList());
 
@@ -410,6 +511,42 @@ public class ProductService {
             return path;
         }
         return "/api/v1/static/" + path.replace("\\", "/");
+    }
+
+    private String resolveThumbnailPath(String path) {
+        if (path == null || path.isBlank()) {
+            return resolveImagePath(null);
+        }
+        if (path.startsWith("http")) {
+            return path;
+        }
+
+        String normalizedPath = path;
+        int staticIndex = normalizedPath.indexOf("/static/");
+        if (staticIndex >= 0) {
+            normalizedPath = normalizedPath.substring(staticIndex + "/static/".length());
+        } else if (normalizedPath.startsWith("static/")) {
+            normalizedPath = normalizedPath.substring("static/".length());
+        } else if (normalizedPath.startsWith("/static/")) {
+            normalizedPath = normalizedPath.substring("/static/".length());
+        }
+
+        String thumbnailCandidate = fileStorageService.buildThumbnailPath(normalizedPath);
+        if (thumbnailCandidate == null) {
+            return resolveImagePath(path);
+        }
+
+        boolean isRelativePath = !thumbnailCandidate.startsWith("/") && !thumbnailCandidate.startsWith("http");
+        boolean thumbnailExists = isRelativePath && fileStorageService.thumbnailExists(normalizedPath);
+        if (!thumbnailExists && isRelativePath) {
+            return resolveImagePath(path);
+        }
+
+        if (thumbnailCandidate.startsWith("/")) {
+            return thumbnailCandidate;
+        }
+
+        return resolveImagePath(thumbnailCandidate);
     }
 
     /**
@@ -538,5 +675,51 @@ public class ProductService {
      */
     private BigDecimal toBigDecimal(Double value) {
         return value == null ? null : BigDecimal.valueOf(value);
+    }
+
+    /**
+     * 90일 이상 소프트 삭제된 상품 자동 정리
+     * - 매일 새벽 3시 실행
+     * - 삭제된 지 90일이 넘은 상품의 이미지 파일 및 DB 레코드 완전 삭제
+     */
+    @Transactional
+    public int cleanupOldDeletedProducts() {
+        LocalDateTime cutoff = LocalDateTime.now().minusDays(90);
+        List<Product> oldProducts = productRepository.findByIsDeleteTrueAndUpdatedAtBefore(cutoff);
+
+        if (oldProducts.isEmpty()) {
+            log.info("정리할 오래된 삭제 상품이 없습니다.");
+            return 0;
+        }
+
+        int deletedCount = 0;
+        for (Product product : oldProducts) {
+            try {
+                // 1. 관련 이미지 파일 삭제
+                if (product.getImages() != null && !product.getImages().isEmpty()) {
+                    for (ProductImage image : product.getImages()) {
+                        try {
+                            fileStorageService.deleteFile(image.getPath());
+                            log.debug("이미지 파일 삭제 완료: {}", image.getPath());
+                        } catch (Exception e) {
+                            log.warn("이미지 파일 삭제 실패: path={}, error={}", image.getPath(), e.getMessage());
+                        }
+                    }
+                }
+
+                // 2. DB에서 상품 완전 삭제 (CASCADE로 관련 이미지도 자동 삭제)
+                productRepository.delete(product);
+                deletedCount++;
+
+                log.info("상품 완전 삭제 완료: productId={}, title={}, deletedAt={}",
+                        product.getId(), product.getTitle(), product.getUpdatedAt());
+            } catch (Exception e) {
+                log.error("상품 삭제 중 오류 발생: productId={}, error={}",
+                        product.getId(), e.getMessage(), e);
+            }
+        }
+
+        log.info("자동 정리 배치 작업 완료: 총 {}개 상품 삭제", deletedCount);
+        return deletedCount;
     }
 }

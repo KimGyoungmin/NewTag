@@ -81,14 +81,14 @@ public class User {
 
     @Column(name = "provider_id", length = 100)
     private String providerId;
-    
-    //  @Column(name = "email_verified", nullable = false)
-    //  @Builder.Default
-    // private boolean emailVerified = false;
 
-    // @Column(name = "phone_verified", nullable = false)
-    // @Builder.Default
-    // private boolean phoneVerified = false;
+    @Column(name = "email_verified", nullable = false)
+    @Builder.Default
+    private boolean emailVerified = false;
+
+    @Column(name = "phone_verified", nullable = false)
+    @Builder.Default
+    private boolean phoneVerified = false;
 
 
 
@@ -119,11 +119,39 @@ public class User {
     private LocalDateTime updatedAt;
 
 
-     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-     @Builder.Default
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<Address> addresses = new ArrayList<>();
 
-      @AssertTrue(message = "Invalid auth combination for provider/password/providerId")
+    @OneToMany(mappedBy = "seller", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Product> products = new ArrayList<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Favorite> favorites = new ArrayList<>();
+
+    @OneToMany(mappedBy = "buyer", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Transaction> buyTransactions = new ArrayList<>();
+
+    @OneToMany(mappedBy = "seller", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Transaction> sellTransactions = new ArrayList<>();
+
+    @OneToMany(mappedBy = "writer", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Review> writtenReviews = new ArrayList<>();
+
+    @OneToMany(mappedBy = "target", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<Review> receivedReviews = new ArrayList<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
+    private List<SearchLog> searchLogs = new ArrayList<>();
+
+    @AssertTrue(message = "Invalid auth combination for provider/password/providerId")
     public boolean isAuthCombinationValid() {
         if (provider == Provider.LOCAL) {
             return password != null && !password.isBlank() && providerId == null;

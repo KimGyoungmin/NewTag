@@ -1,3 +1,8 @@
+<<<<<<< HEAD
 2025/11/25-09:26:14.482 47b8 Reusing MANIFEST C:\NT\NewTag\model\crawling\selenium_profile\Default\Site Characteristics Database/MANIFEST-000001
 2025/11/25-09:26:14.484 47b8 Recovering log #3
 2025/11/25-09:26:14.484 47b8 Reusing old log C:\NT\NewTag\model\crawling\selenium_profile\Default\Site Characteristics Database/000003.log 
+=======
+2025/11/20-17:05:53.639 47b4 Creating DB C:\Users\USER\Desktop\NewTag\model\crawling\selenium_profile\Default\Site Characteristics Database since it was missing.
+2025/11/20-17:05:53.647 47b4 Reusing MANIFEST C:\Users\USER\Desktop\NewTag\model\crawling\selenium_profile\Default\Site Characteristics Database/MANIFEST-000001
+>>>>>>> origin/dev

@@ -1,3 +1,8 @@
+<<<<<<< HEAD
 2025/11/25-09:26:14.549 3ff4 Reusing MANIFEST C:\NT\NewTag\model\crawling\selenium_profile\Default\Local Storage\leveldb/MANIFEST-000001
 2025/11/25-09:26:14.555 3ff4 Recovering log #25
 2025/11/25-09:26:14.557 3ff4 Reusing old log C:\NT\NewTag\model\crawling\selenium_profile\Default\Local Storage\leveldb/000025.log 
+=======
+2025/11/20-17:05:53.664 e74 Creating DB C:\Users\USER\Desktop\NewTag\model\crawling\selenium_profile\Default\Local Storage\leveldb since it was missing.
+2025/11/20-17:05:53.689 e74 Reusing MANIFEST C:\Users\USER\Desktop\NewTag\model\crawling\selenium_profile\Default\Local Storage\leveldb/MANIFEST-000001
+>>>>>>> origin/dev

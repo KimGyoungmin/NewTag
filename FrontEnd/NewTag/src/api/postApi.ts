@@ -39,6 +39,7 @@ export interface ProductDetailResponse {
     createdAt: string;
     updatedAt: string;
     productId: number;
+    thumbnailPath?: string;
   }>;
   mainImage: string;
   sellerId: number;
@@ -78,14 +79,43 @@ export const postApi = {
   },
 
   uploadImage: async (file: File): Promise<UploadImageResponse> => {
+    // 파일 타입 검증
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/bmp', 'image/tiff'];
+    const allowedExtensions = ['.jpg', '.jpeg', '.jfif', '.png', '.gif', '.webp', '.bmp', '.tiff', '.tif'];
+
+    if (!allowedTypes.includes(file.type)) {
+      const fileName = file.name.toLowerCase();
+      const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
+
+      if (!hasValidExtension) {
+        throw new Error('지원하지 않는 이미지 형식입니다.\n(jpg, jpeg, png, gif, webp, bmp, tiff만 지원)');
+      }
+    }
+
+    // 파일 크기 검증 (10MB)
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      throw new Error('이미지 크기는 10MB 이하만 업로드 가능합니다.');
+    }
+
     const formData = new FormData();
     formData.append('file', file);
-    const response = await api.post<UploadImageResponse>('/uploads/images', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    }); 
-    return response.data;
+
+    try {
+      const response = await api.post<UploadImageResponse>('/uploads/images', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      return response.data;
+    } catch (error: any) {
+      // 백엔드 에러 메시지 추출
+      const backendMessage = error?.response?.data?.message || error?.response?.data?.error;
+      if (backendMessage) {
+        throw new Error(backendMessage);
+      }
+      throw error;
+    }
   },
 
   autoWrite: async (imagePaths: string[]): Promise<AutoWriteResponse> => {

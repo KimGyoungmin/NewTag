@@ -10,6 +10,7 @@ import org.springframework.stereotype.Repository;
 import com.goldenRun.NewTag.entity.Product;
 import com.goldenRun.NewTag.enums.ProductStatus;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -57,5 +58,36 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
         @Param("lon") Double longitude,
         @Param("distance") Double distance,
         Pageable pageable
+    );
+
+    @Query("SELECT p FROM Product p " +
+            "WHERE p.category.id = :categoryId " +
+            "AND p.id <> :productId " +
+            "AND p.is_delete = false " +
+            "ORDER BY p.view_count DESC, p.createdAt DESC")
+    Page<Product> findRelatedProducts(
+            @Param("categoryId") Long categoryId,
+            @Param("productId") Long productId,
+            Pageable pageable
+    );
+
+    // 판매자의 다른 상품 조회 (현재 상품 제외)
+    @Query("SELECT p FROM Product p " +
+            "WHERE p.seller.id = :sellerId " +
+            "AND p.id <> :productId " +
+            "AND p.is_delete = false " +
+            "ORDER BY p.createdAt DESC")
+    Page<Product> findOtherProductsBySeller(
+            @Param("sellerId") Long sellerId,
+            @Param("productId") Long productId,
+            Pageable pageable
+    );
+
+    // 90일 이상 소프트 삭제된 상품 조회 (자동 정리용)
+    @Query("SELECT p FROM Product p " +
+            "WHERE p.is_delete = true " +
+            "AND p.updatedAt < :cutoffDate")
+    List<Product> findByIsDeleteTrueAndUpdatedAtBefore(
+            @Param("cutoffDate") LocalDateTime cutoffDate
     );
 }

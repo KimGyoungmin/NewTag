@@ -190,6 +190,64 @@ export const chatRoomsApi = {
       callback(chatRooms);
     });
   },
+
+  /**
+   * 특정 상품의 채팅방 개수 조회
+   */
+  getChatRoomCountByProduct: async (productId: number): Promise<number> => {
+    const chatRoomsRef = collection(db, 'chatRooms');
+    const q = query(
+      chatRoomsRef,
+      where('productId', '==', productId)
+    );
+
+    const querySnapshot = await getDocs(q);
+    return querySnapshot.size;
+  },
+
+  /**
+   * 여러 상품의 채팅방 개수를 한 번에 조회 (배치)
+   */
+  getChatRoomCountsByProducts: async (productIds: number[]): Promise<Map<number, number>> => {
+    const chatRoomsRef = collection(db, 'chatRooms');
+
+    // Firestore의 'in' 쿼리는 최대 10개까지만 지원하므로, 필요시 청크로 나눔
+    const chunkSize = 10;
+    const chunks: number[][] = [];
+    for (let i = 0; i < productIds.length; i += chunkSize) {
+      chunks.push(productIds.slice(i, i + chunkSize));
+    }
+
+    const countMap = new Map<number, number>();
+
+    // 각 청크별로 쿼리 실행
+    await Promise.all(
+      chunks.map(async (chunk) => {
+        const q = query(
+          chatRoomsRef,
+          where('productId', 'in', chunk)
+        );
+
+        const querySnapshot = await getDocs(q);
+
+        // 각 상품별 카운트 집계
+        querySnapshot.docs.forEach((doc) => {
+          const data = doc.data();
+          const productId = data.productId as number;
+          countMap.set(productId, (countMap.get(productId) || 0) + 1);
+        });
+      })
+    );
+
+    // 0개인 상품들도 Map에 추가
+    productIds.forEach((id) => {
+      if (!countMap.has(id)) {
+        countMap.set(id, 0);
+      }
+    });
+
+    return countMap;
+  },
 };
 
 /**

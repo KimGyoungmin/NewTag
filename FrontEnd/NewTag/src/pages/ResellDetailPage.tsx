@@ -227,14 +227,17 @@ export function ResellDetailPage({ productId, onNavigate, products }: ResellDeta
                 <LineChart data={chartData}>
                   <XAxis
                     dataKey="label"
-                    tick={{ fontSize: 10, angle: -25, textAnchor: "end" }}
+                    angle={-25}
+                    tick={{ fontSize: 10, textAnchor: "end" }}
                     interval="preserveStartEnd"
                   />
                   <YAxis tickFormatter={(value) => `₩${(value / 1000).toFixed(0)}k`} domain={yDomain} />
                   <Tooltip
-                    formatter={(value: number | null) =>
-                      value === null ? "값 없음" : `₩ ${value.toLocaleString("ko-KR")}`
-                    }
+                    formatter={(value: number | string | null) => {
+                      if (value == null) return ["값 없음", ""];
+                      const numeric = typeof value === "number" ? value : Number(value);
+                      return [`₩ ${numeric.toLocaleString("ko-KR")}`, "가격"];
+                    }}
                   />
                   <Line type="monotone" dataKey="actualPrice" stroke="#10b981" strokeWidth={2} dot={false} name="실거래" />
                   {hasPredictions && (
@@ -306,4 +309,6 @@ export function ResellDetailPage({ productId, onNavigate, products }: ResellDeta
       </div>
     </div>
   );
+
 }
+

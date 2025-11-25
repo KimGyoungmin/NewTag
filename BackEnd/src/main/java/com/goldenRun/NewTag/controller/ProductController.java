@@ -10,6 +10,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -57,6 +59,28 @@ public class ProductController {
     ) {
         ProductDtos.DetailResponse product = productService.getProductDetail(id, userId);
         return ResponseEntity.ok(product);
+    }
+
+    @GetMapping("/{id}/related")
+    public ResponseEntity<List<ProductDtos.ListItem>> getRelatedProducts(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "6") int limit
+    ) {
+        List<ProductDtos.ListItem> related = productService.getRelatedProducts(id, limit);
+        return ResponseEntity.ok(related);
+    }
+
+    /**
+     * 판매자의 다른 상품 조회 (현재 상품 제외)
+     * GET /api/v1/products/{id}/seller-other?limit=6
+     */
+    @GetMapping("/{id}/seller-other")
+    public ResponseEntity<List<ProductDtos.ListItem>> getOtherProductsBySeller(
+            @PathVariable Long id,
+            @RequestParam(defaultValue = "6") int limit
+    ) {
+        List<ProductDtos.ListItem> otherProducts = productService.getOtherProductsBySeller(id, limit);
+        return ResponseEntity.ok(otherProducts);
     }
 
     /**
@@ -134,13 +158,44 @@ public class ProductController {
     }
 
     /**
+     * 특정 검색어 삭제
+     * DELETE /api/v1/products/search/recent?userId=1&keyword=빵빵이
+     */
+    @DeleteMapping("/search/recent")
+    public ResponseEntity<Map<String, Object>> deleteRecentKeyword(
+            @RequestParam Long userId,
+            @RequestParam String keyword
+    ) {
+        searchLogService.deleteRecentKeyword(userId, keyword);
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "검색어가 삭제되었습니다."
+        ));
+    }
+
+    /**
+     * 모든 검색어 삭제
+     * DELETE /api/v1/products/search/recent/all?userId=1
+     */
+    @DeleteMapping("/search/recent/all")
+    public ResponseEntity<Map<String, Object>> deleteAllRecentKeywords(
+            @RequestParam Long userId
+    ) {
+        searchLogService.deleteAllRecentKeywords(userId);
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "모든 검색어가 삭제되었습니다."
+        ));
+    }
+
+    /**
      * 상품 등록
      * POST /api/v1/products
      */
     @PostMapping
     public ResponseEntity<ProductDtos.DetailResponse> createProduct(
-            @RequestBody ProductDtos.CreateRequest request,
-            @AuthenticationPrincipal String currentUserNick
+            @Valid @RequestBody ProductDtos.CreateRequest request,
+            @AuthenticationPrincipal(expression = "username") String currentUserNick
     ) {
         ProductDtos.DetailResponse created = productService.createProduct(request, currentUserNick);
         return ResponseEntity.status(201).body(created);
@@ -153,7 +208,7 @@ public class ProductController {
     @DeleteMapping("/{id}")
     public ResponseEntity<Map<String, Object>> deleteProduct(
             @PathVariable Long id,
-            @AuthenticationPrincipal String currentUserNick
+            @AuthenticationPrincipal(expression = "username") String currentUserNick
     ) {
         productService.deleteProduct(id, currentUserNick);
         return ResponseEntity.ok(Map.of(
@@ -165,8 +220,8 @@ public class ProductController {
     @PatchMapping("/{id}/status")
     public ResponseEntity<ProductDtos.DetailResponse> updateStatus(
             @PathVariable Long id,
-            @RequestBody ProductDtos.StatusUpdateRequest request,
-            @AuthenticationPrincipal String currentUserNick
+            @Valid @RequestBody ProductDtos.StatusUpdateRequest request,
+            @AuthenticationPrincipal(expression = "username") String currentUserNick
     ) {
         if (request.getStatus() == null) {
             throw new IllegalArgumentException("변경할 상태를 선택해주세요.");
@@ -178,8 +233,8 @@ public class ProductController {
     @PostMapping("/{id}/complete")
     public ResponseEntity<ProductDtos.CompleteSaleResponse> completeSale(
             @PathVariable Long id,
-            @RequestBody ProductDtos.CompleteSaleRequest request,
-            @AuthenticationPrincipal String currentUserNick
+            @Valid @RequestBody ProductDtos.CompleteSaleRequest request,
+            @AuthenticationPrincipal(expression = "username") String currentUserNick
     ) {
         ProductDtos.CompleteSaleResponse response = productService.completeSale(id, request.getBuyerId(), currentUserNick);
         return ResponseEntity.ok(response);

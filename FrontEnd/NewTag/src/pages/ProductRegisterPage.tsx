@@ -1,19 +1,33 @@
 ﻿import { useMemo, useRef, useState } from "react";
 import { ChevronLeft, X, Camera, MapPin } from "lucide-react";
+import { useEffect } from "react";
+import { useLocation as useRouterLocation, useNavigate } from "react-router-dom";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Textarea } from "../components/ui/textarea";
 import { Label } from "../components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../components/ui/select";
-import { CATEGORIES, IMAGE_CONFIG } from "../constants";
+import { IMAGE_CONFIG } from "../constants";
 import { postApi } from "../api/postApi";
 import { resolveImageUrl } from "../utils/image";
 import { toast } from "sonner";
-import { LocationPicker } from "../components/LocationPicker";
+import { categoryApi, Category } from "../api/categoryApi";
 
 interface ProductRegisterPageProps {
   onNavigate: (page: string, id?: string) => void;
 }
+
+type RegisterFormState = {
+  title: string;
+  categoryId: string;
+  price: string;
+  description: string;
+  images: string[];
+  isResell: boolean;
+  location: string;
+  latitude: number;
+  longitude: number;
+};
 
 const DEFAULT_LATITUDE = 37.4979;
 const DEFAULT_LONGITUDE = 127.0276;
@@ -30,18 +44,46 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isAutoWriting, setIsAutoWriting] = useState(false);
+  const [latitude, setLatitude] = useState(DEFAULT_LATITUDE);
+  const [longitude, setLongitude] = useState(DEFAULT_LONGITUDE);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
 
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const navigate = useNavigate();
+  const routerLocation = useRouterLocation();
+  const locationState = routerLocation.state as {
+    selectedLocation?: { locationName: string; latitude: number; longitude: number };
+    formState?: RegisterFormState;
+  } | null;
 
   const categoryOptions = useMemo(
     () =>
-      CATEGORIES.map(({ id, name, emoji }) => ({
-        value: id.toString(),
-        label: `${emoji ?? ""} ${name}`.trim(),
+      categories.map((cat) => ({
+        value: cat.id.toString(),
+        label: cat.categoryNm,
       })),
-    []
+    [categories]
   );
+
+  // 카테고리 데이터 가져오기
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        setLoadingCategories(true);
+        const data = await categoryApi.getAllCategories();
+        setCategories(data);
+      } catch (error) {
+        console.error('Failed to fetch categories:', error);
+        toast.error('카테고리 목록을 불러오는데 실패했습니다.');
+      } finally {
+        setLoadingCategories(false);
+      }
+    };
+
+    fetchCategories();
+  }, []);
 
   const handleImageButtonClick = () => {
     if (images.length >= 10) {
@@ -68,7 +110,8 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
       toast.success("이미지가 업로드되었습니다.");
     } catch (error) {
       console.error("Failed to upload image:", error);
-      toast.error("이미지 업로드에 실패했습니다.");
+      const errorMessage = error instanceof Error ? error.message : "이미지 업로드에 실패했습니다.";
+      toast.error(errorMessage);
     } finally {
       setIsUploading(false);
       event.target.value = "";
@@ -117,8 +160,8 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
       price: priceValue,
       categoryId: Number(categoryId),
       locationNm: location,
-      latitude: DEFAULT_LATITUDE,
-      longitude: DEFAULT_LONGITUDE,
+      latitude,
+      longitude,
       images: imagePayload,
       isResell,
     };
@@ -171,6 +214,56 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
     } finally {
       setIsAutoWriting(false);
     }
+  };
+
+  useEffect(() => {
+    const formState = locationState?.formState;
+    if (!formState) return;
+
+    setTitle(formState.title ?? "");
+    setCategoryId(formState.categoryId ?? "");
+    setPrice(formState.price ?? "");
+    setDescription(formState.description ?? "");
+    setImages(formState.images ?? []);
+    setIsResell(!!formState.isResell);
+    setLocation(formState.location ?? location);
+    setLatitude(formState.latitude ?? DEFAULT_LATITUDE);
+    setLongitude(formState.longitude ?? DEFAULT_LONGITUDE);
+  }, [locationState?.formState]);
+
+  useEffect(() => {
+    if (locationState?.selectedLocation) {
+      const { locationName, latitude, longitude } = locationState.selectedLocation;
+      setLocation(locationName);
+      setLatitude(latitude);
+      setLongitude(longitude);
+      navigate("/product/register", { replace: true });
+    }
+  }, [locationState?.selectedLocation, navigate]);
+
+  const handleLocationChange = () => {
+    const formState: RegisterFormState = {
+      title,
+      categoryId,
+      price,
+      description,
+      images,
+      isResell,
+      location,
+      latitude,
+      longitude,
+    };
+
+    navigate("/product/location", {
+      state: {
+        formState,
+        currentLocation: {
+          locationName: location,
+          latitude,
+          longitude,
+        },
+      },
+    });
   };
 
   return (
@@ -249,7 +342,7 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
           </p>
           <input
             type="file"
-            accept="image/*"
+            accept=".jpg,.jpeg,.jfif,.png,.gif,.webp,.bmp,.tiff,.tif"
             ref={fileInputRef}
             className="hidden"
             onChange={handleFileChange}
@@ -333,7 +426,7 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
             <MapPin className="h-5 w-5 text-primary" />
 
             <span>{location}</span>
-            <Button variant="link" size="sm" className="ml-auto" disabled>
+            <Button variant="link" size="sm" className="ml-auto" onClick={handleLocationChange}>
               변경
             </Button>
           </div>
