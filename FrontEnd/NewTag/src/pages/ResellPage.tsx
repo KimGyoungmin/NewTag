@@ -1,8 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Search, ArrowUp, ArrowDown } from "lucide-react";
 import { Input } from "../components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
-import { Badge } from "../components/ui/badge";
+import { Card, CardContent } from "../components/ui/card";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
 import { BrandFilter } from "../components/BrandFilter";
@@ -16,6 +15,14 @@ interface ResellPageProps {
 
 const FALLBACK_IMAGE = "/api/v1/static/p_default_img.png";
 const MAX_HISTORY_LIMIT = 100;
+
+const TEXT = {
+  placeholder: "리셀 상품을 검색해 보세요",
+  currentPrice: "현재 시세",
+  basePrice: "기준가",
+  notEnoughData: "거래 데이터가 충분하지 않습니다.",
+  notFound: "조건에 맞는 상품을 찾지 못했습니다.",
+};
 
 export function ResellPage({ onNavigate, products, onProductsChange }: ResellPageProps) {
   const [searchQuery, setSearchQuery] = useState("");
@@ -45,7 +52,7 @@ export function ResellPage({ onNavigate, products, onProductsChange }: ResellPag
           setIsAutoFeed(true);
         }
       } catch (err) {
-        console.info("resell_auto.json 불러오기 실패 (정적 데이터로 대체)", err);
+        console.info("resell_auto.json load failed; using default data", err);
       }
     };
     load();
@@ -53,6 +60,28 @@ export function ResellPage({ onNavigate, products, onProductsChange }: ResellPag
       cancelled = true;
     };
   }, [onProductsChange]);
+
+  const pickKoreanName = (product: ResellProductRecord & Record<string, any>) => {
+    const rawCandidates = [
+      product.nameKo,
+      product.name_ko,
+      product.koreanName,
+      product.localizedName,
+      product.name,
+    ].filter((v) => typeof v === "string");
+
+    const hasKorean = (text: string) => /[가-힣]/.test(text);
+
+    for (const candidate of rawCandidates) {
+      if (!candidate) continue;
+      const parts = candidate.split(/\\r?\\n| {2,}|\\t/).filter(Boolean);
+      for (const part of parts) {
+        if (hasKorean(part)) return part.trim();
+      }
+      if (hasKorean(candidate)) return candidate.trim();
+    }
+    return rawCandidates[0] || product.id;
+  };
 
   const normalizedProducts = useMemo(() => {
     const baseProducts = localProducts.length ? localProducts : RESELL_PRODUCTS;
@@ -68,10 +97,13 @@ export function ResellPage({ onNavigate, products, onProductsChange }: ResellPag
         })
         .filter((point) => point.price > 0);
 
+      const displayName = pickKoreanName(product as any);
+
       return {
         ...product,
         image: product.image ?? FALLBACK_IMAGE,
         priceHistory: normalizedHistory,
+        displayName,
       };
     });
   }, [localProducts]);
@@ -93,9 +125,10 @@ export function ResellPage({ onNavigate, products, onProductsChange }: ResellPag
     const query = searchQuery.trim().toLowerCase();
 
     return normalizedProducts.filter((product) => {
+      const displayName = (product as any).displayName || product.name;
       const matchesQuery =
         !query ||
-        product.name.toLowerCase().includes(query) ||
+        displayName.toLowerCase().includes(query) ||
         product.brand.toLowerCase().includes(query) ||
         product.id.toLowerCase().includes(query);
 
@@ -106,13 +139,6 @@ export function ResellPage({ onNavigate, products, onProductsChange }: ResellPag
     });
   }, [normalizedProducts, searchQuery, selectedBrands]);
 
-  const summaryTitle = searchQuery ? `"${searchQuery}" 검색 결과` : "리셀 데이터 연동 상품";
-  const summarySubtitle = searchQuery
-    ? `${filteredProducts.length}개의 상품이 조건을 만족합니다.`
-    : isAutoFeed
-      ? "최근 크롤링/예측 결과(resell_auto.json)를 불러왔습니다."
-      : "model/Best_test에 있는 실제 거래 데이터를 기반으로 합니다.";
-
   return (
     <div className="min-h-screen pb-20 md:pb-8">
       <div className="sticky top-16 z-40 bg-background border-b">
@@ -120,7 +146,7 @@ export function ResellPage({ onNavigate, products, onProductsChange }: ResellPag
           <div className="relative">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="리셀 상품을 검색해 보세요 (예: missing_item_name_0)"
+              placeholder={TEXT.placeholder}
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               className="pl-10"
@@ -136,28 +162,6 @@ export function ResellPage({ onNavigate, products, onProductsChange }: ResellPag
       </div>
 
       <div className="container mx-auto max-w-6xl px-4 py-6 space-y-6">
-        <Card className="border-dashed bg-muted/40">
-          <CardHeader>
-            <CardTitle>AI 시세 전망</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              크롤링/예측 결과(resell_auto.json)가 생성되면 자동 반영됩니다. 데이터가 없으면 빈 목록이 표시됩니다.
-            </p>
-          </CardHeader>
-          <CardContent className="text-sm text-muted-foreground">
-            현재는 model/Best_test에 저장된 원본 거래 정보만 연결되어 있습니다. 예측 결과는 super_kream_crawling.py 실행 시 생성됩니다.
-          </CardContent>
-        </Card>
-
-        <div className="flex items-start justify-between">
-          <div>
-            <h2 className="text-xl mb-1">{summaryTitle}</h2>
-            <p className="text-sm text-muted-foreground">{summarySubtitle}</p>
-          </div>
-          <Badge variant="outline" className="text-xs">
-            총 {filteredProducts.length}개
-          </Badge>
-        </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {filteredProducts.map((product) => {
             const priceHistory = product.priceHistory.slice(0, MAX_HISTORY_LIMIT);
@@ -171,6 +175,8 @@ export function ResellPage({ onNavigate, products, onProductsChange }: ResellPag
             const domainMin = hasHistory ? Math.max(minPrice - paddingBase, 0) : 0;
             const domainMax = hasHistory ? maxPrice + paddingBase : 1;
             const isPositive = product.changePercent >= 0;
+            const displayName = (product as any).displayName || product.name;
+            const tagLabel = product.category || product.brand || product.id;
 
             return (
               <Card
@@ -182,31 +188,31 @@ export function ResellPage({ onNavigate, products, onProductsChange }: ResellPag
                   <div className="w-28 h-28 rounded-lg overflow-hidden bg-muted shrink-0">
                     <ImageWithFallback
                       src={product.image}
-                      alt={product.name}
+                      alt={displayName}
                       className="h-full w-full object-cover"
                     />
                   </div>
 
                   <div className="flex-1 space-y-3">
                     <div className="flex items-start justify-between">
-                      <Badge variant="secondary">#{product.brand}</Badge>
+                      <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                        #{tagLabel}
+                      </span>
                       <div
-                        className={`flex items-center gap-1 text-sm font-medium ${
-                          isPositive ? "text-green-500" : "text-red-500"
-                        }`}
+                        className={`flex items-center gap-1 text-sm font-medium ${isPositive ? "text-green-500" : "text-red-500"}`}
                       >
                         {isPositive ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
                         {Math.abs(product.changePercent).toFixed(2)}%
                       </div>
                     </div>
-                    <p className="text-sm font-medium line-clamp-2">{product.name}</p>
+                    <p className="text-sm font-medium line-clamp-2">{displayName}</p>
                     <div className="space-y-1">
-                      <p className="text-xs text-muted-foreground">현재 시세</p>
+                      <p className="text-xs text-muted-foreground">{TEXT.currentPrice}</p>
                       <p className="text-xl font-semibold">
-                        ₩ {product.currentPrice.toLocaleString("ko-KR")}
+                        ₩{product.currentPrice.toLocaleString("ko-KR")}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        기준가 ₩ {product.previousPrice.toLocaleString("ko-KR")}
+                        {TEXT.basePrice} ₩{product.previousPrice.toLocaleString("ko-KR")}
                       </p>
                     </div>
                   </div>
@@ -228,7 +234,7 @@ export function ResellPage({ onNavigate, products, onProductsChange }: ResellPag
                     </ResponsiveContainer>
                   ) : (
                     <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
-                      거래 데이터가 충분하지 않습니다.
+                      {TEXT.notEnoughData}
                     </div>
                   )}
                 </div>
@@ -238,9 +244,7 @@ export function ResellPage({ onNavigate, products, onProductsChange }: ResellPag
         </div>
 
         {filteredProducts.length === 0 && (
-          <div className="py-16 text-center text-muted-foreground">
-            연결된 데이터에서 조건에 맞는 상품을 찾지 못했습니다.
-          </div>
+          <div className="py-16 text-center text-muted-foreground">{TEXT.notFound}</div>
         )}
       </div>
     </div>

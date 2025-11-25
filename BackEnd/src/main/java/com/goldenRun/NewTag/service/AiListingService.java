@@ -50,15 +50,15 @@ public class AiListingService {
 
     private static final List<CategoryHint> CATEGORY_HINTS =
             List.of(
-                    new CategoryHint("전자", List.of("전자", "디지털", "휴대폰", "모바일", "노트북", "카메라")),
+                    new CategoryHint("전자", List.of("전자", "휴대폰", "핸드폰", "모바일", "태블릿", "카메라")),
                     new CategoryHint("가구", List.of("가구", "인테리어", "의자", "책상", "조명", "수납")),
-                    new CategoryHint("패션", List.of("패션", "의류", "옷", "신발", "가방", "잡화", "액세서리")),
+                    new CategoryHint("패션", List.of("패션", "의류", "옷", "신발", "가방", "화장품", "액세서리")),
                     new CategoryHint("스포츠", List.of("스포츠", "레저", "운동", "자전거", "캠핑", "등산", "헬스")),
                     new CategoryHint("도서", List.of("도서", "책", "교재", "소설", "만화")));
 
     public AutoWriteResponse generateListing(AutoWriteRequest request) {
         if (request == null || CollectionUtils.isEmpty(request.imagePaths())) {
-            throw new IllegalArgumentException("최소 한 장의 이미지 경로가 필요합니다.");
+            throw new IllegalArgumentException("최소 1개의 이미지 경로가 필요합니다.");
         }
         List<String> resolved = new ArrayList<>();
         for (String imagePath : request.imagePaths()) {

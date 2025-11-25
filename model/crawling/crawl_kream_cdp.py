@@ -34,6 +34,7 @@ def setup_driver_with_cdp(use_persistent_profile=True):
     chrome_options = Options()
     chrome_options.add_argument('--start-maximized')
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
+    chrome_options.add_argument('--lang=ko-KR')
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
 
@@ -927,158 +928,110 @@ def crawl_kream_with_cdp(product_url, naver_id=None, naver_pw=None, phone_number
 
         # 사이즈 필터링 (270 사이즈 선택)
         print("\n사이즈 필터 설정 중...")
-        try:
-            # 1. 사이즈 필터 버튼 클릭 (.detail-size)
-            size_filter_btn = driver.execute_script("""
-                const btn = document.querySelector('div.product-trade-history-drawer__header_product_info > div.detail-size');
-                if (btn) {
-                    btn.click();
-                    return true;
-                }
-                return false;
-            """)
-
-            if size_filter_btn:
-                print("  ✓ 사이즈 필터 버튼 클릭")
-                time.sleep(1)
-
-                # 2. 270 사이즈 선택
-                size_270_clicked = driver.execute_script("""
-                    const size270 = document.querySelector('div.layer_container > div.layer_content > div.size_list_area.grid_list.grid_3 > div:nth-child(11) > div > span');
-                    if (size270 && size270.textContent.includes('270')) {
-                        size270.click();
-                        return true;
-                    }
-                    return false;
-                """)
-
-                if size_270_clicked:
-                    print("  ✓ 270 사이즈 선택 완료")
-                    time.sleep(1)
-
-                    # 3. 확인 버튼 클릭
-                    confirm_clicked = driver.execute_script("""
-                        const confirmBtn = document.querySelector('#bottomsheet_1762838817984 > div.layer_container > div.layer_bottom > div > button');
-                        if (confirmBtn) {
-                            confirmBtn.click();
-                            return true;
-                        }
-                        // 대체 선택자 시도 (ID가 동적일 수 있음)
-                        const altConfirmBtn = document.querySelector('div.layer_container > div.layer_bottom > div > button');
-                        if (altConfirmBtn) {
-                            altConfirmBtn.click();
-                            return true;
-                        }
-                        return false;
-                    """)
-
-                    if confirm_clicked:
-                        print("  ✓ 확인 버튼 클릭 완료")
-                        time.sleep(2)
-
-                        # 4. "채결 거래" 탭 클릭 및 확인
-                        print("  4. 채결 거래 탭 클릭 중...")
-
-                        # 먼저 drawer 안의 모든 탭 출력 (디버깅)
-                        all_tabs_info = driver.execute_script("""
-                            // drawer 컨테이너 찾기
-                            const drawer = document.querySelector('#panel1') ||
-                                         document.querySelector('.product-trade-history-drawer__content') ||
-                                         document.querySelector('[class*="drawer"]');
-
-                            const tabsInfo = [];
-                            if (drawer) {
-                                // drawer 안의 탭만 찾기
-                                const tabs = drawer.querySelectorAll('li.item > a, a[role="tab"], button[role="tab"]');
-                                tabs.forEach((tab, idx) => {
-                                    tabsInfo.push({
-                                        index: idx,
-                                        text: tab.textContent.trim(),
-                                        ariaSelected: tab.getAttribute('aria-selected'),
-                                        className: tab.className,
-                                        tagName: tab.tagName,
-                                        parentTag: tab.parentElement.tagName
-                                    });
-                                });
-                            }
-                            return tabsInfo;
-                        """)
-
-                        print(f"  [DEBUG] 발견된 탭들:")
-                        for tab_info in all_tabs_info[:5]:
-                            print(f"    - 텍스트: '{tab_info['text'][:30]}', aria-selected: {tab_info['ariaSelected']}, class: {tab_info['className'][:30]}")
-
-                        # 여러 번 시도
-                        max_attempts = 3
-                        is_selected = False
-
-                        for attempt in range(max_attempts):
-                            sales_tab_clicked = driver.execute_script("""
-                                // "채결 거래" 또는 "체결 거래" 텍스트로 찾기
-                                const tabs = document.querySelectorAll('li.item > a, a[role="tab"]');
-                                for (const tab of tabs) {
-                                    const text = tab.textContent.trim();
-                                    if (text.includes('채결') || text.includes('체결')) {
-                                        tab.click();
-                                        return true;
-                                    }
-                                }
-                                return false;
-                            """)
-
-                            if sales_tab_clicked:
-                                print(f"  ✓ 채결 거래 탭 클릭 시도 #{attempt + 1}")
-                                time.sleep(2)
-
-                                # aria-selected="true" 확인
-                                is_selected = driver.execute_script("""
-                                    const tabs = document.querySelectorAll('li.item > a, a[role="tab"]');
-                                    for (const tab of tabs) {
-                                        const text = tab.textContent.trim();
-                                        if ((text.includes('채결') || text.includes('체결'))
-                                            && tab.getAttribute('aria-selected') === 'true') {
-                                            return true;
-                                        }
-                                    }
-                                    return false;
-                                """)
-
-                                if is_selected:
-                                    print("  ✓ 채결 거래 탭 활성화 확인 (aria-selected=true)")
-                                    break
-                                else:
-                                    print(f"  ⚠ 시도 #{attempt + 1}: 탭이 활성화되지 않음, 재시도...")
-                                    time.sleep(1)
-                            else:
-                                print(f"  ⚠ 시도 #{attempt + 1}: 채결 거래 탭을 찾을 수 없음")
-                                time.sleep(1)
-
-                        if not is_selected:
-                            print("  ⚠⚠ 경고: 채결 거래 탭이 활성화되지 않았습니다! 데이터가 부정확할 수 있습니다.")
-                    else:
-                        print("  ⚠ 확인 버튼을 찾을 수 없습니다")
-                else:
-                    print("  ⚠ 270 사이즈를 찾을 수 없습니다")
-            else:
-                print("  ⚠ 사이즈 필터 버튼을 찾을 수 없습니다")
-        except Exception as e:
-            print(f"  ⚠ 사이즈 필터 설정 실패: {e}")
+        # 사이즈 필터링 비활성화 (모든 사이즈 데이터 수집)
 
         # Drawer 내에서 스크롤하면서 DOM 데이터 수집
         print("\nDrawer 스크롤 시작...")
-        scroll_drawer_and_wait(driver, wait_time=1000)  # 100초 스크롤
+        scroll_drawer_and_wait(driver, wait_time=20)  # 100초 스크롤
 
         # DOM에서 거래 데이터 추출
         print("\nDOM에서 거래 데이터 추출 중...")
         transactions = extract_dom_transactions(driver, wait_time=5)  # DOM 수집은 5초면 충분
 
         # 결과 정리
+        name_data = driver.execute_script("""
+            const getText = (selectors) => {
+                for (const sel of selectors) {
+                    const el = document.querySelector(sel);
+                    if (el && el.textContent) return el.textContent.trim();
+                }
+                return '';
+            };
+            // Trade/?? ??? ?? ??
+            const drawerKo = getText([
+                '.product-trade-history-drawer__header_product_info_name',
+                '[class*=\"product-trade-history-drawer__header_product_info_name\"]',
+                '#desktop-tablet-target-v-0-0-0 > div > div.product-trade-history-drawer__header_product_info > div.product-trade-history-drawer__header_product_info_content > div > div.product-trade-history-drawer__header_product_info_name'
+            ]);
+            const drawerDesc = Array.from(document.querySelectorAll(
+                '.product-trade-history-drawer__header_product_info_description p, [class*=\"product-trade-history-drawer__header_product_info_description\"] p'
+            ))
+              .map(el => el.textContent.trim()).filter(Boolean);
+            const drawerEn = drawerDesc.find(t => /[A-Za-z]/.test(t)) || '';
+
+            // ?? ?? ??
+            const primary = getText([
+                '#wrap .product-detail-left-section p',
+                '#wrap > div.layout__main--without-search > div > div > div.product-detail-left-section > div:nth-child(4) > div > div.layout_list_vertical.pc\\:cgap-2.mo\\:cgap-2.list-vertical-fill-available > div:nth-child(4) > div.layout_list_horizontal.sdui-fit-content > div > div > div:nth-child(1) > p',
+                '.text-lookup',
+                'p.text-lookup',
+                'p.text-lookup.display_paragraph',
+                'p.text-lookup.text-element',
+                'p[class*=text-lookup]',
+                'h1',
+                '.title',
+                '.product_title',
+                '.product-detail .name',
+                '.product_info_area h2'
+            ]);
+            const secondary = getText(['h2', '.sub_title', '.product_info_area h3']);
+            const ogTitle = (() => {
+                const el = document.querySelector('meta[property=\"og:title\"]');
+                return el && el.content ? el.content.trim() : '';
+            })();
+
+            const uniq = Array.from(new Set([drawerKo, drawerEn, primary, secondary, ogTitle]));
+            const hasKorean = (t) => /[\uac00-\ud7a3]/.test(t);
+            const hasLatin = (t) => /[A-Za-z]/.test(t);
+
+            const clean = (t) => {
+                if (!t) return '';
+                let cleaned = t;
+                const keywords = [
+                    \"\ucd5c\uadfc \uc2e4\uc138\", // ?? ??
+                    \"\uac70\ub798\",               // ??
+                    \"\uc785\ucc29\",               // ??
+                    \"\uc635\uc158\",               // ??
+                    \"\uc635\uc158\uad6c\ub9e4\", // ????
+                    \"\ube60\ub978\ubc30\uc1a1\", // ????
+                    \"\uac70\ub798\uc774\ub825\", // ????
+                    \"\uc785\ucc29\uc774\ub825\"  // ????
+                ];
+                for (const kw of keywords) {
+                    const idx = cleaned.indexOf(kw);
+                    if (idx >= 0) cleaned = cleaned.slice(0, idx);
+                }
+                cleaned = cleaned.split(/\\r?\\n/)[0].trim();
+                if (cleaned.length > 120) cleaned = cleaned.slice(0, 120);
+                return cleaned;
+            };
+
+            const valid = uniq.filter(Boolean).map(t => clean(t)).filter(t => t.length > 0);
+            const koreanCandidates = valid.filter(hasKorean).sort((a, b) => b.length - a.length);
+            const englishCandidates = valid.filter(hasLatin).sort((a, b) => b.length - a.length);
+            const korean = koreanCandidates[0] || '';
+            const english = englishCandidates[0] || '';
+            return { korean, english, primary, secondary, ogTitle, drawerKo, drawerEn };
+        """)
+
+        name_ko = name_data.get('korean') or name_data.get('primary') or ''
+        name_en = name_data.get('english') or name_data.get('secondary') or ''
+        # Drop generic placeholders like '상품'
+        generic_terms = ["\uc0c1\ud488", "\uac80\uc218 \ud2b9\uc774\uc0ac\ud56d", "\ube0c\ub79c\ub4dc \ud2b9\uc774\uc0ac\ud56d"]
+        if any(term in name_ko for term in generic_terms):
+            name_ko = ''
+        if any(term in name_en for term in generic_terms):
+            name_en = ''
+
         result = {
             'product_id': product_id,
             'product_url': product_url,
             'crawled_at': datetime.now().isoformat(),
             'total_transactions': len(transactions),
-            'transactions': transactions
+            'transactions': transactions,
+            'name': name_ko or name_en or '',
+            'koreanName': name_ko,
+            'englishName': name_en
         }
 
         return result

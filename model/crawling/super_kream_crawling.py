@@ -175,20 +175,64 @@ def run_forecast_all(data_dir: Path, run_tag: str) -> Path:
 def build_resell_feed(data_dir: Path, output_root: Path) -> None:
     """Convert crawl/forecast outputs into FrontEnd resell_auto.json."""
     records: List[Dict[str, Any]] = []
+    # Preserve existing predictions when possible to avoid wiping graphs on feed-only runs.
+    existing_feed: Dict[str, dict] = {}
+    if FRONTEND_RESELL_JSON.exists():
+        try:
+            with open(FRONTEND_RESELL_JSON, encoding="utf-8") as f:
+                for item in json.load(f):
+                    if isinstance(item, dict) and item.get("id"):
+                        existing_feed[item["id"]] = item
+        except Exception as exc:  # pragma: no cover - defensive
+            print(f"[WARN] Failed to load existing resell_auto.json: {exc}")
+
     mode_dir = "price_only"
     pred_file = f"predictions_h{PRED_LEN}.csv"
 
-    for json_path in sorted(data_dir.glob("kream_*_*.json")):
+    def pick_names(source: dict) -> tuple[str | None, str | None]:
+        """
+        Choose (korean_name, english_name) from crawl JSON first.
+        Filters out generic placeholders and requires script-specific characters to avoid mojibake.
+        """
+        raw_ko = (source.get("koreanName") or source.get("name") or "").strip()
+        raw_en = (source.get("englishName") or source.get("name_en") or source.get("name") or "").strip()
+
+        def has_korean(text: str) -> bool:
+            return bool(re.search(r"[가-힣]", text))
+
+        def has_latin(text: str) -> bool:
+            return bool(re.search(r"[A-Za-z]", text))
+
+        def is_generic(text: str) -> bool:
+            if not text:
+                return True
+            generic_terms = [
+                "상품",
+                "검수 특이사항 안내",
+                "확인하세요",
+            ]
+            return any(term in text for term in generic_terms)
+
+        name_ko = raw_ko if raw_ko and has_korean(raw_ko) and not is_generic(raw_ko) else None
+        name_en = raw_en if raw_en and has_latin(raw_en) and not is_generic(raw_en) else None
+        return name_ko, name_en
+
+    product_ids = get_product_ids_from_filenames(data_dir)
+    if not product_ids:
+        print("[WARN] No kream_* data files found; skip feed build.")
+        return
+
+    for pid in sorted(product_ids):
+        json_path = find_latest_file_for_pid(data_dir, pid)
+        if not json_path:
+            print(f"[WARN] No data file found for pid={pid}, skip")
+            continue
+
         try:
             with open(json_path, encoding="utf-8") as f:
                 data = json.load(f)
         except Exception as exc:
             print(f"[WARN] Failed to read {json_path.name}: {exc}")
-            continue
-
-        pid = str(data.get("product_id") or "").strip()
-        if not pid:
-            print(f"[WARN] {json_path.name}: missing product_id, skip")
             continue
 
         product_url = data.get("product_url") or f"https://kream.co.kr/products/{pid}"
@@ -256,6 +300,12 @@ def build_resell_feed(data_dir: Path, output_root: Path) -> None:
         else:
             print(f"[WARN] Prediction file missing: {pred_path}")
 
+        # Reuse previous predictions if the current run cannot find any.
+        existing_preds = (existing_feed.get(f"kream_{pid}") or {}).get("predictions") or []
+        if not predictions and existing_preds:
+            predictions = existing_preds
+            print(f"[INFO] Reused existing predictions for pid={pid}")
+
         # If predictions are far off (e.g., 10x), scale down by 1/10
         if predictions:
             hist_median = sorted(price_list)[len(price_list) // 2] if price_list else 0.0
@@ -269,9 +319,15 @@ def build_resell_feed(data_dir: Path, output_root: Path) -> None:
                     ]
                     print(f"[INFO] Scaled predictions by 1/10 for pid={pid} (outlier correction)")
 
+        name_ko, name_en = pick_names(data)
+        # Try to use a pre-downloaded image if present (public/resell_images/{pid}.png)
+        local_image_path = (FRONTEND_RESELL_JSON.parent / "resell_images" / f"{pid}.png")
+        local_image_url = f"/resell_images/{pid}.png" if local_image_path.exists() else None
+
         record = {
             "id": f"kream_{pid}",
-            "name": f"kream 상품 {pid}",
+            "name": name_en or name_ko or f"kream 상품 {pid}",
+            "nameKo": name_ko or name_en or f"kream 상품 {pid}",
             "brand": "kream_dataset",
             "category": "resell",
             "productUrl": product_url,
@@ -280,8 +336,12 @@ def build_resell_feed(data_dir: Path, output_root: Path) -> None:
             "changePercent": round(change_percent, 2),
             "priceHistory": price_history,
             "predictions": predictions,
+            "image": local_image_url,
         }
         records.append(record)
+
+    # Stable ordering to reduce merge conflicts in the generated JSON.
+    records = sorted(records, key=lambda item: item.get("id") or "")
 
     FRONTEND_RESELL_JSON.parent.mkdir(parents=True, exist_ok=True)
     with open(FRONTEND_RESELL_JSON, "w", encoding="utf-8") as f:
@@ -290,7 +350,12 @@ def build_resell_feed(data_dir: Path, output_root: Path) -> None:
 
 
 def get_latest_output_dir() -> Path | None:
-    candidates = sorted([p for p in OUTPUT_DIR.glob("run_*") if p.is_dir()], reverse=True)
+    candidates = [
+        p
+        for p in OUTPUT_DIR.iterdir()
+        if p.is_dir() and (p.name.startswith("run_") or p.name.startswith("resell_auto_"))
+    ]
+    candidates = sorted(candidates, key=lambda path: path.stat().st_mtime, reverse=True)
     return candidates[0] if candidates else None
 
 
