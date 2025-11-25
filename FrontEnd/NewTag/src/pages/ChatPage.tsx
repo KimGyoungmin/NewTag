@@ -213,7 +213,7 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
   };
 
   return (
-    <div className="flex flex-col h-[100dvh] md:h-screen bg-background overflow-hidden relative">
+    <div className="flex flex-col h-[100dvh] md:h-screen bg-background overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between border-b bg-background px-4 h-14 shrink-0 sticky top-0 z-40">
         <div className="flex items-center gap-3 flex-1">
@@ -256,7 +256,7 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
         </AlertDialog>
       </div>
 
-      <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {/* Product Info Card */}
         {room && (
           <div className="border-b bg-card px-4 py-3 shrink-0">
@@ -283,10 +283,7 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
         )}
 
         {/* Messages */}
-        <div
-          ref={messagesContainerRef}
-          className="flex-1 overflow-y-auto px-4 py-6 space-y-4 mb-[72px] md:mb-4"
-        >
+        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 py-6 space-y-4">
           {messages.map((msg) => {
             const isMine = currentUser && msg.senderId === currentUser.id;
             const reviewed =
@@ -342,7 +339,7 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
         </div>
 
         {/* Input Area */}
-        <div className="fixed bottom-16 left-0 right-0 md:relative md:bottom-auto border-t bg-background p-4 z-40">
+        <div className="border-t bg-background p-4 shrink-0 sticky bottom-0">
           <div className="flex items-center gap-2">
             <Input
               type="text"
