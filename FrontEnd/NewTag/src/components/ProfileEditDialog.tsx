@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,6 +13,9 @@ import { Label } from "./ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { Camera } from "lucide-react";
 import { UserProfile } from "../utils/localStorage";
+import { userApi } from "../api/userApi";
+import { toast } from "sonner";
+import { resolveImageUrl } from "../utils/image";
 
 interface ProfileEditDialogProps {
   open: boolean;
@@ -28,19 +31,36 @@ export function ProfileEditDialog({
   onSave,
 }: ProfileEditDialogProps) {
   const [editedProfile, setEditedProfile] = useState<UserProfile>(profile);
+  const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 다이얼로그 열릴 때마다 최신 프로필로 초기화
+  useEffect(() => {
+    if (open) {
+      setEditedProfile(profile);
+    }
+  }, [open, profile]);
+
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setEditedProfile({
-          ...editedProfile,
-          profileImage: reader.result as string,
-        });
-      };
-      reader.readAsDataURL(file);
+      try {
+        setUploading(true);
+        const result = await userApi.uploadProfileImage(file);
+        if (result.success) {
+          setEditedProfile({
+            ...editedProfile,
+            profileImage: resolveImageUrl(result.url),
+          });
+          toast.success("프로필 사진이 업로드되었습니다.");
+        } else {
+          toast.error("프로필 사진 업로드에 실패했습니다.");
+        }
+      } catch (err: any) {
+        toast.error(err?.message || "프로필 사진 업로드 중 오류가 발생했습니다.");
+      } finally {
+        setUploading(false);
+      }
     }
   };
 
@@ -108,15 +128,15 @@ export function ProfileEditDialog({
             />
           </div>
 
-          {/* 이메일 */}
+          {/* 휴대폰 번호 */}
           <div className="space-y-2">
-            <Label htmlFor="email">이메일</Label>
+            <Label htmlFor="phone">휴대폰 번호</Label>
             <Input
-              id="email"
-              type="email"
-              value={editedProfile.email}
+              id="phone"
+              type="tel"
+              value={editedProfile.phone || ""}
               onChange={(e) =>
-                setEditedProfile({ ...editedProfile, email: e.target.value })
+                setEditedProfile({ ...editedProfile, phone: e.target.value })
               }
             />
           </div>
@@ -126,7 +146,9 @@ export function ProfileEditDialog({
           <Button variant="outline" onClick={onClose}>
             취소
           </Button>
-          <Button onClick={handleSave}>저장</Button>
+          <Button onClick={handleSave} disabled={uploading}>
+            {uploading ? "업로드 중..." : "저장"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

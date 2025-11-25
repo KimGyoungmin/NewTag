@@ -25,16 +25,24 @@ public class FileStorageService {
     @Value("${app.upload.product-dir:products}")
     private String productDir;
 
+    @Value("${app.upload.profile-base-dir:BackEnd/src/main/resources/userprofile}")
+    private String profileBaseDir;
+
+    @Value("${app.upload.profile-dir:userprofile}")
+    private String profileDir;
+
     private static final int OPTIMIZE_MAX_WIDTH = 1600;
     private static final int OPTIMIZE_MAX_HEIGHT = 1600;
     private static final double OPTIMIZE_QUALITY = 0.85;
     private static final int THUMBNAIL_SIZE = 300;
 
     private Path baseDirectoryPath;
+    private Path profileBaseDirectoryPath;
 
     @PostConstruct
     void init() {
         this.baseDirectoryPath = Paths.get(baseDir).toAbsolutePath().normalize();
+        this.profileBaseDirectoryPath = Paths.get(profileBaseDir).toAbsolutePath().normalize();
     }
 
     /**
@@ -71,6 +79,34 @@ public class FileStorageService {
         } catch (IOException e) {
             log.error("❌ Failed to store image", e);
             throw new RuntimeException("이미지 업로드에 실패했습니다: " + e.getMessage());
+        }
+    }
+
+    /**
+     * 프로필 이미지 저장
+     */
+    public String storeProfileImage(MultipartFile file, String folderName) {
+        validateFile(file);
+
+        String extension = getFileExtension(file.getOriginalFilename());
+        String filename = "profile_" + UUID.randomUUID().toString().replace("-", "").substring(0, 10) + extension;
+        String folder = (folderName != null && !folderName.isBlank()) ? folderName : "temp";
+
+        try {
+            Path userFolder = getProfileFolder(folder);
+            Files.createDirectories(userFolder);
+
+            Path targetLocation = userFolder.resolve(filename);
+            file.transferTo(targetLocation);
+
+            optimizeImageFile(targetLocation);
+
+            String relativePath = profileDir + "/" + folder + "/" + filename;
+            log.info("Stored profile image: {}", targetLocation);
+            return relativePath.replace("\\", "/");
+        } catch (IOException e) {
+            log.error("Failed to store profile image", e);
+            throw new RuntimeException("프로필 이미지를 저장하지 못했습니다: " + e.getMessage());
         }
     }
 
@@ -200,6 +236,11 @@ public class FileStorageService {
 
     private Path getProductFolder(String folder) {
         return baseDirectoryPath.resolve(Paths.get(productDir, folder)).normalize();
+    }
+
+    private Path getProfileFolder(String folder) {
+        // 프로필 기본 경로(profileBaseDir) 하위에 사용자 폴더만 붙인다.
+        return profileBaseDirectoryPath.resolve(folder).normalize();
     }
 
     private Path getAbsolutePath(String relativePath) {

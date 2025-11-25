@@ -58,4 +58,17 @@ public class UserDtos {
                     .build();
         }
     }
+
+    @Getter
+    @Builder
+    @NoArgsConstructor
+    @AllArgsConstructor
+    public static class UpdateRequest {
+        private String name;
+        private String nick;
+        private String email;
+        private String phone;
+        private LocalDate birth;
+        private String profileImg;
+    }
 }
