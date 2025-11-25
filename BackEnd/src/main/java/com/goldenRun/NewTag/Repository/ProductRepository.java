@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import com.goldenRun.NewTag.dto.ProductDtos;
 import com.goldenRun.NewTag.entity.Product;
 import com.goldenRun.NewTag.enums.ProductStatus;
 
@@ -24,9 +25,33 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     @Query("SELECT p FROM Product p WHERE p.is_delete = false")
     Page<Product> findAllNotDeleted(Pageable pageable);
 
+    // 삭제되지 않은 상품을 Fetch Join으로 조회 (N+1 최적화)
+    @Query("SELECT DISTINCT p FROM Product p " +
+           "LEFT JOIN FETCH p.seller " +
+           "LEFT JOIN FETCH p.category " +
+           "LEFT JOIN FETCH p.images " +
+           "WHERE p.is_delete = false")
+    List<Product> findAllNotDeletedWithFetchJoin();
+
+    // ID로 상품 조회 (Fetch Join)
+    @Query("SELECT p FROM Product p " +
+           "LEFT JOIN FETCH p.seller " +
+           "LEFT JOIN FETCH p.category " +
+           "LEFT JOIN FETCH p.images " +
+           "WHERE p.id = :id AND p.is_delete = false")
+    Product findByIdWithFetchJoin(@Param("id") Long id);
+
     // 카테고리별 상품 조회
     @Query("SELECT p FROM Product p WHERE p.category.id = :categoryId AND p.is_delete = false")
     Page<Product> findByCategoryNotDeleted(@Param("categoryId") Long categoryId, Pageable pageable);
+
+    // 카테고리별 상품 조회 (Fetch Join)
+    @Query("SELECT DISTINCT p FROM Product p " +
+           "LEFT JOIN FETCH p.seller " +
+           "LEFT JOIN FETCH p.category " +
+           "LEFT JOIN FETCH p.images " +
+           "WHERE p.category.id = :categoryId AND p.is_delete = false")
+    List<Product> findByCategoryNotDeletedWithFetchJoin(@Param("categoryId") Long categoryId);
 
     // 판매 상태별 상품 조회
     @Query("SELECT p FROM Product p WHERE p.status = :status AND p.is_delete = false")
@@ -90,4 +115,43 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     List<Product> findByIsDeleteTrueAndUpdatedAtBefore(
             @Param("cutoffDate") LocalDateTime cutoffDate
     );
+
+    // DTO Projection 조회 (N+1 최적화 - 최고 성능)
+    @Query("SELECT p.id as id, " +
+           "p.title as title, " +
+           "p.price as price, " +
+           "p.location_nm as locationNm, " +
+           "p.latitude as latitude, " +
+           "p.longitude as longitude, " +
+           "p.createdAt as createdAt, " +
+           "p.view_count as viewCount, " +
+           "p.isResell as isResell, " +
+           "p.seller.id as sellerId, " +
+           "p.seller.nick as sellerNick, " +
+           "p.seller.name as sellerName, " +
+           "p.category.id as categoryId, " +
+           "p.category.categoryNm as categoryName, " +
+           "(SELECT pi.path FROM ProductImage pi WHERE pi.product.id = p.id AND pi.is_main = true) as mainImagePath " +
+           "FROM Product p " +
+           "WHERE p.is_delete = false")
+    Page<ProductDtos.ProductListProjection> findAllNotDeletedWithProjection(Pageable pageable);
+
+    @Query("SELECT p.id as id, " +
+           "p.title as title, " +
+           "p.price as price, " +
+           "p.location_nm as locationNm, " +
+           "p.latitude as latitude, " +
+           "p.longitude as longitude, " +
+           "p.createdAt as createdAt, " +
+           "p.view_count as viewCount, " +
+           "p.isResell as isResell, " +
+           "p.seller.id as sellerId, " +
+           "p.seller.nick as sellerNick, " +
+           "p.seller.name as sellerName, " +
+           "p.category.id as categoryId, " +
+           "p.category.categoryNm as categoryName, " +
+           "(SELECT pi.path FROM ProductImage pi WHERE pi.product.id = p.id AND pi.is_main = true) as mainImagePath " +
+           "FROM Product p " +
+           "WHERE p.category.id = :categoryId AND p.is_delete = false")
+    Page<ProductDtos.ProductListProjection> findByCategoryNotDeletedWithProjection(@Param("categoryId") Long categoryId, Pageable pageable);
 }

@@ -77,12 +77,16 @@ public class ProductService {
     }
 
     /**
-     * 상품 상세 조회
+     * 상품 상세 조회 (N+1 최적화 적용)
      */
     @Transactional
     public ProductDtos.DetailResponse getProductDetail(Long productId, Long currentUserId) {
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
+        // Fetch Join으로 연관 엔티티 한 번에 조회
+        Product product = productRepository.findByIdWithFetchJoin(productId);
+
+        if (product == null) {
+            throw new IllegalArgumentException("상품을 찾을 수 없습니다.");
+        }
 
         if (product.getIs_delete()) {
             throw new IllegalArgumentException("삭제된 상품입니다.");

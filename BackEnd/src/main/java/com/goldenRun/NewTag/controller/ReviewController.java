@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -23,9 +24,9 @@ public class ReviewController {
     @PostMapping
     public ResponseEntity<ReviewDtos.Response> createReview(
             @Valid @RequestBody ReviewDtos.CreateRequest request,
-            @AuthenticationPrincipal String currentUserNick
+            @AuthenticationPrincipal UserDetails userDetails
     ) {
-        ReviewDtos.Response response = reviewService.createReview(request, currentUserNick);
+        ReviewDtos.Response response = reviewService.createReview(request, userDetails.getUsername());
         return ResponseEntity.ok(response);
     }
 
@@ -58,9 +59,9 @@ public class ReviewController {
     @GetMapping("/exists")
     public ResponseEntity<Map<String, Object>> existsReview(
             @RequestParam Long transactionId,
-            @AuthenticationPrincipal String currentUserNick
+            @AuthenticationPrincipal UserDetails userDetails
     ) {
-        boolean exists = reviewService.hasReview(transactionId, currentUserNick);
+        boolean exists = reviewService.hasReview(transactionId, userDetails.getUsername());
         return ResponseEntity.ok(Map.of("exists", exists));
     }
 
