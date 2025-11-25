@@ -270,4 +270,185 @@ export const chatService = {
       updatedAt: serverTimestamp(),
     });
   },
+
+  // 안읽은 메시지 개수 조회
+  getUnreadCount: async (chatRoomId: string, userId: number): Promise<number> => {
+    const q = query(
+      collection(db, 'messages'),
+      where('chatRoomId', '==', chatRoomId),
+      where('senderId', '!=', userId),
+      where('isRead', '==', false)
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.size;
+  },
+
+  // 특정 상품의 채팅방 개수 조회
+  getChatCountByProductId: async (productId: number): Promise<number> => {
+    const q = query(
+      collection(db, 'chatRooms'),
+      where('productId', '==', productId)
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.size;
+  },
+
+  // 여러 상품의 채팅방 개수 일괄 조회
+  getChatCountsByProductIds: async (productIds: number[]): Promise<Map<number, number>> => {
+    const counts = new Map<number, number>();
+
+    // productIds를 10개씩 나눠서 처리 (Firebase IN 쿼리 제한)
+    const chunkSize = 10;
+    for (let i = 0; i < productIds.length; i += chunkSize) {
+      const chunk = productIds.slice(i, i + chunkSize);
+
+      const q = query(
+        collection(db, 'chatRooms'),
+        where('productId', 'in', chunk)
+      );
+
+      const snapshot = await getDocs(q);
+
+      snapshot.docs.forEach(doc => {
+        const productId = doc.data().productId;
+        counts.set(productId, (counts.get(productId) || 0) + 1);
+      });
+    }
+
+    return counts;
+  },
+
+  // 사용자의 전체 안읽은 메시지 개수 조회 (인덱스 불필요)
+  getTotalUnreadCount: async (userId: number): Promise<number> => {
+    console.log('[chatService] getTotalUnreadCount called for userId:', userId);
+
+    // 1. 내가 참여한 채팅방 목록 가져오기
+    const chatRoomsQuery1 = query(
+      collection(db, 'chatRooms'),
+      where('buyerId', '==', userId)
+    );
+    const chatRoomsQuery2 = query(
+      collection(db, 'chatRooms'),
+      where('sellerId', '==', userId)
+    );
+
+    const [buyerRooms, sellerRooms] = await Promise.all([
+      getDocs(chatRoomsQuery1),
+      getDocs(chatRoomsQuery2)
+    ]);
+
+    console.log('[chatService] My chat rooms - buyer:', buyerRooms.size, 'seller:', sellerRooms.size);
+
+    const myChatRoomIds = [
+      ...buyerRooms.docs.map(doc => doc.id),
+      ...sellerRooms.docs.map(doc => doc.id)
+    ];
+
+    // 2. 각 채팅방의 안읽은 메시지 개수를 조회하고 합산
+    let totalUnread = 0;
+    for (const roomId of myChatRoomIds) {
+      const messagesQuery = query(
+        collection(db, 'messages'),
+        where('chatRoomId', '==', roomId),
+        where('isRead', '==', false)
+      );
+
+      const messagesSnapshot = await getDocs(messagesQuery);
+
+      // 내가 보낸 메시지는 제외
+      const unreadFromOthers = messagesSnapshot.docs.filter(
+        doc => doc.data().senderId !== userId
+      ).length;
+
+      totalUnread += unreadFromOthers;
+    }
+
+    console.log('[chatService] Total unread messages:', totalUnread);
+    return totalUnread;
+  },
+
+  // 사용자의 전체 안읽은 메시지 개수 실시간 구독
+  subscribeToTotalUnreadCount: (
+    userId: number,
+    callback: (count: number) => void
+  ): (() => void) => {
+    console.log('[chatService] subscribeToTotalUnreadCount started for userId:', userId);
+
+    let myChatRoomIds: string[] = [];
+    const unsubscribers: Array<() => void> = [];
+
+    // 1. 내 채팅방 목록 실시간 구독
+    const chatRoomsQuery1 = query(
+      collection(db, 'chatRooms'),
+      where('buyerId', '==', userId)
+    );
+    const chatRoomsQuery2 = query(
+      collection(db, 'chatRooms'),
+      where('sellerId', '==', userId)
+    );
+
+    let messageUnsubscribers: Array<() => void> = [];
+
+    const updateChatRooms = () => {
+      // 기존 메시지 구독 해제
+      messageUnsubscribers.forEach(unsub => unsub());
+      messageUnsubscribers = [];
+
+      // 각 채팅방의 안읽은 메시지 실시간 구독
+      const unreadCounts = new Map<string, number>();
+
+      if (myChatRoomIds.length === 0) {
+        callback(0);
+        return;
+      }
+
+      myChatRoomIds.forEach(roomId => {
+        const messagesQuery = query(
+          collection(db, 'messages'),
+          where('chatRoomId', '==', roomId),
+          where('isRead', '==', false)
+        );
+
+        const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
+          // 내가 보낸 메시지는 제외
+          const unreadFromOthers = snapshot.docs.filter(
+            doc => doc.data().senderId !== userId
+          ).length;
+
+          unreadCounts.set(roomId, unreadFromOthers);
+
+          // 전체 합산
+          const total = Array.from(unreadCounts.values()).reduce((sum, count) => sum + count, 0);
+          console.log('[chatService] Real-time unread count updated:', total);
+          callback(total);
+        });
+
+        messageUnsubscribers.push(unsubscribe);
+      });
+    };
+
+    // 채팅방 목록 구독 (buyer)
+    const unsubBuyer = onSnapshot(chatRoomsQuery1, (snapshot) => {
+      const buyerRoomIds = snapshot.docs.map(doc => doc.id);
+
+      onSnapshot(chatRoomsQuery2, (snapshot2) => {
+        const sellerRoomIds = snapshot2.docs.map(doc => doc.id);
+        myChatRoomIds = [...buyerRoomIds, ...sellerRoomIds];
+
+        console.log('[chatService] Chat rooms updated:', myChatRoomIds.length);
+        updateChatRooms();
+      });
+    });
+
+    unsubscribers.push(unsubBuyer);
+
+    // 모든 구독 해제 함수 반환
+    return () => {
+      console.log('[chatService] Unsubscribing from unread count');
+      unsubscribers.forEach(unsub => unsub());
+      messageUnsubscribers.forEach(unsub => unsub());
+    };
+  },
 };

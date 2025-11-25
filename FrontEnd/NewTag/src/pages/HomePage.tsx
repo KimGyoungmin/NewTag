@@ -154,6 +154,13 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
       const filtered = filterProductsByLocation(newProducts, selectedAddress);
       setProducts(filtered);
 
+      // 상품별 채팅 개수 조회
+      if (newProducts.length > 0) {
+        const productIds = newProducts.map((p: Product) => p.id);
+        const counts = await chatRoomsApi.getChatRoomCountsByProducts(productIds);
+        setChatCounts(counts);
+      }
+
       // 30개 미만이면 더 이상 로드할 데이터가 없음
       if (newProducts.length < 30) {
         setHasMore(false);
@@ -210,6 +217,11 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
         const filtered = filterProductsByLocation(updatedAll, selectedAddress);
         setProducts(filtered);
         setCurrentPage(nextPage);
+
+        // 새로 추가된 상품의 채팅 개수 조회
+        const newProductIds = newProducts.map((p: Product) => p.id);
+        const newCounts = await chatRoomsApi.getChatRoomCountsByProducts(newProductIds);
+        setChatCounts(prev => new Map([...prev, ...newCounts]));
       }
 
       // 10개 미만이면 더 이상 로드할 데이터가 없음
@@ -503,7 +515,7 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
                           location={product.locationNm}
                           timeAgo={product.timeAgo}
                           likes={product.favoriteCount}
-                          chatCount={product.viewCount}
+                          chatCount={chatCounts.get(product.id) ?? 0}
                           isLikedByMe={favoriteProductIds.has(product.id)}
                           sellerNick={product.seller?.nick}
                           onClick={() => onNavigate('detail', product.id.toString())}
@@ -522,7 +534,7 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
                         location={product.locationNm}
                         timeAgo={product.timeAgo}
                         likes={product.favoriteCount}
-                        chatCount={product.viewCount}
+                        chatCount={chatCounts.get(product.id) ?? 0}
                         isLikedByMe={favoriteProductIds.has(product.id)}
                         sellerNick={product.seller?.nick}
                         onClick={() => onNavigate('detail', product.id.toString())}

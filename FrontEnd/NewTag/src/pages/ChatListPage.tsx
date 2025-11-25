@@ -14,6 +14,7 @@ export function ChatListPage({ onNavigate }: ChatListPageProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [rooms, setRooms] = useState<ChatRoom[]>([]);
+  const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     let unsubscribe: (() => void) | null = null;
@@ -32,8 +33,18 @@ export function ChatListPage({ onNavigate }: ChatListPageProps) {
         return;
       }
 
-      unsubscribe = chatService.subscribeToChatRooms(me.id, (list) => {
+      unsubscribe = chatService.subscribeToChatRooms(me.id, async (list) => {
         setRooms(list);
+
+        // 각 채팅방의 안읽은 메시지 개수 조회
+        const counts: Record<string, number> = {};
+        await Promise.all(
+          list.map(async (room) => {
+            const count = await chatService.getUnreadCount(room.id, me.id);
+            counts[room.id] = count;
+          })
+        );
+        setUnreadCounts(counts);
       });
     };
 
@@ -55,9 +66,10 @@ export function ChatListPage({ onNavigate }: ChatListPageProps) {
       lastMessage: string;
       lastMessageTime: string;
       unreadCount: number;
+      lastMessageDate: Date | null;
     }>;
 
-    return rooms.map((room) => {
+    const mapped = rooms.map((room) => {
       const isSeller = currentUser.id === room.sellerId;
       const peerNick = isSeller ? room.buyerNick : room.sellerNick;
       const peerImg = isSeller ? room.buyerProfileImg : room.sellerProfileImg;
@@ -69,10 +81,23 @@ export function ChatListPage({ onNavigate }: ChatListPageProps) {
         productImage: room.productImage,
         lastMessage: room.lastMessage || "",
         lastMessageTime: lastAt,
-        unreadCount: 0,
+        unreadCount: unreadCounts[room.id] || 0,
+        lastMessageDate: room.lastMessageAt || null,
       };
     });
-  }, [rooms, currentUser]);
+
+    // 안읽은 메시지가 있는 채팅을 먼저, 그 다음 최신 메시지 순으로 정렬
+    return mapped.sort((a, b) => {
+      // 안읽은 메시지가 있는 채팅을 위로
+      if (a.unreadCount > 0 && b.unreadCount === 0) return -1;
+      if (a.unreadCount === 0 && b.unreadCount > 0) return 1;
+
+      // 최신 메시지 순으로 정렬
+      const dateA = a.lastMessageDate?.getTime() || 0;
+      const dateB = b.lastMessageDate?.getTime() || 0;
+      return dateB - dateA;
+    });
+  }, [rooms, currentUser, unreadCounts]);
 
   const filteredChats = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();

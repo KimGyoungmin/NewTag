@@ -5,10 +5,11 @@ console.log('[BottomNav] Component file loaded at:', new Date().toLocaleTimeStri
 interface BottomNavProps {
   currentPage: string;
   onNavigate: (page: string) => void;
+  unreadChatCount?: number;
 }
 
-export function BottomNav({ currentPage, onNavigate }: BottomNavProps) {
-  console.log('[BottomNav] Component rendered, currentPage:', currentPage);
+export function BottomNav({ currentPage, onNavigate, unreadChatCount = 0 }: BottomNavProps) {
+  console.log('[BottomNav] Component rendered, currentPage:', currentPage, 'unreadChatCount:', unreadChatCount);
   const navItems = [
     { id: 'home', label: '홈', icon: Home },
     { id: 'resell', label: '리셀', icon: TrendingUp },
@@ -23,6 +24,7 @@ export function BottomNav({ currentPage, onNavigate }: BottomNavProps) {
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive = currentPage === item.id;
+          const showBadge = item.id === 'chat' && unreadChatCount > 0;
 
           return (
             <button
@@ -38,7 +40,14 @@ export function BottomNav({ currentPage, onNavigate }: BottomNavProps) {
               }`}
               style={{ position: 'relative', zIndex: 10000 }}
             >
-              <Icon className="h-6 w-6" />
+              <div className="relative">
+                <Icon className="h-6 w-6" />
+                {showBadge && (
+                  <div className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white font-bold">
+                    {unreadChatCount > 99 ? '99+' : unreadChatCount}
+                  </div>
+                )}
+              </div>
               <span className="text-xs mt-1">{item.label}</span>
             </button>
           );
