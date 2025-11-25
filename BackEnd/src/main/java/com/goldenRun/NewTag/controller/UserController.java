@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.goldenRun.NewTag.dto.UserDtos;
 import com.goldenRun.NewTag.entity.User;
+import com.goldenRun.NewTag.service.GoogleAuthService;
 import com.goldenRun.NewTag.service.KakaoAuthService;
 import com.goldenRun.NewTag.service.UserService;
 
@@ -33,6 +34,9 @@ public class UserController {
 
 	@Autowired
 	private KakaoAuthService kakaoAuthService;
+
+	@Autowired
+	private GoogleAuthService googleAuthService;
 
 	@PostMapping("/login")
 	public ResponseEntity<Map<String, Object>> login(@RequestBody User loginUser) {
@@ -82,5 +86,13 @@ public class UserController {
 	@GetMapping("/auth/kakao/callback")
 	public ResponseEntity<Map<String, Object>> kakaoCallback(@RequestParam String code) {
 		return kakaoAuthService.processKakaoLogin(code);
+	}
+
+	/**
+	 * 구글 로그인 콜백 처리
+	 */
+	@GetMapping("/auth/google/callback")
+	public ResponseEntity<Map<String, Object>> googleCallback(@RequestParam String code) {
+		return googleAuthService.processGoogleLogin(code);
 	}
 }
