@@ -9,6 +9,7 @@ import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,10 +27,10 @@ public class PurchaseController {
     @GetMapping
     public ResponseEntity<Map<String, Object>> getPurchaseHistory(
             @RequestParam(name = "status", required = false) ProductStatus status,
-            @AuthenticationPrincipal String currentUserNick
+            @AuthenticationPrincipal UserDetails userDetails
     ) {
         List<PurchaseDtos.HistoryItem> purchases = purchaseService.getMyPurchases(
-                currentUserNick,
+                userDetails.getUsername(),
                 status
         );
 

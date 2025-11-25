@@ -17,6 +17,7 @@ import { addressApi, type Address } from "../api/addressApi";
 import { resolveImageUrl } from "../utils/image";
 import { getAddressFromCoords, getCurrentPosition } from "../utils/kakaoMap";
 import { calculateDistance } from "../utils/distance";
+import { chatRoomsApi } from "../api/firebase";
 import { toast } from "sonner";
 
 interface HomePageProps {
@@ -62,6 +63,7 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
   const [selectedAddress, setSelectedAddress] = useState<Address | null>(null);
   const [myAddresses, setMyAddresses] = useState<Address[]>([]);
   const [addressesLoaded, setAddressesLoaded] = useState(false); // 주소 로드 완료 플래그
+  const [chatCounts, setChatCounts] = useState<Map<number, number>>(new Map()); // 상품별 채팅방 개수
   const MAX_DISTANCE_KM = 10; // 최대 거리 10km
 
   // 위치 기반 상품 필터링 함수

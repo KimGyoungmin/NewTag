@@ -187,6 +187,7 @@ export function MyPage({ onNavigate }: MyPageProps) {
       fetchWishlist(userId);
       fetchMyProducts(userId);
       fetchPurchaseHistory();
+      console.log("에러 확인" + fetchPurchaseHistory());
       fetchReviews(userId);
       fetchRatingSummary(userId);
     };
