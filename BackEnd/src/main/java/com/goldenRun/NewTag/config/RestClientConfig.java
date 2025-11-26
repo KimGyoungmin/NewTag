@@ -1,7 +1,6 @@
 package com.goldenRun.NewTag.config;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -33,9 +32,6 @@ public class RestClientConfig {
         public ClientHttpResponse intercept(HttpRequest request, byte[] body, ClientHttpRequestExecution execution) throws IOException {
             System.out.println("[RestTemplate] Request URI: " + request.getURI());
             System.out.println("[RestTemplate] Request Method: " + request.getMethod());
-            System.out.println("[RestTemplate] Request Headers: " + request.getHeaders());
-            System.out.println("[RestTemplate] Request Body: " + new String(body, StandardCharsets.UTF_8));
-            System.out.println("[RestTemplate] Request Body Length: " + body.length);
 
             ClientHttpResponse response = execution.execute(request, body);
 

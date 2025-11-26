@@ -1,3 +1,9 @@
+<<<<<<< HEAD
+2025/11/25-09:25:29.919 2224 Reusing MANIFEST C:\NT\NewTag\model\crawling\selenium_profile\Default\Sync Data\LevelDB/MANIFEST-000001
+2025/11/25-09:25:29.926 2224 Recovering log #3
+2025/11/25-09:25:29.927 2224 Reusing old log C:\NT\NewTag\model\crawling\selenium_profile\Default\Sync Data\LevelDB/000003.log 
+=======
 2025/11/20-16:43:39.045 9d4 Reusing MANIFEST C:\NT\NewTag\model\crawling\selenium_profile\Default\Sync Data\LevelDB/MANIFEST-000001
 2025/11/20-16:43:39.072 9d4 Recovering log #3
 2025/11/20-16:43:39.073 9d4 Reusing old log C:\NT\NewTag\model\crawling\selenium_profile\Default\Sync Data\LevelDB/000003.log 
+>>>>>>> origin/dev

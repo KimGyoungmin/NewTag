@@ -56,14 +56,9 @@ const refreshAccessToken = async (): Promise<string | null> => {
 apiClient.interceptors.request.use(
   (config) => {
     const token = tokenManager.getAccessToken();
-    console.log('[API Client] Request interceptor - URL:', config.url);
-    console.log('[API Client] Token from tokenManager:', token ? `${token.substring(0, 20)}...` : 'null');
 
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
-      console.log('[API Client] Authorization header set');
-    } else {
-      console.log('[API Client] No token or no headers - Authorization not set');
     }
     return config;
   },
