@@ -14,6 +14,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { SignupPage } from "./pages/SignupPage";
 import { KakaoCallbackPage } from "./pages/KakaoCallbackPage";
 import { GoogleCallbackPage } from "./pages/GoogleCallbackPage";
+import { NaverCallbackPage } from "./pages/NaverCallbackPage";
 import { authApi } from "./api/auth";
 import { chatService } from "./services/firebase/chatService";
 import type { ResellProductRecord } from "./data/resellProducts";
@@ -250,6 +251,11 @@ export default function App() {
           <Route
             path="/auth/google/callback"
             element={<GoogleCallbackPage />}
+          />
+          {/* 네이버 로그인 콜백 */}
+          <Route
+            path="/auth/naver/callback"
+            element={<NaverCallbackPage />}
           />
 
           {/* 보호된 라우트 - 로그인 필요 */}

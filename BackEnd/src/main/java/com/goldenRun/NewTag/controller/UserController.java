@@ -20,6 +20,7 @@ import com.goldenRun.NewTag.dto.UserDtos;
 import com.goldenRun.NewTag.entity.User;
 import com.goldenRun.NewTag.service.GoogleAuthService;
 import com.goldenRun.NewTag.service.KakaoAuthService;
+import com.goldenRun.NewTag.service.NaverAuthService;
 import com.goldenRun.NewTag.service.UserService;
 
 import jakarta.servlet.http.HttpServletRequest;
@@ -37,6 +38,9 @@ public class UserController {
 
 	@Autowired
 	private GoogleAuthService googleAuthService;
+
+	@Autowired
+	private NaverAuthService naverAuthService;
 
 	@PostMapping("/login")
 	public ResponseEntity<Map<String, Object>> login(@RequestBody User loginUser) {
@@ -94,5 +98,15 @@ public class UserController {
 	@GetMapping("/auth/google/callback")
 	public ResponseEntity<Map<String, Object>> googleCallback(@RequestParam String code) {
 		return googleAuthService.processGoogleLogin(code);
+	}
+
+	/**
+	 * 네이버 로그인 콜백 처리
+	 */
+	@GetMapping("/auth/naver/callback")
+	public ResponseEntity<Map<String, Object>> naverCallback(
+			@RequestParam String code,
+			@RequestParam String state) {
+		return naverAuthService.processNaverLogin(code, state);
 	}
 }
