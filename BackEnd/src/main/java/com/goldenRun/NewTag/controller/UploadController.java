@@ -58,4 +58,20 @@ public class UploadController {
                 "url", url
         ));
     }
+
+    @PostMapping("/chat")
+    public ResponseEntity<Map<String, Object>> uploadChatImage(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "chatRoomId", required = false) String chatRoomId
+    ) {
+        String folder = chatRoomId != null ? "chat/" + chatRoomId : "chat/temp";
+        String path = fileStorageService.storeChatImage(file, folder);
+        String url = "/api/v1/static/" + path;
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "path", path,
+                "url", url
+        ));
+    }
 }

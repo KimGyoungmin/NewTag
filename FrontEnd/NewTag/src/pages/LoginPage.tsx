@@ -86,6 +86,13 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
         toast.error('구글 로그인 중 오류가 발생했습니다.');
         console.error('Google login error:', error);
       }
+    } else if (provider === 'naver') {
+      try {
+        authApi.loginWithNaver();
+      } catch (error) {
+        toast.error('네이버 로그인 중 오류가 발생했습니다.');
+        console.error('Naver login error:', error);
+      }
     } else {
       console.log("Social login:", provider);
       toast.info(`${provider} 로그인은 준비 중입니다.`);

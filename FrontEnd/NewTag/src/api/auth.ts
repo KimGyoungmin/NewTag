@@ -124,4 +124,43 @@ export const authApi = {
     handleAuthSuccess(response.data);
     return response.data;
   },
+
+  /**
+   * 네이버 로그인 - 인증 URL로 리다이렉트
+   */
+  loginWithNaver: (): void => {
+    // @ts-ignore - Vite env
+    const NAVER_CLIENT_ID = import.meta.env.VITE_NAVER_CLIENT_ID;
+    const REDIRECT_URI = `${window.location.origin}/auth/naver/callback`;
+    const STATE = Math.random().toString(36).substring(2, 15); // 랜덤 state 생성
+
+    if (!NAVER_CLIENT_ID) {
+      throw new Error('네이버 클라이언트 ID가 설정되지 않았습니다.');
+    }
+
+    // state를 sessionStorage에 저장 (CSRF 방지)
+    sessionStorage.setItem('naver_oauth_state', STATE);
+
+    // 네이버 OAuth 인증 페이지로 리다이렉트
+    const naverAuthUrl = `https://nid.naver.com/oauth2.0/authorize?response_type=code&client_id=${NAVER_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&state=${STATE}`;
+    window.location.href = naverAuthUrl;
+  },
+
+  /**
+   * 네이버 로그인 콜백 처리 - 인증 코드를 백엔드로 전송
+   */
+  handleNaverCallback: async (code: string, state: string): Promise<LoginResponse> => {
+    // state 검증 (CSRF 방지)
+    const savedState = sessionStorage.getItem('naver_oauth_state');
+    if (savedState !== state) {
+      throw new Error('State 값이 일치하지 않습니다. 다시 시도해주세요.');
+    }
+    sessionStorage.removeItem('naver_oauth_state');
+
+    const response = await api.get<LoginResponse>('/auth/naver/callback', {
+      params: { code, state },
+    });
+    handleAuthSuccess(response.data);
+    return response.data;
+  },
 };

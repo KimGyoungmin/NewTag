@@ -111,6 +111,34 @@ public class FileStorageService {
     }
 
     /**
+     * 채팅 이미지 저장
+     */
+    public String storeChatImage(MultipartFile file, String folder) {
+        validateFile(file);
+
+        String extension = getFileExtension(file.getOriginalFilename());
+        String filename = "chat_" + System.currentTimeMillis() + "_" + UUID.randomUUID().toString().replace("-", "").substring(0, 8) + extension;
+
+        try {
+            Path chatFolder = baseDirectoryPath.resolve(folder).normalize();
+            Files.createDirectories(chatFolder);
+
+            Path targetLocation = chatFolder.resolve(filename);
+            file.transferTo(targetLocation);
+
+            optimizeImageFile(targetLocation);
+
+            String relativePath = folder + "/" + filename;
+            log.info("✅ Stored chat image: {}", targetLocation);
+            return relativePath.replace("\\", "/");
+
+        } catch (IOException e) {
+            log.error("❌ Failed to store chat image", e);
+            throw new RuntimeException("채팅 이미지 업로드에 실패했습니다: " + e.getMessage());
+        }
+    }
+
+    /**
      * temp 폴더 이미지를 상품 폴더로 이동
      */
     public String moveToProductFolder(String tempPath, Long productId, boolean isMain) {
