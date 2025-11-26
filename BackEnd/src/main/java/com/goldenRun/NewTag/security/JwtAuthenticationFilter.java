@@ -29,14 +29,6 @@ public class JwtAuthenticationFilter extends GenericFilterBean {
 
         System.out.println("[JWT Filter] Request: " + httpRequest.getMethod() + " " + httpRequest.getRequestURI());
 
-        // 모든 헤더 출력 (디버깅용)
-        System.out.println("[JWT Filter] All Headers:");
-        java.util.Enumeration<String> headerNames = httpRequest.getHeaderNames();
-        while (headerNames.hasMoreElements()) {
-            String headerName = headerNames.nextElement();
-            System.out.println("  " + headerName + ": " + httpRequest.getHeader(headerName));
-        }
-
         // CORS preflight 요청(OPTIONS)은 토큰 검증 없이 통과
         if ("OPTIONS".equalsIgnoreCase(httpRequest.getMethod())) {
             chain.doFilter(request, response);
@@ -45,7 +37,6 @@ public class JwtAuthenticationFilter extends GenericFilterBean {
 
         // HTTP 요청 헤더에서 토큰을 추출
         String token = resolveToken(httpRequest);
-        System.out.println("[JWT Filter] Token extracted: " + (token != null ? token.substring(0, Math.min(20, token.length())) + "..." : "null"));
 
         // 토큰 유효성 검증
         if (token != null && jwtTokenProvider.validateToken(token) && jwtTokenProvider.isAccessToken(token)) {

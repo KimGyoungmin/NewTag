@@ -8,22 +8,20 @@ import {
   updateDoc,
   doc,
   getDocs,
-  Timestamp,
   serverTimestamp,
   writeBatch,
 } from 'firebase/firestore';
 import { db } from './config';
-import type { ChatMessage, ChatRoom, ReviewNavigationPayload } from '../../types';
+import type { ChatLocation, ChatMessage, ChatRoom, ReviewNavigationPayload } from '../../types';
 
 export const chatService = {
-  // 채팅방 생성 또는 가져오기
+  // Create chat room if one already exists return that id
   getOrCreateChatRoom: async (
     productId: number,
     seller: { id: number; nick?: string; profileImg?: string },
     buyer: { id: number; nick?: string; profileImg?: string },
     productInfo: { title: string; image: string; price: number }
   ): Promise<string> => {
-    // 기존 채팅방 확인
     const q = query(
       collection(db, 'chatRooms'),
       where('productId', '==', productId),
@@ -37,7 +35,6 @@ export const chatService = {
       return snapshot.docs[0].id;
     }
 
-    // 새 채팅방 생성
     const chatRoom = {
       productId,
       productTitle: productInfo.title,
@@ -57,13 +54,19 @@ export const chatService = {
     return docRef.id;
   },
 
-  // 메시지 전송
+  // Send message (text / image / location / review)
   sendMessage: async (
     chatRoomId: string,
     senderId: number,
     senderNick: string,
     senderProfileImg: string,
-    message: string
+    message: string,
+    options?: {
+      messageType?: string;
+      imageUrl?: string;
+      location?: ChatLocation | null;
+      reviewPayload?: ReviewNavigationPayload | null;
+    }
   ) => {
     const messageData = {
       chatRoomId,
@@ -73,13 +76,23 @@ export const chatService = {
       message,
       createdAt: serverTimestamp(),
       isRead: false,
+      ...(options?.messageType ? { messageType: options.messageType } : {}),
+      ...(options?.imageUrl ? { imageUrl: options.imageUrl } : {}),
+      ...(options?.location ? { location: options.location } : {}),
+      ...(options?.reviewPayload ? { reviewPayload: options.reviewPayload } : {}),
     };
+
+    const lastMessageText =
+      options?.messageType === 'image'
+        ? '사진을 보냈습니다.'
+        : options?.messageType === 'location'
+          ? options?.location?.address || '위치를 공유했습니다.'
+          : message;
 
     const docRef = await addDoc(collection(db, 'messages'), messageData);
 
-    // 채팅방 lastMessage 업데이트
     await updateDoc(doc(db, 'chatRooms', chatRoomId), {
-      lastMessage: message,
+      lastMessage: lastMessageText,
       lastMessageAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
     });
@@ -87,7 +100,7 @@ export const chatService = {
     return docRef.id;
   },
 
-  // 실시간 메시지 구독
+  // Subscribe to messages in a room
   subscribeToMessages: (
     chatRoomId: string,
     callback: (messages: ChatMessage[]) => void
@@ -98,15 +111,14 @@ export const chatService = {
       orderBy('createdAt', 'asc')
     );
 
-    // includeMetadataChanges:true로 서버 confirm 후 타임스탬프 반영되도록 보장
     return onSnapshot(
       q,
       { includeMetadataChanges: true },
       (snapshot) => {
-        const messages = snapshot.docs.map((doc) => {
-          const data = doc.data();
+        const messages = snapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
           return {
-            id: doc.id,
+            id: docSnap.id,
             chatRoomId: data.chatRoomId,
             senderId: data.senderId,
             senderNick: data.senderNick,
@@ -116,6 +128,8 @@ export const chatService = {
             isRead: data.isRead,
             messageType: data.messageType,
             reviewPayload: data.reviewPayload || null,
+            imageUrl: data.imageUrl,
+            location: data.location || null,
           } as ChatMessage;
         });
         callback(messages);
@@ -123,7 +137,7 @@ export const chatService = {
     );
   },
 
-  // 사용자의 채팅방 목록 구독
+  // Subscribe to chat rooms for a user
   subscribeToChatRooms: (
     userId: number,
     callback: (chatRooms: ChatRoom[]) => void
@@ -138,7 +152,6 @@ export const chatService = {
       where('sellerId', '==', userId)
     );
 
-    // 두 쿼리 결과를 병합해서 전달
     let buyerRooms: ChatRoom[] = [];
     let sellerRooms: ChatRoom[] = [];
 
@@ -148,23 +161,23 @@ export const chatService = {
     };
 
     const unsubscribe1 = onSnapshot(q, (snapshot) => {
-      buyerRooms = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-        lastMessageAt: doc.data().lastMessageAt?.toDate(),
+      buyerRooms = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+        createdAt: docSnap.data().createdAt?.toDate() || new Date(),
+        updatedAt: docSnap.data().updatedAt?.toDate() || new Date(),
+        lastMessageAt: docSnap.data().lastMessageAt?.toDate(),
       })) as ChatRoom[];
       emit();
     });
 
     const unsubscribe2 = onSnapshot(q2, (snapshot) => {
-      sellerRooms = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-        createdAt: doc.data().createdAt?.toDate() || new Date(),
-        updatedAt: doc.data().updatedAt?.toDate() || new Date(),
-        lastMessageAt: doc.data().lastMessageAt?.toDate(),
+      sellerRooms = snapshot.docs.map((docSnap) => ({
+        id: docSnap.id,
+        ...docSnap.data(),
+        createdAt: docSnap.data().createdAt?.toDate() || new Date(),
+        updatedAt: docSnap.data().updatedAt?.toDate() || new Date(),
+        lastMessageAt: docSnap.data().lastMessageAt?.toDate(),
       })) as ChatRoom[];
       emit();
     });
@@ -175,7 +188,7 @@ export const chatService = {
     };
   },
 
-  // 메시지 읽음 처리
+  // Mark all messages from others as read
   markAsRead: async (chatRoomId: string, userId: number) => {
     const q = query(
       collection(db, 'messages'),
@@ -196,7 +209,6 @@ export const chatService = {
   deleteChatRoom: async (chatRoomId: string) => {
     const batch = writeBatch(db);
 
-    // Delete all messages in the room
     const messagesQuery = query(
       collection(db, 'messages'),
       where('chatRoomId', '==', chatRoomId)
@@ -206,7 +218,6 @@ export const chatService = {
       batch.delete(messageDoc.ref);
     });
 
-    // Delete the chat room document
     batch.delete(doc(db, 'chatRooms', chatRoomId));
 
     await batch.commit();
@@ -250,7 +261,7 @@ export const chatService = {
     sender: { id: number; nick?: string; profileImg?: string },
     payload: ReviewNavigationPayload
   ) => {
-    const message = "[시스템] 거래가 완료되었습니다. 아래 버튼을 눌러 리뷰를 작성해 주세요.";
+    const message = "[거래가 완료되었나요? 아래 버튼을 눌러 리뷰를 작성해주세요]";
     const messageData = {
       chatRoomId,
       senderId: sender.id,
@@ -271,7 +282,6 @@ export const chatService = {
     });
   },
 
-  // 안읽은 메시지 개수 조회
   getUnreadCount: async (chatRoomId: string, userId: number): Promise<number> => {
     const q = query(
       collection(db, 'messages'),
@@ -284,7 +294,6 @@ export const chatService = {
     return snapshot.size;
   },
 
-  // 특정 상품의 채팅방 개수 조회
   getChatCountByProductId: async (productId: number): Promise<number> => {
     const q = query(
       collection(db, 'chatRooms'),
@@ -295,11 +304,9 @@ export const chatService = {
     return snapshot.size;
   },
 
-  // 여러 상품의 채팅방 개수 일괄 조회
   getChatCountsByProductIds: async (productIds: number[]): Promise<Map<number, number>> => {
     const counts = new Map<number, number>();
 
-    // productIds를 10개씩 나눠서 처리 (Firebase IN 쿼리 제한)
     const chunkSize = 10;
     for (let i = 0; i < productIds.length; i += chunkSize) {
       const chunk = productIds.slice(i, i + chunkSize);
@@ -311,8 +318,8 @@ export const chatService = {
 
       const snapshot = await getDocs(q);
 
-      snapshot.docs.forEach(doc => {
-        const productId = doc.data().productId;
+      snapshot.docs.forEach((docSnap) => {
+        const productId = docSnap.data().productId;
         counts.set(productId, (counts.get(productId) || 0) + 1);
       });
     }
@@ -320,11 +327,9 @@ export const chatService = {
     return counts;
   },
 
-  // 사용자의 전체 안읽은 메시지 개수 조회 (인덱스 불필요)
   getTotalUnreadCount: async (userId: number): Promise<number> => {
     console.log('[chatService] getTotalUnreadCount called for userId:', userId);
 
-    // 1. 내가 참여한 채팅방 목록 가져오기
     const chatRoomsQuery1 = query(
       collection(db, 'chatRooms'),
       where('buyerId', '==', userId)
@@ -336,17 +341,16 @@ export const chatService = {
 
     const [buyerRooms, sellerRooms] = await Promise.all([
       getDocs(chatRoomsQuery1),
-      getDocs(chatRoomsQuery2)
+      getDocs(chatRoomsQuery2),
     ]);
 
     console.log('[chatService] My chat rooms - buyer:', buyerRooms.size, 'seller:', sellerRooms.size);
 
     const myChatRoomIds = [
-      ...buyerRooms.docs.map(doc => doc.id),
-      ...sellerRooms.docs.map(doc => doc.id)
+      ...buyerRooms.docs.map((docSnap) => docSnap.id),
+      ...sellerRooms.docs.map((docSnap) => docSnap.id),
     ];
 
-    // 2. 각 채팅방의 안읽은 메시지 개수를 조회하고 합산
     let totalUnread = 0;
     for (const roomId of myChatRoomIds) {
       const messagesQuery = query(
@@ -357,9 +361,8 @@ export const chatService = {
 
       const messagesSnapshot = await getDocs(messagesQuery);
 
-      // 내가 보낸 메시지는 제외
       const unreadFromOthers = messagesSnapshot.docs.filter(
-        doc => doc.data().senderId !== userId
+        (docSnap) => docSnap.data().senderId !== userId
       ).length;
 
       totalUnread += unreadFromOthers;
@@ -369,7 +372,6 @@ export const chatService = {
     return totalUnread;
   },
 
-  // 사용자의 전체 안읽은 메시지 개수 실시간 구독
   subscribeToTotalUnreadCount: (
     userId: number,
     callback: (count: number) => void
@@ -379,7 +381,6 @@ export const chatService = {
     let myChatRoomIds: string[] = [];
     const unsubscribers: Array<() => void> = [];
 
-    // 1. 내 채팅방 목록 실시간 구독
     const chatRoomsQuery1 = query(
       collection(db, 'chatRooms'),
       where('buyerId', '==', userId)
@@ -392,11 +393,9 @@ export const chatService = {
     let messageUnsubscribers: Array<() => void> = [];
 
     const updateChatRooms = () => {
-      // 기존 메시지 구독 해제
-      messageUnsubscribers.forEach(unsub => unsub());
+      messageUnsubscribers.forEach((unsub) => unsub());
       messageUnsubscribers = [];
 
-      // 각 채팅방의 안읽은 메시지 실시간 구독
       const unreadCounts = new Map<string, number>();
 
       if (myChatRoomIds.length === 0) {
@@ -404,7 +403,7 @@ export const chatService = {
         return;
       }
 
-      myChatRoomIds.forEach(roomId => {
+      myChatRoomIds.forEach((roomId) => {
         const messagesQuery = query(
           collection(db, 'messages'),
           where('chatRoomId', '==', roomId),
@@ -412,14 +411,12 @@ export const chatService = {
         );
 
         const unsubscribe = onSnapshot(messagesQuery, (snapshot) => {
-          // 내가 보낸 메시지는 제외
           const unreadFromOthers = snapshot.docs.filter(
-            doc => doc.data().senderId !== userId
+            (docSnap) => docSnap.data().senderId !== userId
           ).length;
 
           unreadCounts.set(roomId, unreadFromOthers);
 
-          // 전체 합산
           const total = Array.from(unreadCounts.values()).reduce((sum, count) => sum + count, 0);
           console.log('[chatService] Real-time unread count updated:', total);
           callback(total);
@@ -429,12 +426,11 @@ export const chatService = {
       });
     };
 
-    // 채팅방 목록 구독 (buyer)
     const unsubBuyer = onSnapshot(chatRoomsQuery1, (snapshot) => {
-      const buyerRoomIds = snapshot.docs.map(doc => doc.id);
+      const buyerRoomIds = snapshot.docs.map((docSnap) => docSnap.id);
 
       onSnapshot(chatRoomsQuery2, (snapshot2) => {
-        const sellerRoomIds = snapshot2.docs.map(doc => doc.id);
+        const sellerRoomIds = snapshot2.docs.map((docSnap) => docSnap.id);
         myChatRoomIds = [...buyerRoomIds, ...sellerRoomIds];
 
         console.log('[chatService] Chat rooms updated:', myChatRoomIds.length);
@@ -444,11 +440,10 @@ export const chatService = {
 
     unsubscribers.push(unsubBuyer);
 
-    // 모든 구독 해제 함수 반환
     return () => {
       console.log('[chatService] Unsubscribing from unread count');
-      unsubscribers.forEach(unsub => unsub());
-      messageUnsubscribers.forEach(unsub => unsub());
+      unsubscribers.forEach((unsub) => unsub());
+      messageUnsubscribers.forEach((unsub) => unsub());
     };
   },
 };

@@ -74,3 +74,13 @@ target/
 /venv
 .venv
 venv/
+
+# ============================================
+# Model/Crawling generated artifacts
+# ============================================
+model/Best_test/OutPut/
+model/crawling/selenium_profile/
+FrontEnd/NewTag/public/resell_auto.json
+FrontEnd/NewTag/public/resell_images/
+
+model/crawling/crawl_kream_cdp.py
