@@ -1,14 +1,9 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, MoreVertical, Send } from "lucide-react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
+import { ChevronLeft, Image as ImageIcon, MapPin, MoreVertical, Plus, Send } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "../components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,12 +15,69 @@ import {
   AlertDialogTitle,
 } from "../components/ui/alert-dialog";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
+import { KakaoMap } from "../components/KakaoMap";
 import { chatService } from "../services/firebase/chatService";
 import { db } from "../services/firebase/config";
 import { doc, getDoc } from "firebase/firestore";
 import { authApi } from "../api/auth";
 import { reviewApi } from "../services/api/reviewApi";
+import { getAddressFromCoords, getCurrentPosition } from "../utils/kakaoMap";
+import { toast } from "sonner";
+import { uploadService } from "../services/firebase/uploadService";
 import type { AuthUser, ChatMessage, ChatRoom, ReviewNavigationPayload } from "../types";
+
+const resizeImageIfNeeded = (file: File, maxSize = 1280): Promise<File> => {
+  return new Promise((resolve) => {
+    if (!file.type.startsWith("image/")) {
+      resolve(file);
+      return;
+    }
+
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const { width, height } = img;
+      const longest = Math.max(width, height);
+      if (longest <= maxSize) {
+        URL.revokeObjectURL(url);
+        resolve(file);
+        return;
+      }
+
+      const scale = maxSize / longest;
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.round(width * scale);
+      canvas.height = Math.round(height * scale);
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        URL.revokeObjectURL(url);
+        resolve(file);
+        return;
+      }
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(url);
+          if (blob) {
+            const resized = new File([blob], file.name.replace(/\.[^/.]+$/, "") + ".jpg", {
+              type: "image/jpeg",
+            });
+            resolve(resized);
+          } else {
+            resolve(file);
+          }
+        },
+        "image/jpeg",
+        0.85
+      );
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(file);
+    };
+    img.src = url;
+  });
+};
 
 interface ChatPageProps {
   chatId: string;
@@ -40,15 +92,18 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
   const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
   const [reviewStatus, setReviewStatus] = useState<Record<number, boolean>>({});
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [isSharingLocation, setIsSharingLocation] = useState(false);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const firstScrollDone = useRef(false);
 
-  // 채팅방이 바뀔 때마다 스크롤 초기화
+  // Reset scroll state when chat room changes
   useEffect(() => {
     firstScrollDone.current = false;
   }, [chatId]);
 
-  // 로그인 사용자 동기화
+  // Keep auth user in sync
   useEffect(() => {
     const updateUser = () => setCurrentUser(authApi.getCurrentUser());
     updateUser();
@@ -56,7 +111,7 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
     return () => window.removeEventListener("auth-change", updateUser);
   }, []);
 
-  // 채팅방 정보 로드
+  // Load chat room info
   useEffect(() => {
     (async () => {
       try {
@@ -88,7 +143,7 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
     })();
   }, [chatId]);
 
-  // 메시지 구독
+  // Subscribe to messages
   useEffect(() => {
     const unsub = chatService.subscribeToMessages(chatId, (list) => {
       setMessages(list);
@@ -96,11 +151,12 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
     return () => unsub();
   }, [chatId]);
 
-  // 새 메시지에 맞춰 스크롤
+  // Auto scroll to newest message
   useLayoutEffect(() => {
     const el = messagesContainerRef.current;
     if (!el) return;
     const isInitial = !firstScrollDone.current;
+
     if (isInitial) {
       el.scrollTop = el.scrollHeight;
       firstScrollDone.current = true;
@@ -112,14 +168,14 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
     }
   }, [messages]);
 
-  // 읽음 처리
+  // Mark as read
   useEffect(() => {
     if (currentUser) {
       chatService.markAsRead(chatId, currentUser.id).catch((e) => console.error("markAsRead failed", e));
     }
   }, [chatId, currentUser, messages.length]);
 
-  // 리뷰 작성 여부 조회
+  // Fetch review statuses
   useEffect(() => {
     const fetchStatuses = async () => {
       if (!currentUser) return;
@@ -188,6 +244,83 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
     }
   };
 
+  const handleImageSelect = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!currentUser) {
+      toast.error("로그인 후 이용해주세요.");
+      event.target.value = "";
+      return;
+    }
+
+    try {
+      setIsUploadingImage(true);
+      const resized = await resizeImageIfNeeded(file);
+      const imageUrl = await uploadService.uploadChatImage(chatId, resized);
+      await chatService.sendMessage(
+        chatId,
+        currentUser.id,
+        currentUser.nick,
+        currentUser.profileImg || "",
+        "사진을 보냈습니다.",
+        {
+          messageType: "image",
+          imageUrl,
+        }
+      );
+      toast.success("이미지를 전송했어요.");
+    } catch (e) {
+      console.error("Failed to upload image", e);
+      toast.error("이미지를 보내지 못했어요. 다시 시도해주세요.");
+    } finally {
+      setIsUploadingImage(false);
+      event.target.value = "";
+    }
+  };
+
+  const handleShareLocation = async () => {
+    if (!currentUser) {
+      toast.error("로그인 후 이용해주세요.");
+      return;
+    }
+
+    try {
+      setIsSharingLocation(true);
+      const position = await getCurrentPosition();
+      const { latitude, longitude } = position.coords;
+      let address = "";
+
+      try {
+        address = await getAddressFromCoords(latitude, longitude);
+      } catch (e) {
+        console.error("Failed to resolve address from coordinates", e);
+      }
+
+      await chatService.sendMessage(
+        chatId,
+        currentUser.id,
+        currentUser.nick,
+        currentUser.profileImg || "",
+        address || "위치를 공유했습니다.",
+        {
+          messageType: "location",
+          location: {
+            lat: latitude,
+            lng: longitude,
+            address,
+          },
+        }
+      );
+      toast.success("현재 위치를 공유했어요.");
+    } catch (e) {
+      console.error("Failed to share location", e);
+      const message = e instanceof Error ? e.message : "위치를 공유하지 못했어요.";
+      toast.error(message);
+    } finally {
+      setIsSharingLocation(false);
+    }
+  };
+
   const handleReviewLink = (payload: ReviewNavigationPayload) => {
     onNavigate("review-write", JSON.stringify(payload));
   };
@@ -216,9 +349,12 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
   };
 
   return (
-    <div className="fixed inset-0 flex flex-col bg-background overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b bg-background px-4 h-14 shrink-0 z-50">
+    <div className="flex flex-col h-[100dvh] md:h-screen bg-background">
+      {/* Empty Header Spacer - for fixed headers (user header 56px + product card ~68px) */}
+      <div className="h-[7.5rem] shrink-0"></div>
+
+      {/* User Header */}
+      <div className="flex items-center justify-between border-b bg-background px-4 h-14 shrink-0 fixed top-0 left-0 right-0 z-40">
         <div className="flex items-center gap-3 flex-1">
           <Button variant="ghost" size="icon" onClick={() => onNavigate("chat")}>
             <ChevronLeft className="h-5 w-5" />
@@ -246,71 +382,119 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
             <AlertDialogHeader>
               <AlertDialogTitle>채팅방을 나갈까요?</AlertDialogTitle>
               <AlertDialogDescription>
-                채팅방을 나가면 이전 대화 내용이 모두 삭제되고 채팅 목록에서 사라집니다.
+                채팅방을 나가면 이전 대화 내용이 모두 지워지고 채팅 목록에서 사라집니다.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
               <AlertDialogCancel disabled={isLeaving}>취소하기</AlertDialogCancel>
               <AlertDialogAction onClick={handleLeaveChat} disabled={isLeaving}>
-                {isLeaving ? "나가는 중..." : "나가기"}
+                {isLeaving ? "처리 중..." : "나가기"}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden pb-24">
-        {/* Product Info */}
-        {room && (
-          <div className="border-b bg-card px-4 py-3 shrink-0">
-            <div className="flex items-center gap-3">
-              <div
-                className="h-12 w-12 overflow-hidden rounded-lg border shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={() => onNavigate("detail", String(room.productId))}
-              >
-                <ImageWithFallback
-                  src={room.productImage}
-                  alt={room.productTitle}
-                  className="h-full w-full object-cover"
-                />
-              </div>
-              <div
-                className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
-                onClick={() => onNavigate("detail", String(room.productId))}
-              >
-                <p className="truncate text-sm">{room.productTitle}</p>
-                <p className="text-sm">{room.productPrice?.toLocaleString()}원</p>
-              </div>
+      {/* Product Info Card */}
+      {room && (
+        <div className="border-b bg-card px-4 py-3 shrink-0 fixed top-14 left-0 right-0 z-30">
+          <div className="flex items-center gap-3">
+            <div
+              className="h-12 w-12 overflow-hidden rounded-lg border shrink-0 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => onNavigate("detail", String(room.productId))}
+            >
+              <ImageWithFallback
+                src={room.productImage}
+                alt={room.productTitle}
+                className="h-full w-full object-cover"
+              />
+            </div>
+            <div
+              className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => onNavigate("detail", String(room.productId))}
+            >
+              <p className="truncate text-sm">{room.productTitle}</p>
+              <p className="text-sm">{room.productPrice?.toLocaleString()}원</p>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Messages */}
-        <div
-          ref={messagesContainerRef}
-          className="flex-1 min-h-0 overflow-y-auto px-4 py-6 space-y-4"
-        >
-          {messages.map((msg) => {
-            const isMine = currentUser && msg.senderId === currentUser.id;
-            const reviewed =
-              msg.reviewPayload?.reviewCompleted === true ||
-              msg.reviewPayload?.isReviewed === true ||
-              (typeof msg.reviewPayload?.transactionId === "number" &&
-                reviewStatus[msg.reviewPayload.transactionId] === true);
-            return (
-              <div key={msg.id} className={`flex gap-2 ${isMine ? "justify-end" : "justify-start"}`}>
-                {!isMine && (
-                  <Avatar className="h-8 w-8 shrink-0">
-                    <AvatarImage src={peer.img} />
-                    <AvatarFallback>{peer.nick?.[0] || "?"}</AvatarFallback>
-                  </Avatar>
-                )}
-                <div
-                  className={`max-w-[70%] rounded-2xl px-4 py-2 ${
-                    isMine ? "bg-primary text-white rounded-br-sm" : "bg-secondary text-foreground rounded-bl-sm"
-                  }`}
-                >
-                  <p className="break-words">{msg.message}</p>
+      {/* Messages */}
+      <div ref={messagesContainerRef} className="flex-1 overflow-y-auto px-4 pt-2 pb-28 md:pb-8 space-y-4">
+        {messages.map((msg) => {
+          const isMine = currentUser && msg.senderId === currentUser.id;
+          const reviewed =
+            msg.reviewPayload?.reviewCompleted === true ||
+            msg.reviewPayload?.isReviewed === true ||
+            (typeof msg.reviewPayload?.transactionId === "number" &&
+              reviewStatus[msg.reviewPayload.transactionId] === true);
+          const isImageMessage = msg.messageType === "image" && !!msg.imageUrl;
+          const isLocationMessage = msg.messageType === "location" && !!msg.location;
+          const locationText = isLocationMessage ? msg.location?.address || msg.message : msg.message;
+          const locationLink =
+            isLocationMessage && msg.location
+              ? `https://map.kakao.com/link/map/${encodeURIComponent(
+                  msg.location.address || "공유 위치"
+                )},${msg.location.lat},${msg.location.lng}`
+              : "";
+          const locationLat = msg.location?.lat ?? 37.5665;
+          const locationLng = msg.location?.lng ?? 126.978;
+
+          return (
+            <div key={msg.id} className={`flex gap-2 ${isMine ? "justify-end" : "justify-start"}`}>
+              {!isMine && (
+                <Avatar className="h-8 w-8 shrink-0">
+                  <AvatarImage src={peer.img} />
+                  <AvatarFallback>{peer.nick?.[0] || "?"}</AvatarFallback>
+                </Avatar>
+              )}
+              <div
+                className={`max-w-[78%] rounded-2xl px-4 py-3 ${
+                  isMine ? "bg-primary text-white rounded-br-sm" : "bg-secondary text-foreground rounded-bl-sm"
+                }`}
+              >
+                <div className="space-y-2">
+                  {isImageMessage ? (
+                    <a
+                      href={msg.imageUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block overflow-hidden rounded-xl border border-white/10 bg-background/40"
+                    >
+                      <img src={msg.imageUrl} alt="shared image" className="max-h-64 w-full object-cover" />
+                    </a>
+                  ) : isLocationMessage ? (
+                    <div className="space-y-2">
+                      <p className="break-words font-semibold">{locationText}</p>
+                      <div className="overflow-hidden rounded-xl border border-white/10">
+                        <KakaoMap
+                          latitude={locationLat}
+                          longitude={locationLng}
+                          locationName={msg.location?.address || "공유 위치"}
+                          width="100%"
+                          height="180px"
+                          draggable={false}
+                          zoomable={false}
+                          showMarker
+                        />
+                      </div>
+                      {locationLink && (
+                        <a
+                          href={locationLink}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`text-xs underline-offset-2 hover:underline ${
+                            isMine ? "text-white" : "text-foreground"
+                          }`}
+                        >
+                          카카오맵에서 보기
+                        </a>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="break-words">{msg.message}</p>
+                  )}
                   {msg.messageType === "review_link" &&
                     !isMine &&
                     msg.reviewPayload &&
@@ -326,31 +510,53 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
                                 ? msg.reviewPayload!
                                 : {
                                     ...msg.reviewPayload!,
-                                    targetId: msg.reviewPayload!.buyerId,
+                                    targetId: msg.reviewPayload!.buyerId, // 판매자가 구매자에 대해 작성
                                   }
                             )
                           }
                         >
-                          {reviewed ? "후기 작성 완료" : "후기 작성하기"}
+                          {reviewed ? "리뷰 작성 완료" : "리뷰 작성하기"}
                         </Button>
                       </div>
                     )}
-                  <p className={`mt-1 text-xs ${isMine ? "text-white/70" : "text-muted-foreground"}`}>
+                  <p className={`text-xs ${isMine ? "text-white/70" : "text-muted-foreground"}`}>
                     {formatTime(msg.createdAt)}
                   </p>
                 </div>
               </div>
-            );
-          })}
-        </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* Input */}
-      <div className="fixed bottom-0 left-0 right-0 border-t bg-background p-4 z-50">
-        <div className="flex items-center gap-2">
+      {/* Input Area */}
+      <div className="fixed bottom-0 md:relative md:bottom-0 left-0 right-0 border-t bg-background p-4 shrink-0 z-30">
+        <div className="flex items-center gap-2 max-w-screen-md mx-auto">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="shrink-0 bg-secondary text-foreground"
+                disabled={isUploadingImage || isSharingLocation}
+              >
+                <Plus className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start">
+              <DropdownMenuItem onClick={() => fileInputRef.current?.click()} disabled={isUploadingImage}>
+                <ImageIcon className="mr-2 h-4 w-4" />
+                {isUploadingImage ? "이미지 업로드 중..." : "이미지 업로드"}
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleShareLocation} disabled={isSharingLocation}>
+                <MapPin className="mr-2 h-4 w-4" />
+                {isSharingLocation ? "위치 공유 중..." : "내 위치 공유"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Input
             type="text"
-            placeholder="메시지를 입력하세요"
+            placeholder="메시지를 입력해주세요"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             onKeyDown={(e) => {
@@ -367,6 +573,13 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
             <Send className="h-5 w-5" />
           </Button>
         </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleImageSelect}
+        />
       </div>
     </div>
   );

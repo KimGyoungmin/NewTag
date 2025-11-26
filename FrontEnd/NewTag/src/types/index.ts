@@ -166,6 +166,12 @@ export interface ReviewNavigationPayload {
   isReviewed?: boolean;
 }
 
+export interface ChatLocation {
+  lat: number;
+  lng: number;
+  address?: string;
+}
+
 export interface ChatMessage {
   id: string;
   chatRoomId: string;
@@ -177,6 +183,8 @@ export interface ChatMessage {
   isRead: boolean;
   messageType?: string;
   reviewPayload?: ReviewNavigationPayload | null;
+  imageUrl?: string;
+  location?: ChatLocation | null;
 }
 
 

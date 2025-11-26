@@ -1,0 +1,160 @@
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { ChevronLeft, MoreVertical, Send } from "lucide-react";
+import { Button } from "../components/ui/button";
+import { Input } from "../components/ui/input";
+import { Avatar, AvatarFallback, AvatarImage } from "../components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "../components/ui/alert-dialog";
+import { ImageWithFallback } from "../components/figma/ImageWithFallback";
+import { chatService } from "../services/firebase/chatService";
+import { db } from "../services/firebase/config";
+import { doc, getDoc } from "firebase/firestore";
+import { authApi } from "../api/auth";
+import { reviewApi } from "../services/api/reviewApi";
+import type { AuthUser, ChatMessage, ChatRoom, ReviewNavigationPayload } from "../types";
+
+interface ChatPageProps {
+  chatId: string;
+  onNavigate: (page: string, id?: string) => void;
+}
+
+export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
+  const [message, setMessage] = useState("");
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
+  const [room, setRoom] = useState<ChatRoom | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [reviewStatus, setReviewStatus] = useState<Record<number, boolean>>({});
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const lastMessageRef = useRef<HTMLDivElement | null>(null);
+  const firstScrollDone = useRef(false);
+
+  // 채팅방이 바�??�마???�크�?초기??  useEffect(() => {
+    firstScrollDone.current = false;
+  }, [chatId]);
+
+  // 로그???�용???�기??  useEffect(() => {
+    const updateUser = () => setCurrentUser(authApi.getCurrentUser());
+    updateUser();
+    window.addEventListener("auth-change", updateUser);
+    return () => window.removeEventListener("auth-change", updateUser);
+  }, []);
+
+  // 채팅�??�보 불러?�기
+  useEffect(() => {
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, "chatRooms", chatId));
+        if (snap.exists()) {
+          const data = snap.data() as any;
+          const roomData: ChatRoom = {
+            id: snap.id,
+            productId: data.productId,
+            productTitle: data.productTitle,
+            productImage: data.productImage,
+            productPrice: data.productPrice,
+            sellerId: data.sellerId,
+            sellerNick: data.sellerNick,
+            sellerProfileImg: data.sellerProfileImg,
+            buyerId: data.buyerId,
+            buyerNick: data.buyerNick,
+            buyerProfileImg: data.buyerProfileImg,
+            lastMessage: data.lastMessage,
+            lastMessageAt: data.lastMessageAt?.toDate?.() || undefined,
+            createdAt: data.createdAt?.toDate?.() || new Date(),
+            updatedAt: data.updatedAt?.toDate?.() || new Date(),
+          };
+          setRoom(roomData);
+        }
+      } catch (e) {
+        console.error("Failed to load chat room", e);
+      }
+    })();
+  }, [chatId]);
+
+  // 메시지 구독
+  useEffect(() => {
+    const unsub = chatService.subscribeToMessages(chatId, (list) => {
+      setMessages(list);
+    });
+    return () => unsub();
+  }, [chatId]);
+
+  // ??메시지??맞춰 ?�크�?  useLayoutEffect(() => {
+    const el = messagesContainerRef.current;
+    if (!el) return;
+    const isInitial = !firstScrollDone.current;
+
+    if (isInitial) {
+      // 초기 진입 ??즉시 �??�래�?(?�니메이???�이)
+      el.scrollTop = el.scrollHeight;
+      firstScrollDone.current = true;
+      // DOM ?�더�????�시 ??�??�인
+      requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight;
+      });
+    } else {
+      // ??메시지 ??부?�럽�??�크�?      el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    }
+  }, [messages]);
+
+  // ?�음 처리
+  useEffect(() => {
+    if (currentUser) {
+      chatService.markAsRead(chatId, currentUser.id).catch((e) => console.error("markAsRead failed", e));
+    }
+  }, [chatId, currentUser, messages.length]);
+
+  // 리뷰 ?�성 ?��? 조회 (중복 ?�성 방�?)
+  useEffect(() => {
+    const fetchStatuses = async () => {
+      if (!currentUser) return;
+      const ids = Array.from(
+        new Set(
+          messages
+            .map((m) => m.reviewPayload?.transactionId)
+            .filter((id): id is number => typeof id === "number")
+        )
+      ).filter((id) => reviewStatus[id] === undefined);
+      if (ids.length === 0) return;
+
+      try {
+        const entries = await Promise.all(
+          ids.map(async (id) => {
+            const exists = await reviewApi.existsReview(id);
+            return [id, exists] as const;
+          })
+        );
+        setReviewStatus((prev) => {
+          const next = { ...prev };
+          for (const [id, exists] of entries) next[id] = exists;
+          return next;
+        });
+      } catch (e) {
+        console.error("Failed to check review existence", e);
+      }
+    };
+    fetchStatuses();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [messages, currentUser]);
+
+  const peer = useMemo(() => {
+    if (!currentUser || !room) return { nick: "", img: "" };
+    const seller = currentUser.id === room.sellerId;
+    return {
+      nick: seller ? room.buyerNick : room.sellerNick,
