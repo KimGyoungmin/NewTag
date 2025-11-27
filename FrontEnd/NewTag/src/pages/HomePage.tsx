@@ -65,6 +65,13 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
   const [addressesLoaded, setAddressesLoaded] = useState(false); // 주소 로드 완료 플래그
   const [chatCounts, setChatCounts] = useState<Map<number, number>>(new Map()); // 상품별 채팅방 개수
   const MAX_DISTANCE_KM = 10; // 최대 거리 10km
+  const dedupProducts = (list: Product[]) => {
+    const map = new Map<number, Product>();
+    list.forEach((p) => {
+      if (!map.has(p.id)) map.set(p.id, p);
+    });
+    return Array.from(map.values());
+  };
 
   // 위치 기반 상품 필터링 함수
   const filterProductsByLocation = (products: Product[], address: Address | null): Product[] => {
@@ -148,10 +155,11 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
       }
 
       const newProducts = response.products || [];
-      setAllProducts(newProducts);
+      const deduped = dedupProducts(newProducts);
+      setAllProducts(deduped);
 
       // 위치 필터링 적용
-      const filtered = filterProductsByLocation(newProducts, selectedAddress);
+      const filtered = filterProductsByLocation(deduped, selectedAddress);
       setProducts(filtered);
 
       // 상품별 채팅 개수 조회
@@ -210,7 +218,7 @@ export function HomePage({ onNavigate, searchQuery = '', onClearSearch }: HomePa
       const newProducts = response.products || [];
 
       if (newProducts.length > 0) {
-        const updatedAll = [...allProducts, ...newProducts];
+        const updatedAll = dedupProducts([...allProducts, ...newProducts]);
         setAllProducts(updatedAll);
 
         // 위치 필터링 적용
