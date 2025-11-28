@@ -66,6 +66,13 @@ export interface AutoWriteResponse {
   categoryId?: number;
   categoryName?: string;
   sourceImage?: string;
+  category?: string;
+  forbiddenItem?: string;
+  listing?: {
+    forbiddenItem?: string;
+    forbidden_item?: string;
+    [key: string]: unknown;
+  };
 }
 
 export const postApi = {

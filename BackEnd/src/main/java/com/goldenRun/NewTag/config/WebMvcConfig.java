@@ -13,10 +13,10 @@ import java.nio.file.Paths;
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
 
-    @Value("${app.upload.base-dir:BackEnd/src/main/resources/static}")
+    @Value("${app.upload.base-dir:uploads}")
     private String uploadBaseDir;
 
-    @Value("${app.upload.profile-base-dir:BackEnd/src/main/resources/userprofile}")
+    @Value("${app.upload.profile-base-dir:uploads/userprofile}")
     private String profileBaseDir;
 
     @Value("${app.upload.profile-dir:userprofile}")

@@ -19,13 +19,13 @@ import java.util.UUID;
 @Slf4j
 public class FileStorageService {
 
-    @Value("${app.upload.base-dir:BackEnd/src/main/resources/static}")
+    @Value("${app.upload.base-dir:uploads}")
     private String baseDir;
 
     @Value("${app.upload.product-dir:products}")
     private String productDir;
 
-    @Value("${app.upload.profile-base-dir:BackEnd/src/main/resources/userprofile}")
+    @Value("${app.upload.profile-base-dir:uploads/userprofile}")
     private String profileBaseDir;
 
     @Value("${app.upload.profile-dir:userprofile}")
