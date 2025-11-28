@@ -1,4 +1,4 @@
-import { api } from './client';
+﻿import { api } from './client';
 
 import { tokenManager } from './tokenManager';
 import type { LoginRequest, LoginResponse, SignupRequest, User, ApiResponse, AuthUser } from '../types';
@@ -70,24 +70,24 @@ export const authApi = {
   },
 
   /**
-   * 카카오 로그인 - 인증 URL로 리다이렉트
+   * 移댁뭅??濡쒓렇??- ?몄쬆 URL濡?由щ떎?대젆??
    */
   loginWithKakao: (): void => {
     // @ts-ignore - Vite env
-    const KAKAO_JS_KEY = import.meta.env.VITE_KAKAO_MAP_APP_KEY;
+    const KAKAO_CLIENT_ID = import.meta.env.VITE_KAKAO_CLIENT_ID || import.meta.env.VITE_KAKAO_MAP_APP_KEY;
     const REDIRECT_URI = `${window.location.origin}/auth/kakao/callback`;
 
-    if (!KAKAO_JS_KEY) {
-      throw new Error('카카오 JavaScript 키가 설정되지 않았습니다.');
+    if (!KAKAO_CLIENT_ID) {
+      throw new Error('Kakao OAuth Client ID is missing.');
     }
 
-    // 카카오 OAuth 인증 페이지로 리다이렉트
-    const kakaoAuthUrl = `https://kauth.kakao.com/oauth/authorize?client_id=${KAKAO_JS_KEY}&redirect_uri=${REDIRECT_URI}&response_type=code`;
+    // 移댁뭅??OAuth ?몄쬆 ?섏씠吏濡?由щ떎?대젆??
+    const kakaoAuthUrl = `https://kauth.kakao.com/oauth/authorize?client_id=${KAKAO_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code`;
     window.location.href = kakaoAuthUrl;
   },
 
   /**
-   * 카카오 로그인 콜백 처리 - 인증 코드를 백엔드로 전송
+   * 移댁뭅??濡쒓렇??肄쒕갚 泥섎━ - ?몄쬆 肄붾뱶瑜?諛깆뿏?쒕줈 ?꾩넚
    */
   handleKakaoCallback: async (code: string): Promise<LoginResponse> => {
     const response = await api.get<LoginResponse>('/auth/kakao/callback', {
@@ -98,7 +98,7 @@ export const authApi = {
   },
 
   /**
-   * 구글 로그인 - 인증 URL로 리다이렉트
+   * 援ш? 濡쒓렇??- ?몄쬆 URL濡?由щ떎?대젆??
    */
   loginWithGoogle: (): void => {
     // @ts-ignore - Vite env
@@ -106,16 +106,16 @@ export const authApi = {
     const REDIRECT_URI = `${window.location.origin}/auth/google/callback`;
 
     if (!GOOGLE_CLIENT_ID) {
-      throw new Error('구글 클라이언트 ID가 설정되지 않았습니다.');
+      throw new Error('援ш? ?대씪?댁뼵??ID媛 ?ㅼ젙?섏? ?딆븯?듬땲??');
     }
 
-    // 구글 OAuth 인증 페이지로 리다이렉트
+    // 援ш? OAuth ?몄쬆 ?섏씠吏濡?由щ떎?대젆??
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=openid%20email%20profile`;
     window.location.href = googleAuthUrl;
   },
 
   /**
-   * 구글 로그인 콜백 처리 - 인증 코드를 백엔드로 전송
+   * 援ш? 濡쒓렇??肄쒕갚 泥섎━ - ?몄쬆 肄붾뱶瑜?諛깆뿏?쒕줈 ?꾩넚
    */
   handleGoogleCallback: async (code: string): Promise<LoginResponse> => {
     const response = await api.get<LoginResponse>('/auth/google/callback', {
@@ -126,34 +126,34 @@ export const authApi = {
   },
 
   /**
-   * 네이버 로그인 - 인증 URL로 리다이렉트
+   * ?ㅼ씠踰?濡쒓렇??- ?몄쬆 URL濡?由щ떎?대젆??
    */
   loginWithNaver: (): void => {
     // @ts-ignore - Vite env
     const NAVER_CLIENT_ID = import.meta.env.VITE_NAVER_CLIENT_ID;
     const REDIRECT_URI = `${window.location.origin}/auth/naver/callback`;
-    const STATE = Math.random().toString(36).substring(2, 15); // 랜덤 state 생성
+    const STATE = Math.random().toString(36).substring(2, 15); // ?쒕뜡 state ?앹꽦
 
     if (!NAVER_CLIENT_ID) {
-      throw new Error('네이버 클라이언트 ID가 설정되지 않았습니다.');
+      throw new Error('?ㅼ씠踰??대씪?댁뼵??ID媛 ?ㅼ젙?섏? ?딆븯?듬땲??');
     }
 
-    // state를 sessionStorage에 저장 (CSRF 방지)
+    // state瑜?sessionStorage?????(CSRF 諛⑹?)
     sessionStorage.setItem('naver_oauth_state', STATE);
 
-    // 네이버 OAuth 인증 페이지로 리다이렉트
+    // ?ㅼ씠踰?OAuth ?몄쬆 ?섏씠吏濡?由щ떎?대젆??
     const naverAuthUrl = `https://nid.naver.com/oauth2.0/authorize?response_type=code&client_id=${NAVER_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&state=${STATE}`;
     window.location.href = naverAuthUrl;
   },
 
   /**
-   * 네이버 로그인 콜백 처리 - 인증 코드를 백엔드로 전송
+   * ?ㅼ씠踰?濡쒓렇??肄쒕갚 泥섎━ - ?몄쬆 肄붾뱶瑜?諛깆뿏?쒕줈 ?꾩넚
    */
   handleNaverCallback: async (code: string, state: string): Promise<LoginResponse> => {
-    // state 검증 (CSRF 방지)
+    // state 寃利?(CSRF 諛⑹?)
     const savedState = sessionStorage.getItem('naver_oauth_state');
     if (savedState !== state) {
-      throw new Error('State 값이 일치하지 않습니다. 다시 시도해주세요.');
+      throw new Error('State 媛믪씠 ?쇱튂?섏? ?딆뒿?덈떎. ?ㅼ떆 ?쒕룄?댁＜?몄슂.');
     }
     sessionStorage.removeItem('naver_oauth_state');
 
@@ -164,3 +164,4 @@ export const authApi = {
     return response.data;
   },
 };
+

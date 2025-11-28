@@ -10,7 +10,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -19,7 +18,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1/purchase")
 @RequiredArgsConstructor
-@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:5174"}, allowCredentials = "true")
 public class PurchaseController {
 
     private final PurchaseService purchaseService;
@@ -29,6 +27,10 @@ public class PurchaseController {
             @RequestParam(name = "status", required = false) ProductStatus status,
             @AuthenticationPrincipal UserDetails userDetails
     ) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).body(Map.of("success", false, "message", "인증 정보가 없습니다."));
+        }
+
         List<PurchaseDtos.HistoryItem> purchases = purchaseService.getMyPurchases(
                 userDetails.getUsername(),
                 status

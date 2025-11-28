@@ -1,4 +1,6 @@
-import { API_BASE_URL } from '../../constants';
+import { API_BASE_URL as RAW_API_BASE_URL } from '../../api/client';
+
+const API_ROOT = RAW_API_BASE_URL.replace(/\/api(\/v\d+)?$/, '');
 
 export const uploadService = {
   uploadChatImage: async (chatRoomId: string, file: File): Promise<string> => {
@@ -14,7 +16,7 @@ export const uploadService = {
       headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(`${API_BASE_URL}/uploads/chat`, {
+    const response = await fetch(`${RAW_API_BASE_URL}/uploads/chat`, {
       method: 'POST',
       body: formData,
       credentials: 'include',
@@ -27,8 +29,9 @@ export const uploadService = {
     }
 
     const data = await response.json();
-    // data.url은 /api/v1/로 시작하는 상대 경로
-    // 백엔드가 http://localhost:8081이라면 전체 URL 반환
-    return `http://localhost:8081${data.url}`;
+    const resolvedUrl = data?.url?.startsWith('/')
+      ? `${API_ROOT}${data.url}`
+      : `${API_ROOT}/${data?.url ?? ''}`;
+    return resolvedUrl;
   },
 };

@@ -48,7 +48,7 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
   const [longitude, setLongitude] = useState(DEFAULT_LONGITUDE);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
-
+  const [forbiddenReason, setForbiddenReason] = useState<string | null>(null);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -129,6 +129,10 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
 
   const handleSubmit = async () => {
     if (isSubmitting) return;
+    if (forbiddenReason) {
+      toast.error("금지 품목으로 감지되어 등록할 수 없습니다. 다른 이미지로 다시 시도해주세요.");
+      return;
+    }
 
     const priceValue = parseInt(price, 10);
     if (Number.isNaN(priceValue) || priceValue <= 0) {
@@ -193,6 +197,27 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
     try {
       setIsAutoWriting(true);
       const result = await postApi.autoWrite(images);
+      const listingForbidden =
+        result.listing?.forbiddenItem ??
+        (result.listing as Record<string, unknown> | undefined)?.forbidden_item;
+      const forbiddenFromModel = result.forbiddenItem || listingForbidden;
+      const isForbidden =
+        result.category?.toLowerCase() === "forbidden" ||
+        !!forbiddenFromModel ||
+        result.title === "금지 품목";
+
+      if (isForbidden) {
+        const reason =
+          forbiddenFromModel ||
+          (result.title === "금지 품목" ? "금지 품목" : null) ||
+          "금지 품목으로 감지되었습니다.";
+        setForbiddenReason(reason);
+        toast.error("금지 품목으로 감지되어 작성이 차단되었습니다. 다른 이미지로 다시 시도해주세요.");
+        return;
+      }
+
+      setForbiddenReason(null);
+
       if (result.title) {
         setTitle(result.title);
       }
@@ -436,6 +461,12 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
 
       <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background p-4">
         <div className="container mx-auto max-w-2xl">
+          
+          {forbiddenReason && (
+            <div className="mb-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {forbiddenReason} - 다른 이미지로 다시 시도해주세요.
+            </div>
+          )}
           <Button
             className="w-full bg-primary hover:bg-primary-hover"
             onClick={handleSubmit}
@@ -444,10 +475,11 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
               isAutoWriting ||
               !title ||
               !categoryId ||
-              !price
+              !price ||
+              !!forbiddenReason
             }
           >
-            {isSubmitting ? "등록 중..." : "작성 완료"}
+            {isSubmitting ? "작성 중..." : "작성 완료"}
           </Button>
         </div>
       </div>

@@ -336,7 +336,7 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
         </AlertDialog>
       </div>
 
-      <div className="flex-1 min-h-0 flex flex-col overflow-hidden pb-24">
+      <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
         {/* Product Info */}
         {room && (
           <div className="border-b bg-card px-4 py-3 shrink-0">
@@ -363,117 +363,115 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
         )}
 
         {/* Messages */}
-        <div
-          ref={messagesContainerRef}
-          className="flex-1 min-h-0 overflow-y-auto px-4 py-6 space-y-4"
-        >
-          {messages.map((msg) => {
-            const isMine = currentUser && msg.senderId === currentUser.id;
-            const reviewed =
-              msg.reviewPayload?.reviewCompleted === true ||
-              msg.reviewPayload?.isReviewed === true ||
-              (typeof msg.reviewPayload?.transactionId === "number" &&
-                reviewStatus[msg.reviewPayload.transactionId] === true);
-            const isImageMessage = msg.messageType === "image" && !!msg.imageUrl;
-            const isLocationMessage = msg.messageType === "location" && !!msg.location;
-            const locationText = isLocationMessage ? msg.location?.address || msg.message : msg.message;
-            const locationLink =
-              isLocationMessage && msg.location
-                ? `https://map.kakao.com/link/map/${encodeURIComponent(
-                    msg.location.address || "공유 위치"
-                  )},${msg.location.lat},${msg.location.lng}`
-                : "";
-            const locationLat = msg.location?.lat ?? 37.5665;
-            const locationLng = msg.location?.lng ?? 126.978;
-            return (
-              <div key={msg.id} className={`flex gap-2 ${isMine ? "justify-end" : "justify-start"}`}>
-                {!isMine && (
-                  <Avatar className="h-8 w-8 shrink-0">
-                    <AvatarImage src={peer.img} />
-                    <AvatarFallback>{peer.nick?.[0] || "?"}</AvatarFallback>
-                  </Avatar>
-                )}
-                <div
-                  className={`max-w-[78%] rounded-2xl px-4 py-3 ${
-                    isMine ? "bg-primary text-white rounded-br-sm" : "bg-secondary text-foreground rounded-bl-sm"
-                  }`}
-                >
-                  <div className="space-y-2">
-                    {isImageMessage ? (
-                      <a
-                        href={msg.imageUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block overflow-hidden rounded-xl border border-white/10 bg-background/40"
-                      >
-                        <img src={msg.imageUrl} alt="shared image" className="max-h-64 w-full object-cover" />
-                      </a>
-                    ) : isLocationMessage ? (
-                      <div className="space-y-2">
-                        <p className="break-words font-semibold">{locationText}</p>
-                        <div className="overflow-hidden rounded-xl border border-white/10">
-                          <KakaoMap
-                            latitude={locationLat}
-                            longitude={locationLng}
-                            locationName={msg.location?.address || "공유 위치"}
-                            width="100%"
-                            height="180px"
-                            draggable={false}
-                            zoomable={false}
-                            showMarker
-                          />
-                        </div>
-                        {locationLink && (
-                          <a
-                            href={locationLink}
-                            target="_blank"
-                            rel="noreferrer"
-                            className={`text-xs underline-offset-2 hover:underline ${
-                              isMine ? "text-white" : "text-foreground"
-                            }`}
-                          >
-                            카카오맵에서 보기
-                          </a>
-                        )}
-                      </div>
-                    ) : (
-                      <p className="break-words">{msg.message}</p>
-                    )}
-                  {msg.messageType === "review_link" &&
-                    !isMine &&
-                    msg.reviewPayload &&
-                    (isBuyer || isSeller) && (
-                      <div className="mt-2">
-                        <Button
-                          size="sm"
-                          className="bg-white text-primary hover:bg-white/90 disabled:opacity-70 disabled:cursor-not-allowed"
-                          disabled={reviewed}
-                          onClick={() =>
-                            handleReviewLink(
-                              isBuyer
-                                ? msg.reviewPayload!
-                                : {
-                                    ...msg.reviewPayload!,
-                                    targetId: msg.reviewPayload!.buyerId,
-                                  }
-                            )
-                          }
+        <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto px-4 pt-6 pb-28">
+          <div className="flex flex-col justify-end gap-4 min-h-full">
+            {messages.map((msg) => {
+              const isMine = currentUser && msg.senderId === currentUser.id;
+              const reviewed =
+                msg.reviewPayload?.reviewCompleted === true ||
+                msg.reviewPayload?.isReviewed === true ||
+                (typeof msg.reviewPayload?.transactionId === "number" &&
+                  reviewStatus[msg.reviewPayload.transactionId] === true);
+              const isImageMessage = msg.messageType === "image" && !!msg.imageUrl;
+              const isLocationMessage = msg.messageType === "location" && !!msg.location;
+              const locationText = isLocationMessage ? msg.location?.address || msg.message : msg.message;
+              const locationLink =
+                isLocationMessage && msg.location
+                  ? `https://map.kakao.com/link/map/${encodeURIComponent(
+                      msg.location.address || "?? ??"
+                    )},${msg.location.lat},${msg.location.lng}`
+                  : "";
+              const locationLat = msg.location?.lat ?? 37.5665;
+              const locationLng = msg.location?.lng ?? 126.978;
+              return (
+                <div key={msg.id} className={`flex gap-2 ${isMine ? "justify-end" : "justify-start"}`}>
+                  {!isMine && (
+                    <Avatar className="h-8 w-8 shrink-0">
+                      <AvatarImage src={peer.img} />
+                      <AvatarFallback>{peer.nick?.[0] || "?"}</AvatarFallback>
+                    </Avatar>
+                  )}
+                  <div
+                    className={`max-w-[78%] rounded-2xl px-4 py-3 ${
+                      isMine ? "bg-primary text-white rounded-br-sm" : "bg-secondary text-foreground rounded-bl-sm"
+                    }`}
+                  >
+                    <div className="space-y-2">
+                      {isImageMessage ? (
+                        <a
+                          href={msg.imageUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="block overflow-hidden rounded-xl border border-white/10 bg-background/40"
                         >
-                          {reviewed ? "후기 작성 완료" : "후기 작성하기"}
-                        </Button>
-                      </div>
-                    )}
-                    <p className={`text-xs ${isMine ? "text-white/70" : "text-muted-foreground"}`}>
-                      {formatTime(msg.createdAt)}
-                    </p>
+                          <img src={msg.imageUrl} alt="shared image" className="max-h-64 w-full object-cover" />
+                        </a>
+                      ) : isLocationMessage ? (
+                        <div className="space-y-2">
+                          <p className="break-words font-semibold">{locationText}</p>
+                          <div className="overflow-hidden rounded-xl border border-white/10">
+                            <KakaoMap
+                              latitude={locationLat}
+                              longitude={locationLng}
+                              locationName={msg.location?.address || "?? ??"}
+                              width="100%"
+                              height="180px"
+                              draggable={false}
+                              zoomable={false}
+                              showMarker
+                            />
+                          </div>
+                          {locationLink && (
+                            <a
+                              href={locationLink}
+                              target="_blank"
+                              rel="noreferrer"
+                              className={`text-xs underline-offset-2 hover:underline ${
+                                isMine ? "text-white" : "text-foreground"
+                              }`}
+                            >
+                              ?????? ??
+                            </a>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="break-words">{msg.message}</p>
+                      )}
+                    {msg.messageType === "review_link" &&
+                      !isMine &&
+                      msg.reviewPayload &&
+                      (isBuyer || isSeller) && (
+                        <div className="mt-2">
+                          <Button
+                            size="sm"
+                            className="bg-white text-primary hover:bg-white/90 disabled:opacity-70 disabled:cursor-not-allowed"
+                            disabled={reviewed}
+                            onClick={() =>
+                              handleReviewLink(
+                                isBuyer
+                                  ? msg.reviewPayload!
+                                  : {
+                                      ...msg.reviewPayload!,
+                                      targetId: msg.reviewPayload!.buyerId,
+                                    }
+                              )
+                            }
+                          >
+                            {reviewed ? "?? ?? ??" : "?? ????"}
+                          </Button>
+                        </div>
+                      )}
+                      <p className={`text-xs ${isMine ? "text-white/70" : "text-muted-foreground"}`}>
+                        {formatTime(msg.createdAt)}
+                      </p>
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
-
       {/* Input */}
       <div className="fixed bottom-0 left-0 right-0 border-t bg-background p-4 z-50">
         <div className="flex items-center gap-2">

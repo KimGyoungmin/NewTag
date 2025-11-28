@@ -37,9 +37,14 @@ if static_env:
     STATIC_ROOT = Path(static_env).resolve()
     logger.info(f"[Startup] STATIC_ROOT from env: {STATIC_ROOT}")
 else:
-    # PROJECT_ROOT/BackEnd/src/main/resources/static 경로 자동 계산
-    STATIC_ROOT = (PROJECT_ROOT / "BackEnd" / "src" / "main" / "resources" / "static").resolve()
-    logger.info(f"[Startup] STATIC_ROOT auto-detected: {STATIC_ROOT}")
+    # Prefer external uploads dir for Docker/local dev, fall back to bundled static assets
+    uploads_root = (PROJECT_ROOT / "uploads").resolve()
+    if uploads_root.exists():
+        STATIC_ROOT = uploads_root
+        logger.info(f"[Startup] STATIC_ROOT defaulted to uploads: {STATIC_ROOT}")
+    else:
+        STATIC_ROOT = (PROJECT_ROOT / "BackEnd" / "src" / "main" / "resources" / "static").resolve()
+        logger.info(f"[Startup] STATIC_ROOT auto-detected: {STATIC_ROOT}")
 
 logger.info(f"[Startup] BASE_DIR: {BASE_DIR}")
 logger.info(f"[Startup] PROJECT_ROOT: {PROJECT_ROOT}")

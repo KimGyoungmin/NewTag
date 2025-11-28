@@ -49,6 +49,7 @@ public class ProductDtos {
         private String thumbnailImage;
         private String title;
         private Double price;
+        private ProductStatus status;
         private String locationNm;
         private Double latitude;
         private Double longitude;

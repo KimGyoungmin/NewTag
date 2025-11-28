@@ -1,0 +1,15 @@
+# One keyword per line. Whitespace is trimmed and lines starting with # are ignored.
+총,gun,firearm,weapon,pistol,rifle,shotgun,handgun
+권총
+탄약,ammo,ammunition,bullet
+도검,knife,sword,blade
+마약,drug,narcotic
+대마,cannabis,marijuana,weed
+니코틴액상,nicotine,vape,vaping
+주류,alcohol,liquor
+담배,cigarette,tobacco,cigar
+무기,armament
+위조지폐,counterfeit
+성인용품,adult,toy
+빼빼로, pepero
+강아지, 개, 애완동물, 반려견

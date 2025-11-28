@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Search, ArrowUp, ArrowDown } from "lucide-react";
 import { Input } from "../components/ui/input";
 import { Card, CardContent } from "../components/ui/card";
@@ -31,6 +31,8 @@ export function ResellPage({ onNavigate, products, onProductsChange }: ResellPag
   const [localProducts, setLocalProducts] = useState<ResellProductRecord[]>(
     products && products.length ? products : RESELL_PRODUCTS,
   );
+  const chartAreaRef = useRef<HTMLDivElement | null>(null);
+  const [chartSize, setChartSize] = useState<{ w: number; h: number }>({ w: 320, h: 96 });
 
   useEffect(() => {
     if (products && products.length) {
@@ -60,6 +62,24 @@ export function ResellPage({ onNavigate, products, onProductsChange }: ResellPag
       cancelled = true;
     };
   }, [onProductsChange]);
+
+  // Recharts가 0 이하 크기를 읽지 않도록 컨테이너 사이즈를 관찰
+  useEffect(() => {
+    const el = chartAreaRef.current;
+    if (!el) return;
+
+    const resize = () => {
+      setChartSize({
+        w: Math.max(el.clientWidth, 1),
+        h: Math.max(el.clientHeight, 96), // 최소 높이 보장
+      });
+    };
+
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const pickKoreanName = (product: ResellProductRecord & Record<string, any>) => {
     const rawCandidates = [
@@ -297,9 +317,9 @@ export function ResellPage({ onNavigate, products, onProductsChange }: ResellPag
                   </div>
                 </div>
 
-                <div className="h-24">
+                <div className="h-24 min-w-0 w-full" ref={chartAreaRef}>
                   {hasHistory ? (
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width={chartSize.w} height={chartSize.h}>
                       <LineChart data={priceHistory}>
                         <YAxis domain={[domainMin, domainMax]} hide />
                         <Line

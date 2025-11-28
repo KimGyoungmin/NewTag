@@ -371,8 +371,8 @@ export const chatService = {
     userId: number,
     callback: (count: number) => void
   ): (() => void) => {
-    let myChatRoomIds: string[] = [];
-    const unsubscribers: Array<() => void> = [];
+    let buyerRoomIds: string[] = [];
+    let sellerRoomIds: string[] = [];
 
     const chatRoomsQuery1 = query(
       collection(db, 'chatRooms'),
@@ -385,18 +385,23 @@ export const chatService = {
 
     let messageUnsubscribers: Array<() => void> = [];
 
-    const updateChatRooms = () => {
+    const cleanupMessages = () => {
       messageUnsubscribers.forEach((unsub) => unsub());
       messageUnsubscribers = [];
+    };
 
-      const unreadCounts = new Map<string, number>();
+    const rebuildMessageSubscriptions = () => {
+      cleanupMessages();
 
-      if (myChatRoomIds.length === 0) {
+      const roomIds = [...buyerRoomIds, ...sellerRoomIds];
+      if (roomIds.length === 0) {
         callback(0);
         return;
       }
 
-      myChatRoomIds.forEach((roomId) => {
+      const unreadCounts = new Map<string, number>();
+
+      roomIds.forEach((roomId) => {
         const messagesQuery = query(
           collection(db, 'messages'),
           where('chatRoomId', '==', roomId),
@@ -418,21 +423,20 @@ export const chatService = {
       });
     };
 
-    const unsubBuyer = onSnapshot(chatRoomsQuery1, (snapshot) => {
-      const buyerRoomIds = snapshot.docs.map((docSnap) => docSnap.id);
-
-      onSnapshot(chatRoomsQuery2, (snapshot2) => {
-        const sellerRoomIds = snapshot2.docs.map((docSnap) => docSnap.id);
-        myChatRoomIds = [...buyerRoomIds, ...sellerRoomIds];
-        updateChatRooms();
-      });
+    const unsubscribeBuyer = onSnapshot(chatRoomsQuery1, (snapshot) => {
+      buyerRoomIds = snapshot.docs.map((docSnap) => docSnap.id);
+      rebuildMessageSubscriptions();
     });
 
-    unsubscribers.push(unsubBuyer);
+    const unsubscribeSeller = onSnapshot(chatRoomsQuery2, (snapshot) => {
+      sellerRoomIds = snapshot.docs.map((docSnap) => docSnap.id);
+      rebuildMessageSubscriptions();
+    });
 
     return () => {
-      unsubscribers.forEach((unsub) => unsub());
-      messageUnsubscribers.forEach((unsub) => unsub());
+      unsubscribeBuyer();
+      unsubscribeSeller();
+      cleanupMessages();
     };
   },
 };

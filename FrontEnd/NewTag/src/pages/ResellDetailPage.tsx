@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, Calendar } from "lucide-react";
 import { RESELL_PRODUCTS, ResellProductRecord } from "../data/resellProducts";
 import { Button } from "../components/ui/button";
@@ -82,6 +82,25 @@ export function ResellDetailPage({ productId, onNavigate, products }: ResellDeta
   const productList = products && products.length ? products : RESELL_PRODUCTS;
   const product = useMemo(() => productList.find((item) => item.id === productId), [productId, productList]);
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodKey>("month");
+  const chartContainerRef = useRef<HTMLDivElement | null>(null);
+  const [chartSize, setChartSize] = useState<{ w: number; h: number }>({ w: 800, h: 240 });
+
+  useEffect(() => {
+    const el = chartContainerRef.current;
+    if (!el) return;
+
+    const resize = () => {
+      setChartSize({
+        w: Math.max(el.clientWidth, 1),
+        h: Math.max(el.clientHeight, 200),
+      });
+    };
+
+    resize();
+    const observer = new ResizeObserver(resize);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   if (!product) {
     return (
@@ -221,9 +240,9 @@ export function ResellDetailPage({ productId, onNavigate, products }: ResellDeta
               ))}
             </div>
           </CardHeader>
-          <CardContent className="h-72">
+          <CardContent className="h-72 min-w-0 w-full overflow-x-auto" ref={chartContainerRef}>
             {chartData.length > 0 ? (
-              <ResponsiveContainer width="100%" height="100%">
+              <ResponsiveContainer width={chartSize.w} height={chartSize.h}>
                 <LineChart data={chartData}>
                   <XAxis
                     dataKey="label"

@@ -60,6 +60,8 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     // 판매자별 상품 조회
     @Query("SELECT p FROM Product p WHERE p.seller.id = :sellerId AND p.is_delete = false")
     Page<Product> findBySellerNotDeleted(@Param("sellerId") Long sellerId, Pageable pageable);
+    @Query("SELECT COUNT(p) FROM Product p WHERE p.seller.id = :sellerId AND p.is_delete = false")
+    long countActiveBySeller(@Param("sellerId") Long sellerId);
 
     // 제목으로 검색
     @Query("SELECT p FROM Product p WHERE p.is_delete = false AND p.title LIKE %:keyword%")
