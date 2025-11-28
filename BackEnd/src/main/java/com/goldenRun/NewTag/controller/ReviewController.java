@@ -1,4 +1,4 @@
-﻿package com.goldenRun.NewTag.controller;
+package com.goldenRun.NewTag.controller;
 
 import com.goldenRun.NewTag.dto.ReviewDtos;
 import com.goldenRun.NewTag.service.ReviewService;
@@ -15,7 +15,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/v1/reviews")
 @RequiredArgsConstructor
-@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:5174"}, allowCredentials = "true")
+@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:5174", "http://localhost"}, allowCredentials = "true")
 public class ReviewController {
 
     private final ReviewService reviewService;
@@ -30,7 +30,7 @@ public class ReviewController {
     }
 
     /**
-     * ?뱀젙 ?ъ슜?먭? 諛쏆? 由щ럭 紐⑸줉 議고쉶
+     * 특정 사용자가 받은 리뷰 목록 조회
      * GET /api/v1/reviews/user/{userId}?page=0&size=10
      */
     @GetMapping("/user/{userId}")
@@ -65,7 +65,7 @@ public class ReviewController {
     }
 
     /**
-     * ?뱀젙 ?ъ슜?먯쓽 ?됱젏 ?붿빟 ?뺣낫 議고쉶
+     * 특정 사용자의 평점 요약 정보 조회
      * GET /api/v1/reviews/user/{userId}/summary
      */
     @GetMapping("/user/{userId}/summary")
@@ -76,4 +76,3 @@ public class ReviewController {
         return ResponseEntity.ok(summary);
     }
 }
-
