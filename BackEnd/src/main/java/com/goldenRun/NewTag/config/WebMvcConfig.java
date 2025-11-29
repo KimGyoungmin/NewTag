@@ -13,10 +13,10 @@ import java.nio.file.Paths;
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
 
-    @Value("${app.upload.base-dir:BackEnd/src/main/resources/static}")
+    @Value("${app.upload.base-dir:uploads}")
     private String uploadBaseDir;
 
-    @Value("${app.upload.profile-base-dir:BackEnd/src/main/resources/userprofile}")
+    @Value("${app.upload.profile-base-dir:uploads/userprofile}")
     private String profileBaseDir;
 
     @Value("${app.upload.profile-dir:userprofile}")
@@ -29,7 +29,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
         Path uploadPath = Paths.get(uploadBaseDir).toAbsolutePath().normalize();
         String fileLocation = uploadPath.toUri().toString();
 
-        registry.addResourceHandler("/api/v1/static/**")
+        registry.addResourceHandler("/v1/static/**")
                 .addResourceLocations(fileLocation, "classpath:/static/")
                 .setCachePeriod(3600);
 
@@ -37,7 +37,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
 
         Path profilePath = Paths.get(profileBaseDir).toAbsolutePath().normalize();
         String profileLocation = profilePath.toUri().toString();
-        String profilePattern = "/api/v1/" + profileDir + "/**";
+        String profilePattern = "/v1/" + profileDir + "/**";
 
         registry.addResourceHandler(profilePattern)
                 .addResourceLocations(profileLocation)

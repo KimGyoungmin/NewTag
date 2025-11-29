@@ -1,4 +1,4 @@
-import { api } from './client';
+import { api, apiClient } from './client';
 
 interface ImageRequest {
   path: string;
@@ -66,6 +66,13 @@ export interface AutoWriteResponse {
   categoryId?: number;
   categoryName?: string;
   sourceImage?: string;
+  category?: string;
+  forbiddenItem?: string;
+  listing?: {
+    forbiddenItem?: string;
+    forbidden_item?: string;
+    [key: string]: unknown;
+  };
 }
 
 export const postApi = {
@@ -119,7 +126,9 @@ export const postApi = {
   },
 
   autoWrite: async (imagePaths: string[]): Promise<AutoWriteResponse> => {
-    const response = await api.post<AutoWriteResponse>('/ai/auto-listing', { imagePaths });
+    // This endpoint goes to the model server, which is routed via /model/* by Caddy.
+    // We use the base `apiClient` from './client' to call this path directly, bypassing the /api/v1 prefix.
+    const response = await apiClient.post<AutoWriteResponse>('/model/auto-listing', { image_paths: imagePaths });
     return response.data;
   },
 };

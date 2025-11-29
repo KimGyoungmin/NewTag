@@ -253,4 +253,8 @@ public class UserService {
 				.header(HttpHeaders.SET_COOKIE, buildRefreshTokenCookie("", 0).toString())
 				.body(response);
 	}
+
+	public User findById(Long id) {
+		return repository.findById(id).orElse(null);
+	}
 }

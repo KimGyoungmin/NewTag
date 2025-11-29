@@ -16,24 +16,36 @@
 }
 
 :80 {
-    # Backend API (Spring Boot)
-    # Forward requests starting with /api/ to the backend service.
-    handle_path /api/* {
-        reverse_proxy backend:8081
+    # AI Model Server (Precise rule for API gateway)
+    handle_path /api/v1/model/* {
+        uri strip_prefix /api/v1/model
+        reverse_proxy model:8000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
     }
 
-    # Model Server (FastAPI)
-    # Forward requests starting with /model/ to the model service.
-    # The '/model' prefix is stripped before forwarding.
-    # e.g., a request to /model/auto-listing becomes /auto-listing on the model server.
-    handle_path /model/* {
-        uri strip_prefix /model
-        reverse_proxy model:8000
+    # Backend API (Spring Boot) - General rule, comes after specific ones
+    handle_path /api/* {
+        reverse_proxy backend:8081 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            header_up X-Forwarded-Host {host}
+        }
     }
 
     # Frontend (React served by its own Caddy)
     # Forward all other requests to the frontend service.
     handle {
-        reverse_proxy frontend:80
+        reverse_proxy frontend:80 {
+            # Forward important headers
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
     }
 }

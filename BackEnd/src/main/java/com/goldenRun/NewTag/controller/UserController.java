@@ -15,9 +15,12 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PathVariable;
 
 import com.goldenRun.NewTag.dto.UserDtos;
 import com.goldenRun.NewTag.entity.User;
+import com.goldenRun.NewTag.service.ProductService;
+import com.goldenRun.NewTag.service.ReviewService;
 import com.goldenRun.NewTag.service.GoogleAuthService;
 import com.goldenRun.NewTag.service.KakaoAuthService;
 import com.goldenRun.NewTag.service.NaverAuthService;
@@ -26,8 +29,7 @@ import com.goldenRun.NewTag.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
-@RequestMapping("/api/v1")
-@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:5174"}, allowCredentials = "true")
+@RequestMapping("/v1")
 public class UserController {
 
 	@Autowired
@@ -41,6 +43,12 @@ public class UserController {
 
 	@Autowired
 	private NaverAuthService naverAuthService;
+
+	@Autowired
+	private ReviewService reviewService;
+
+	@Autowired
+	private ProductService productService;
 
 	@PostMapping("/login")
 	public ResponseEntity<Map<String, Object>> login(@RequestBody User loginUser) {
@@ -108,5 +116,46 @@ public class UserController {
 			@RequestParam String code,
 			@RequestParam String state) {
 		return naverAuthService.processNaverLogin(code, state);
+	}
+
+	@GetMapping("/sellers/{sellerId}")
+	public ResponseEntity<Map<String, Object>> getSellerProfile(
+			@PathVariable Long sellerId,
+			@RequestParam(defaultValue = "0") int page,
+			@RequestParam(defaultValue = "12") int size
+	) {
+		User seller = service.findById(sellerId);
+		if (seller == null) {
+			return ResponseEntity.status(HttpStatus.NOT_FOUND)
+					.body(Map.of("success", false, "message", "판매자를 찾을 수 없습니다."));
+		}
+
+		var ratingSummary = reviewService.getRatingSummary(sellerId);
+		var productPage = productService.getProductsBySeller(sellerId, page, size);
+		long totalProducts = productService.countActiveProductsBySeller(sellerId);
+
+		UserDtos.SellerProfileResponse profile = UserDtos.SellerProfileResponse.builder()
+				.seller(UserDtos.SimpleResponse.from(seller))
+				.reviewSummary(UserDtos.ReviewSummary.builder()
+						.averageRating(ratingSummary.getAverageRating())
+						.totalCount(ratingSummary.getTotalCount())
+						.rating1Count(ratingSummary.getRating1Count())
+						.rating2Count(ratingSummary.getRating2Count())
+						.rating3Count(ratingSummary.getRating3Count())
+						.rating4Count(ratingSummary.getRating4Count())
+						.rating5Count(ratingSummary.getRating5Count())
+						.build())
+				.products(productPage.getContent())
+				.totalProducts(totalProducts)
+				.build();
+
+		return ResponseEntity.ok(Map.of(
+				"success", true,
+				"data", profile,
+				"currentPage", productPage.getNumber(),
+				"totalPages", productPage.getTotalPages(),
+				"totalElements", productPage.getTotalElements(),
+				"pageSize", productPage.getSize()
+		));
 	}
 }

@@ -15,7 +15,7 @@ import { db } from './config';
 import type { ChatLocation, ChatMessage, ChatRoom, ReviewNavigationPayload } from '../../types';
 
 export const chatService = {
-  // Create chat room if one already exists return that id
+  // 채팅방 생성 또는 기존 방 반환
   getOrCreateChatRoom: async (
     productId: number,
     seller: { id: number; nick?: string; profileImg?: string },
@@ -54,7 +54,7 @@ export const chatService = {
     return docRef.id;
   },
 
-  // Send message (text / image / location / review)
+  // 메시지 전송 (텍스트/이미지/위치/리뷰 링크)
   sendMessage: async (
     chatRoomId: string,
     senderId: number,
@@ -100,7 +100,7 @@ export const chatService = {
     return docRef.id;
   },
 
-  // Subscribe to messages in a room
+  // 실시간 메시지 구독
   subscribeToMessages: (
     chatRoomId: string,
     callback: (messages: ChatMessage[]) => void
@@ -137,7 +137,7 @@ export const chatService = {
     );
   },
 
-  // Subscribe to chat rooms for a user
+  // 사용자 채팅방 목록 구독
   subscribeToChatRooms: (
     userId: number,
     callback: (chatRooms: ChatRoom[]) => void
@@ -188,7 +188,7 @@ export const chatService = {
     };
   },
 
-  // Mark all messages from others as read
+  // 메시지 읽음 처리
   markAsRead: async (chatRoomId: string, userId: number) => {
     const q = query(
       collection(db, 'messages'),
@@ -328,8 +328,6 @@ export const chatService = {
   },
 
   getTotalUnreadCount: async (userId: number): Promise<number> => {
-    console.log('[chatService] getTotalUnreadCount called for userId:', userId);
-
     const chatRoomsQuery1 = query(
       collection(db, 'chatRooms'),
       where('buyerId', '==', userId)
@@ -343,8 +341,6 @@ export const chatService = {
       getDocs(chatRoomsQuery1),
       getDocs(chatRoomsQuery2),
     ]);
-
-    console.log('[chatService] My chat rooms - buyer:', buyerRooms.size, 'seller:', sellerRooms.size);
 
     const myChatRoomIds = [
       ...buyerRooms.docs.map((docSnap) => docSnap.id),
@@ -368,7 +364,6 @@ export const chatService = {
       totalUnread += unreadFromOthers;
     }
 
-    console.log('[chatService] Total unread messages:', totalUnread);
     return totalUnread;
   },
 
@@ -376,10 +371,8 @@ export const chatService = {
     userId: number,
     callback: (count: number) => void
   ): (() => void) => {
-    console.log('[chatService] subscribeToTotalUnreadCount started for userId:', userId);
-
-    let myChatRoomIds: string[] = [];
-    const unsubscribers: Array<() => void> = [];
+    let buyerRoomIds: string[] = [];
+    let sellerRoomIds: string[] = [];
 
     const chatRoomsQuery1 = query(
       collection(db, 'chatRooms'),
@@ -392,18 +385,23 @@ export const chatService = {
 
     let messageUnsubscribers: Array<() => void> = [];
 
-    const updateChatRooms = () => {
+    const cleanupMessages = () => {
       messageUnsubscribers.forEach((unsub) => unsub());
       messageUnsubscribers = [];
+    };
 
-      const unreadCounts = new Map<string, number>();
+    const rebuildMessageSubscriptions = () => {
+      cleanupMessages();
 
-      if (myChatRoomIds.length === 0) {
+      const roomIds = [...buyerRoomIds, ...sellerRoomIds];
+      if (roomIds.length === 0) {
         callback(0);
         return;
       }
 
-      myChatRoomIds.forEach((roomId) => {
+      const unreadCounts = new Map<string, number>();
+
+      roomIds.forEach((roomId) => {
         const messagesQuery = query(
           collection(db, 'messages'),
           where('chatRoomId', '==', roomId),
@@ -418,7 +416,6 @@ export const chatService = {
           unreadCounts.set(roomId, unreadFromOthers);
 
           const total = Array.from(unreadCounts.values()).reduce((sum, count) => sum + count, 0);
-          console.log('[chatService] Real-time unread count updated:', total);
           callback(total);
         });
 
@@ -426,24 +423,20 @@ export const chatService = {
       });
     };
 
-    const unsubBuyer = onSnapshot(chatRoomsQuery1, (snapshot) => {
-      const buyerRoomIds = snapshot.docs.map((docSnap) => docSnap.id);
-
-      onSnapshot(chatRoomsQuery2, (snapshot2) => {
-        const sellerRoomIds = snapshot2.docs.map((docSnap) => docSnap.id);
-        myChatRoomIds = [...buyerRoomIds, ...sellerRoomIds];
-
-        console.log('[chatService] Chat rooms updated:', myChatRoomIds.length);
-        updateChatRooms();
-      });
+    const unsubscribeBuyer = onSnapshot(chatRoomsQuery1, (snapshot) => {
+      buyerRoomIds = snapshot.docs.map((docSnap) => docSnap.id);
+      rebuildMessageSubscriptions();
     });
 
-    unsubscribers.push(unsubBuyer);
+    const unsubscribeSeller = onSnapshot(chatRoomsQuery2, (snapshot) => {
+      sellerRoomIds = snapshot.docs.map((docSnap) => docSnap.id);
+      rebuildMessageSubscriptions();
+    });
 
     return () => {
-      console.log('[chatService] Unsubscribing from unread count');
-      unsubscribers.forEach((unsub) => unsub());
-      messageUnsubscribers.forEach((unsub) => unsub());
+      unsubscribeBuyer();
+      unsubscribeSeller();
+      cleanupMessages();
     };
   },
 };

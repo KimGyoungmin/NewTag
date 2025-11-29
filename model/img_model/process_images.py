@@ -15,6 +15,7 @@ import base64
 import json
 import logging
 import os
+import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -32,8 +33,13 @@ DEFAULT_MAX_DIMENSION = 512
 DEFAULT_MAX_RESULTS = 3
 DEFAULT_TIMEOUT = 10
 JPEG_QUALITY = 82
+FORBIDDEN_FILES = [
+    Path(__file__).resolve().parent / "forbidden_items.txt",
+    Path(__file__).resolve().parent / "forbidden_items.json",
+]
 
 SESSION = requests.Session()
+_FORBIDDEN_CACHE: Optional[List[str]] = None
 
 
 class PipelineError(Exception):
@@ -65,6 +71,84 @@ def load_env_file(path: Path) -> None:
         value = normalize_env_value(value)
         os.environ[key] = value
     LOGGER.debug("Loaded environment variables from %s", path)
+
+
+def load_forbidden_items() -> List[str]:
+    """Load forbidden item keywords (supports comma/pipe separated synonyms) and cache them."""
+    global _FORBIDDEN_CACHE  # noqa: PLW0603
+    if _FORBIDDEN_CACHE is not None:
+        return _FORBIDDEN_CACHE
+
+    items: List[str] = []
+
+    def _extend(raw: str) -> None:
+        # allow comma or pipe separated synonyms in a single line/entry
+        for token in re.split(r"[|,]", raw):
+            token = token.strip()
+            if token:
+                items.append(token)
+    
+    for path in FORBIDDEN_FILES:
+        if not path.exists():
+            continue
+        try:
+            if path.suffix.lower() == ".json":
+                data = json.loads(path.read_text(encoding="utf-8"))
+                if isinstance(data, list):
+                    for entry in data:
+                        if isinstance(entry, str):
+                            _extend(entry)
+                continue
+
+            for line in path.read_text(encoding="utf-8").splitlines():
+                stripped = line.strip()
+                if stripped and not stripped.startswith("#"):
+                    _extend(stripped)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            LOGGER.warning("Failed to load forbidden items from %s: %s", path, exc)
+
+    _FORBIDDEN_CACHE = items
+    return items
+
+
+def detect_forbidden(attributes: Dict[str, Any]) -> Optional[str]:
+    """Check vision attributes against forbidden keywords; return the matched keyword."""
+    forbidden = load_forbidden_items()  
+    if not forbidden:
+        return None
+
+    texts: List[str] = []
+    for entry in attributes.get("labels", []):
+        if isinstance(entry, dict):
+            val = (entry.get("description") or "").strip()
+            if val:
+                texts.append(val)
+    for entry in attributes.get("logos", []):
+        if isinstance(entry, dict):
+            val = (entry.get("description") or "").strip()
+            if val:
+                texts.append(val)
+    for entry in attributes.get("objects", []):
+        if isinstance(entry, dict):
+            val = (entry.get("name") or "").strip()
+            if val:
+                texts.append(val)
+
+    detected_text = (attributes.get("detected_text") or "").strip()
+    if detected_text:
+        texts.append(detected_text)
+    for entry in attributes.get("detected_text_variants", []):
+        if isinstance(entry, str):
+            val = entry.strip()
+            if val:
+                texts.append(val)
+
+    haystack = "\n".join(texts).casefold()
+    for word in forbidden:
+        token = word.strip()
+        if token and token.casefold() in haystack:
+            return token
+    return None
 
 
 def bootstrap_env() -> None:
@@ -322,12 +406,23 @@ def call_gemini(
     attributes: Dict[str, Any],
     image_mime: str,
     image_b64: str,
+    forbidden_words: Optional[List[str]] = None,
     timeout: int = DEFAULT_TIMEOUT,
 ) -> Dict[str, Any]:
     url = (
         f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         f"?key={api_key}"
     )
+    forbid_clause = ""
+    if forbidden_words:
+        forbid_clause = (
+            "If the item matches any forbidden keyword, do NOT create a listing; "
+            "instead return exactly this JSON: "
+            '{"title":"금지 품목","content":"금지 품목(<keyword>)은 등록할 수 없습니다.",'
+            '"priceKRW":0,"category":"forbidden","forbiddenItem":"<keyword>"} . '
+            f"Forbidden keywords: {', '.join(forbidden_words)}. "
+        )
+
     prompt = (
         "Output only JSON for Korean secondhand transactions. "
         "The title must be within 20 characters and begin with brand + model."
@@ -337,7 +432,8 @@ def call_gemini(
         "Think explicitly about similar items and their resale prices before finalizing priceKRW. "
         "Category should be a simple Korean category name. "
         "All sentences must be written in Korean, and no additional explanations or markdown are allowed."
-        "When selecting a price, please select the price of that model, not the general price of that brand."
+        "When selecting a price, please select the price of that model, not the general price of that brand. "
+        + forbid_clause
     )
 
     attribute_summary = build_attribute_prompt(attributes)
@@ -496,12 +592,35 @@ def process_image(
     vision_raw = call_google_vision(image_b64, config.vision_api_key)
     attributes = summarize_vision_response(vision_raw)
 
+    forbidden_hit = detect_forbidden(attributes)
+    if forbidden_hit:
+        elapsed = time.perf_counter() - start
+        listing = {
+            "title": "금지 품목",
+            "content": f"금지 품목({forbidden_hit})은 등록할 수 없습니다.",
+            "priceKRW": 0,
+            "category": "forbidden",
+            "forbiddenItem": forbidden_hit,
+        }
+        result = {
+            "source_image": display_relative_path(image_path, config.base_dir),
+            "resized_image": display_relative_path(resized_path, config.base_dir),
+            "vision_attributes": attributes,
+            "listing": listing,
+            "processing_seconds": round(elapsed, 3),
+        }
+        output_path = config.output_dir / f"{image_path.stem}.json"
+        with output_path.open("w", encoding="utf-8") as fh:
+            json.dump(listing, fh, ensure_ascii=False, indent=2)
+        return result
+
     listing_raw = call_gemini(
         config.gemini_model,
         config.gemini_api_key,
         attributes,
         mime_type,
         image_b64,
+        forbidden_words=load_forbidden_items(),
     )
     listing = normalize_listing(listing_raw)
 

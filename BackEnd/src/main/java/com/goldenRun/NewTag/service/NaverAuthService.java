@@ -43,7 +43,7 @@ public class NaverAuthService {
     @Value("${naver.client-secret:}")
     private String naverClientSecret;
 
-    @Value("${naver.redirect-uri:http://localhost:5173/auth/naver/callback}")
+    @Value("${naver.redirect-uri:http://localhost:5173/v1/auth/naver/callback}")
     private String naverRedirectUri;
 
     private static final String NAVER_TOKEN_URL = "https://nid.naver.com/oauth2.0/token";

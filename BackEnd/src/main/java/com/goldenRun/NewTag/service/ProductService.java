@@ -15,6 +15,7 @@ import com.goldenRun.NewTag.enums.TransactionStatus;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -28,6 +29,8 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -48,78 +51,74 @@ public class ProductService {
     private final FileStorageService fileStorageService;
 
     /**
-     * 상품 목록 조회 (페이징, 정렬, 필터링)
+     * 상품 목록 조회
      */
-    public Page<ProductDtos.ListItem> getProductList(
-            Long categoryId,
-            String sortBy,
-            int page,
-            int size
-    ) {
-        Pageable pageable = createPageable(sortBy, page, size);
+    public Page<ProductDtos.ListItem> getProductList(Long categoryId, String sortBy, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, resolveSort(sortBy));
+        Page<Product> products = (categoryId != null)
+                ? productRepository.findByCategoryNotDeleted(categoryId, pageable)
+                : productRepository.findAllNotDeleted(pageable);
 
-        Page<Product> products;
-        if (categoryId != null && categoryId > 0) {
-            products = productRepository.findByCategoryNotDeleted(categoryId, pageable);
-        } else {
-            products = productRepository.findAllNotDeleted(pageable);
-        }
+        Map<Long, Long> favoriteCountMap = favoriteService.getFavoriteCounts(
+                products.stream().map(Product::getId).toList()
+        );
 
-        // 모든 상품의 ID를 수집
-        List<Long> productIds = products.getContent().stream()
-                .map(Product::getId)
-                .collect(Collectors.toList());
+        List<ProductDtos.ListItem> items = products.stream()
+                .map(p -> toListItem(p, favoriteCountMap))
+                .toList();
 
-        // 한 번의 쿼리로 모든 상품의 찜 개수 조회 (N+1 문제 해결)
-        Map<Long, Long> favoriteCountMap = favoriteService.getFavoriteCounts(productIds);
-
-        return products.map(product -> convertToListItem(product, favoriteCountMap));
+        return new PageImpl<>(items, pageable, products.getTotalElements());
     }
 
     /**
-     * 상품 상세 조회 (N+1 최적화 적용)
+     * 상품 상세 조회
      */
-    @Transactional
-    public ProductDtos.DetailResponse getProductDetail(Long productId, Long currentUserId) {
-        // Fetch Join으로 연관 엔티티 한 번에 조회
-        Product product = productRepository.findByIdWithFetchJoin(productId);
-
-        if (product == null) {
+    public ProductDtos.DetailResponse getProductDetail(Long id, Long userId) {
+        Product product = productRepository.findByIdWithFetchJoin(id);
+        if (product == null || Boolean.TRUE.equals(product.getIs_delete())) {
             throw new IllegalArgumentException("상품을 찾을 수 없습니다.");
         }
-
-        if (product.getIs_delete()) {
-            throw new IllegalArgumentException("삭제된 상품입니다.");
-        }
-
-        // 조회수 증가
-        product.increaseView();
-
-        return convertToDetailResponse(product, currentUserId);
+        return toDetailResponse(product, userId);
     }
 
-    /**
-     * 판매자별 상품 목록 조회
-     */
-    public Page<ProductDtos.ListItem> getProductsBySeller(Long sellerId, int page, int size) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<Product> products = productRepository.findBySellerNotDeleted(sellerId, pageable);
+    public List<ProductDtos.ListItem> getRelatedProducts(Long id, int limit) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
 
-        // 모든 상품의 ID를 수집
-        List<Long> productIds = products.getContent().stream()
-                .map(Product::getId)
-                .collect(Collectors.toList());
+        Page<Product> related = productRepository.findRelatedProducts(
+                product.getCategory().getId(),
+                product.getId(),
+                PageRequest.of(0, limit)
+        );
 
-        // 한 번의 쿼리로 모든 상품의 찜 개수 조회 (N+1 문제 해결)
-        Map<Long, Long> favoriteCountMap = favoriteService.getFavoriteCounts(productIds);
+        Map<Long, Long> favoriteCountMap = favoriteService.getFavoriteCounts(
+                related.stream().map(Product::getId).toList()
+        );
 
-        return products.map(product -> convertToListItem(product, favoriteCountMap));
+        return related.stream()
+                .map(p -> toListItem(p, favoriteCountMap))
+                .toList();
     }
 
-    /**
-     * 상품 검색 (검색 로그 자동 저장)
-     */
-    @Transactional
+    public List<ProductDtos.ListItem> getOtherProductsBySeller(Long id, int limit) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
+
+        Page<Product> others = productRepository.findOtherProductsBySeller(
+                product.getSeller().getId(),
+                product.getId(),
+                PageRequest.of(0, limit)
+        );
+
+        Map<Long, Long> favoriteCountMap = favoriteService.getFavoriteCounts(
+                others.stream().map(Product::getId).toList()
+        );
+
+        return others.stream()
+                .map(p -> toListItem(p, favoriteCountMap))
+                .toList();
+    }
+
     public Page<ProductDtos.ListItem> searchProducts(
             String keyword,
             Long userId,
@@ -127,384 +126,219 @@ public class ProductService {
             int page,
             int size
     ) {
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Pageable pageable = PageRequest.of(page, size, resolveSort("latest"));
         Page<Product> products = productRepository.searchByTitle(keyword, pageable);
 
-        // 검색 로그 저장
-        if (userId != null && keyword != null && !keyword.trim().isEmpty()) {
-            searchLogService.logSearch(userId, keyword, (int) products.getTotalElements(), deviceType);
+        Map<Long, Long> favoriteCountMap = favoriteService.getFavoriteCounts(
+                products.stream().map(Product::getId).toList()
+        );
+
+        List<ProductDtos.ListItem> items = products.stream()
+                .map(p -> toListItem(p, favoriteCountMap))
+                .toList();
+
+        if (userId != null) {
+            searchLogService.logSearch(userId, keyword, products.getNumberOfElements(), deviceType);
         }
 
-        // 모든 상품의 ID를 수집
-        List<Long> productIds = products.getContent().stream()
-                .map(Product::getId)
-                .collect(Collectors.toList());
+        return new PageImpl<>(items, pageable, products.getTotalElements());
+    }
 
-        // 한 번의 쿼리로 모든 상품의 찜 개수 조회 (N+1 문제 해결)
-        Map<Long, Long> favoriteCountMap = favoriteService.getFavoriteCounts(productIds);
+    public Page<ProductDtos.ListItem> getProductsBySeller(Long sellerId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, resolveSort("latest"));
+        Page<Product> products = productRepository.findBySellerNotDeleted(sellerId, pageable);
 
-        return products.map(product -> convertToListItem(product, favoriteCountMap));
+        Map<Long, Long> favoriteCountMap = favoriteService.getFavoriteCounts(
+                products.stream().map(Product::getId).toList()
+        );
+
+        List<ProductDtos.ListItem> items = products.stream()
+                .map(p -> toListItem(p, favoriteCountMap))
+                .toList();
+
+        return new PageImpl<>(items, pageable, products.getTotalElements());
+    }
+
+    public List<ProductDtos.ListItem> getProductsByLocation(Double latitude, Double longitude, Double radius) {
+        if (latitude == null || longitude == null || radius == null) {
+            throw new IllegalArgumentException("위도, 경도, 반경이 필요합니다.");
+        }
+        Page<Product> products = productRepository.findByLocation(
+                latitude,
+                longitude,
+                radius,
+                PageRequest.of(0, 50, resolveSort("latest"))
+        );
+        Map<Long, Long> favoriteCountMap = favoriteService.getFavoriteCounts(
+                products.stream().map(Product::getId).toList()
+        );
+        return products.stream()
+                .map(p -> toListItem(p, favoriteCountMap))
+                .toList();
     }
 
     /**
-     * 관련 상품 추천
+     * 내 상품 목록
      */
-    public List<ProductDtos.ListItem> getRelatedProducts(Long productId, int limit) {
-        Product baseProduct = productRepository.findById(productId)
-                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
+    public List<ProductDtos.ListItem> getMyProducts(String currentUserNick) {
+        User user = resolveCurrentUser(currentUserNick);
+        List<Product> products = productRepository.findBySellerNotDeleted(
+                user.getId(),
+                PageRequest.of(0, 200, resolveSort("latest"))
+        ).getContent();
 
-        if (baseProduct.getCategory() == null) {
-            return List.of();
-        }
+        Map<Long, Long> favoriteCountMap = favoriteService.getFavoriteCounts(
+                products.stream().map(Product::getId).toList()
+        );
 
-        int pageSize = Math.max(limit, 1);
-        Pageable pageable = PageRequest.of(0, pageSize);
-        List<Product> relatedProducts = productRepository
-                .findRelatedProducts(baseProduct.getCategory().getId(), productId, pageable)
-                .getContent();
+        return products.stream()
+                .map(p -> toListItem(p, favoriteCountMap))
+                .toList();
+    }
 
-        if (relatedProducts.isEmpty()) {
-            return List.of();
-        }
-
-        List<Long> productIds = relatedProducts.stream()
-                .map(Product::getId)
-                .collect(Collectors.toList());
-        Map<Long, Long> favoriteCountMap = favoriteService.getFavoriteCounts(productIds);
-
-        return relatedProducts.stream()
-                .map(product -> convertToListItem(product, favoriteCountMap))
-                .collect(Collectors.toList());
+    public long countActiveProductsBySeller(Long sellerId) {
+        return productRepository.countActiveBySeller(sellerId);
     }
 
     /**
-     * 판매자의 다른 상품 조회 (현재 상품 제외)
-     */
-    public List<ProductDtos.ListItem> getOtherProductsBySeller(Long productId, int limit) {
-        Product baseProduct = productRepository.findById(productId)
-                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
-
-        if (baseProduct.getSeller() == null) {
-            return List.of();
-        }
-
-        int pageSize = Math.max(limit, 1);
-        Pageable pageable = PageRequest.of(0, pageSize);
-        List<Product> otherProducts = productRepository
-                .findOtherProductsBySeller(baseProduct.getSeller().getId(), productId, pageable)
-                .getContent();
-
-        if (otherProducts.isEmpty()) {
-            return List.of();
-        }
-
-        List<Long> productIds = otherProducts.stream()
-                .map(Product::getId)
-                .collect(Collectors.toList());
-        Map<Long, Long> favoriteCountMap = favoriteService.getFavoriteCounts(productIds);
-
-        return otherProducts.stream()
-                .map(product -> convertToListItem(product, favoriteCountMap))
-                .collect(Collectors.toList());
-    }
-
-    @Transactional
-    public ProductDtos.DetailResponse updateProductStatus(Long productId, ProductStatus newStatus, String currentUserNick) {
-        if (currentUserNick == null || currentUserNick.isBlank()) {
-            throw new AccessDeniedException("인증 정보가 필요합니다.");
-        }
-
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
-
-        if (!currentUserNick.equals(product.getSeller().getNick())) {
-            throw new AccessDeniedException("상품 상태를 변경할 권한이 없습니다.");
-        }
-
-        product.setStatus(newStatus);
-
-        Long sellerId = product.getSeller() != null ? product.getSeller().getId() : null;
-        return convertToDetailResponse(product, sellerId);
-    }
-
-    @Transactional
-    public ProductDtos.CompleteSaleResponse completeSale(Long productId, Long buyerId, String currentUserNick) {
-        if (buyerId == null) {
-            throw new IllegalArgumentException("구매자를 선택해 주세요.");
-        }
-        if (!StringUtils.hasText(currentUserNick)) {
-            throw new AccessDeniedException("인증 정보가 필요합니다.");
-        }
-
-        Product product = productRepository.findById(productId)
-                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
-
-        if (!currentUserNick.equals(product.getSeller().getNick())) {
-            throw new AccessDeniedException("상품의 판매자만 구매자를 지정할 수 있습니다.");
-        }
-
-        User buyer = userRepository.findById(buyerId)
-                .orElseThrow(() -> new IllegalArgumentException("구매자 정보를 찾을 수 없습니다."));
-
-        product.setStatus(ProductStatus.SOLD_OUT);
-
-        Transaction transaction = transactionRepository.findByProductId(productId)
-                .orElse(Transaction.builder()
-                        .product(product)
-                        .seller(product.getSeller())
-                        .buyer(buyer)
-                        .status(TransactionStatus.COMPLETED)
-                        .build());
-
-        transaction.setBuyer(buyer);
-        transaction.setSeller(product.getSeller());
-        transaction.setStatus(TransactionStatus.COMPLETED);
-        transaction.setUpdatedAt(LocalDateTime.now());
-
-        if (transaction.getProduct() == null) {
-            transaction.setProduct(product);
-        }
-
-        Transaction saved = transactionRepository.save(transaction);
-
-        ProductDtos.DetailResponse detail = convertToDetailResponse(product, product.getSeller().getId());
-        return ProductDtos.CompleteSaleResponse.builder()
-                .product(detail)
-                .transactionId(saved.getId())
-                .build();
-    }
-
-    /**
-     * 상품 등록 (PostService의 createPost 통합)
+     * 상품 등록
      */
     @Transactional
     public ProductDtos.DetailResponse createProduct(ProductDtos.CreateRequest request, String currentUserNick) {
+        if (request == null) {
+            throw new IllegalArgumentException("요청 정보가 없습니다.");
+        }
+
         User seller = resolveCurrentUser(currentUserNick);
         Category category = resolveCategory(request.getCategoryId());
 
-        // 1. Product 엔티티 생성
         Product product = buildProductEntity(request, seller, category);
+        productRepository.save(product);
+        migrateImagesToProductFolder(product);
+        productRepository.save(product);
 
-        // 2. Product 저장 (이미지는 temp 폴더 경로로 저장됨)
-        Product saved = productRepository.save(product);
+        return toDetailResponse(product, seller.getId());
+    }
 
-        // 3. temp 폴더의 이미지를 products/{productId}/ 폴더로 이동
-        migrateImagesToProductFolder(saved);
+    /**
+     * 상품 수정
+     */
+    @Transactional
+    public ProductDtos.DetailResponse updateProduct(Long id, ProductDtos.UpdateRequest request, String currentUserNick) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
+        User seller = resolveCurrentUser(currentUserNick);
+        if (!product.getSeller().getId().equals(seller.getId())) {
+            throw new AccessDeniedException("본인 상품만 수정할 수 있습니다.");
+        }
 
-        log.info("상품 등록 완료: productId={}, 이미지 개수={}", saved.getId(), saved.getImages().size());
+        if (request.getPrice() != null) product.setPrice(toBigDecimal(request.getPrice()));
+        if (StringUtils.hasText(request.getTitle())) product.setTitle(request.getTitle());
+        if (StringUtils.hasText(request.getContent())) product.setContent(request.getContent());
+        if (request.getStatus() != null) product.setStatus(request.getStatus());
+        if (StringUtils.hasText(request.getLocationNm())) product.setLocation_nm(request.getLocationNm());
+        if (request.getLatitude() != null) product.setLatitude(toBigDecimal(request.getLatitude()));
+        if (request.getLongitude() != null) product.setLongitude(toBigDecimal(request.getLongitude()));
+        if (request.getCategoryId() != null) {
+            product.setCategory(resolveCategory(request.getCategoryId()));
+        }
 
-        return convertToDetailResponse(saved, seller.getId());
+        return toDetailResponse(product, seller.getId());
     }
 
     /**
      * 상품 삭제 (소프트 삭제)
      */
     @Transactional
-    public void deleteProduct(Long productId, String currentUserNick) {
-        User seller = resolveCurrentUser(currentUserNick);
-
-        Product product = productRepository.findById(productId)
+    public void deleteProduct(Long id, String currentUserNick) {
+        Product product = productRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
-
+        User seller = resolveCurrentUser(currentUserNick);
         if (!product.getSeller().getId().equals(seller.getId())) {
-            throw new AccessDeniedException("본인이 등록한 상품만 삭제할 수 있습니다.");
+            throw new AccessDeniedException("본인 상품만 삭제할 수 있습니다.");
         }
 
         product.setIs_delete(true);
         product.setUpdatedAt(LocalDateTime.now());
-
-        log.info("상품 삭제 완료: productId={}, seller={}", productId, currentUserNick);
-    }
-
-    // ============================================
-    // Private Helper Methods
-    // ============================================
-
-    /**
-     * Pageable 객체 생성 (정렬 기준 적용)
-     */
-    private Pageable createPageable(String sortBy, int page, int size) {
-        Sort sort = switch (sortBy) {
-            case "price-low" -> Sort.by(Sort.Direction.ASC, "price");
-            case "price-high" -> Sort.by(Sort.Direction.DESC, "price");
-            case "popular" -> Sort.by(Sort.Direction.DESC, "view_count");
-            default -> Sort.by(Sort.Direction.DESC, "createdAt"); // latest
-        };
-        return PageRequest.of(page, size, sort);
     }
 
     /**
-     * Product -> ListItem 변환 (Map을 사용한 최적화 버전)
+     * 상태 변경
      */
-    private ProductDtos.ListItem convertToListItem(Product product, Map<Long, Long> favoriteCountMap) {
-        String mainImage = product.getImages().stream()
-                .filter(ProductImage::getIs_main)
-                .findFirst()
-                .map(img -> resolveImagePath(img.getPath()))
-                .orElse(resolveImagePath(null));
-        String thumbnailImage = product.getImages().stream()
-                .filter(ProductImage::getIs_main)
-                .findFirst()
-                .map(img -> resolveThumbnailPath(img.getPath()))
-                .orElse(resolveThumbnailPath(null));
-
-        // Map에서 Favorite count 조회 (이미 한 번에 가져온 데이터)
-        long favoriteCount = favoriteCountMap.getOrDefault(product.getId(), 0L);
-
-        // 판매자 정보
-        ProductDtos.SellerInfo sellerInfo = null;
-        if (product.getSeller() != null) {
-            sellerInfo = ProductDtos.SellerInfo.builder()
-                    .id(product.getSeller().getId().intValue())
-                    .nick(product.getSeller().getNick())
-                    .name(product.getSeller().getName())
-                    .build();
+    @Transactional
+    public ProductDtos.DetailResponse updateProductStatus(Long id, ProductStatus status, String currentUserNick) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
+        User seller = resolveCurrentUser(currentUserNick);
+        if (!product.getSeller().getId().equals(seller.getId())) {
+            throw new AccessDeniedException("본인 상품만 수정할 수 있습니다.");
         }
-
-        return ProductDtos.ListItem.builder()
-                .id(product.getId().intValue())
-                .mainImage(mainImage)
-                .thumbnailImage(thumbnailImage)
-                .title(product.getTitle())
-                .price(product.getPrice().doubleValue())
-                .locationNm(product.getLocation_nm())
-                .latitude(product.getLatitude() != null ? product.getLatitude().doubleValue() : null)
-                .longitude(product.getLongitude() != null ? product.getLongitude().doubleValue() : null)
-                .createdAt(product.getCreatedAt())
-                .viewCount(product.getView_count())
-                .favoriteCount(favoriteCount)
-                .timeAgo(getTimeAgo(product.getCreatedAt()))
-                .isResell(product.getIsResell())
-                .seller(sellerInfo)
-                .build();
+        product.setStatus(status);
+        return toDetailResponse(product, seller.getId());
     }
 
     /**
-     * Product -> ListItem 변환 (기존 버전 - 하위 호환성)
+     * 조회수 증가
      */
-    private ProductDtos.ListItem convertToListItem(Product product) {
-        String mainImage = product.getImages().stream()
-                .filter(ProductImage::getIs_main)
-                .findFirst()
-                .map(img -> resolveImagePath(img.getPath()))
-                .orElse(resolveImagePath(null));
-        String thumbnailImage = product.getImages().stream()
-                .filter(ProductImage::getIs_main)
-                .findFirst()
-                .map(img -> resolveThumbnailPath(img.getPath()))
-                .orElse(resolveThumbnailPath(null));
-
-        // Favorite count 조회
-        long favoriteCount = favoriteService.getFavoriteCount(product.getId());
-
-        // 판매자 정보
-        ProductDtos.SellerInfo sellerInfo = null;
-        if (product.getSeller() != null) {
-            sellerInfo = ProductDtos.SellerInfo.builder()
-                    .id(product.getSeller().getId().intValue())
-                    .nick(product.getSeller().getNick())
-                    .name(product.getSeller().getName())
-                    .build();
+    @Transactional
+    public void incrementViewCount(Long id) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
+        if (Boolean.TRUE.equals(product.getIs_delete())) {
+            throw new IllegalArgumentException("삭제된 상품입니다.");
         }
-
-        return ProductDtos.ListItem.builder()
-                .id(product.getId().intValue())
-                .mainImage(mainImage)
-                .thumbnailImage(thumbnailImage)
-                .title(product.getTitle())
-                .price(product.getPrice().doubleValue())
-                .locationNm(product.getLocation_nm())
-                .latitude(product.getLatitude() != null ? product.getLatitude().doubleValue() : null)
-                .longitude(product.getLongitude() != null ? product.getLongitude().doubleValue() : null)
-                .createdAt(product.getCreatedAt())
-                .viewCount(product.getView_count())
-                .favoriteCount(favoriteCount)
-                .timeAgo(getTimeAgo(product.getCreatedAt()))
-                .isResell(product.getIsResell())
-                .seller(sellerInfo)
-                .build();
+        product.increaseView();
     }
 
     /**
-     * Product -> DetailResponse 변환
+     * 거래 완료 처리
      */
-    private ProductDtos.DetailResponse convertToDetailResponse(Product product, Long currentUserId) {
-        List<ProductImage> sortedImages = product.getImages().stream()
-                .sorted((a, b) -> Boolean.compare(b.getIs_main(), a.getIs_main())) // 메인 이미지 우선
-                .collect(Collectors.toList());
+    @Transactional
+    public ProductDtos.CompleteSaleResponse completeSale(Long id, Long buyerId, String currentUserNick) {
+        Product product = productRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("상품을 찾을 수 없습니다."));
+        User seller = resolveCurrentUser(currentUserNick);
+        if (!product.getSeller().getId().equals(seller.getId())) {
+            throw new AccessDeniedException("본인 상품만 완료 처리할 수 있습니다.");
+        }
+        User buyer = userRepository.findById(buyerId)
+                .orElseThrow(() -> new IllegalArgumentException("구매자를 찾을 수 없습니다."));
 
-        List<ProductDtos.ImageResponse> images = sortedImages.stream()
-                .map(img -> ProductDtos.ImageResponse.builder()
-                        .id(img.getId().intValue())
-                        .pImg(resolveImagePath(img.getPath()))
-                        .isMain(img.getIs_main())
-                        .createdAt(img.getCreatedAt())
-                        .updatedAt(img.getUpdatedAt())
-                        .productId(product.getId().intValue())
-                        .thumbnailPath(resolveThumbnailPath(img.getPath()))
-                        .build())
-                .collect(Collectors.toList());
+        product.setStatus(ProductStatus.SOLD_OUT);
 
-        String mainImage = sortedImages.isEmpty()
-                ? resolveImagePath(null)
-                : resolveImagePath(sortedImages.get(0).getPath());
+        Transaction transaction = Transaction.builder()
+                .product(product)
+                .buyer(buyer)
+                .seller(seller)
+                .status(TransactionStatus.COMPLETED)
+                .build();
+        Transaction saved = transactionRepository.save(transaction);
 
-        // Favorite count와 likedByMe 조회
-        long favoriteCount = favoriteService.getFavoriteCount(product.getId());
-        boolean likedByMe = currentUserId != null && favoriteService.isFavorite(product.getId(), currentUserId);
-
-        // 판매자 평점 정보 (ReviewService 연동)
-        Long sellerId = product.getSeller().getId();
-        double sellerRatingAvg = reviewService.getAverageRating(sellerId);
-        long sellerRatingCount = reviewService.getReviewCount(sellerId);
-
-        return ProductDtos.DetailResponse.builder()
-                .id(product.getId().intValue())
-                .title(product.getTitle())
-                .price(product.getPrice().doubleValue())
-                .content(product.getContent())
-                .status(product.getStatus())
-                .locationNm(product.getLocation_nm())
-                .latitude(product.getLatitude().doubleValue())
-                .longitude(product.getLongitude().doubleValue())
-                .viewCount(product.getView_count())
-                .favoriteCount(favoriteCount)
-                .timeAgo(getTimeAgo(product.getCreatedAt()))
-                .createdAt(product.getCreatedAt())
-                .categoryId(product.getCategory().getId().intValue())
-                .images(images)
-                .mainImage(mainImage)
-                .sellerId(product.getSeller().getId().intValue())
-                .sellerName(product.getSeller().getName())
-                .sellerNick(product.getSeller().getNick())
-                .sellerProfileImg(product.getSeller().getProfileImg())
-                .sellerRatingAvg(sellerRatingAvg)
-                .sellerRatingCount(sellerRatingCount)
-                .sellerGrade(reviewService.calculateUserGrade(sellerId))
-                .likedByMe(likedByMe)
-                .isResell(product.getIsResell())
+        return ProductDtos.CompleteSaleResponse.builder()
+                .product(toDetailResponse(product, buyerId))
+                .transactionId(saved.getId())
                 .build();
     }
 
     /**
-     * 시간 경과 문자열 생성
+     * Format elapsed time into a human-readable string.
      */
     private String getTimeAgo(LocalDateTime createdAt) {
         Duration duration = Duration.between(createdAt, LocalDateTime.now());
 
         long minutes = duration.toMinutes();
-        if (minutes < 1) return "방금 전";
-        if (minutes < 60) return minutes + "분 전";
+        if (minutes < 1) return "just now";
+        if (minutes < 60) return minutes + "m ago";
 
         long hours = duration.toHours();
-        if (hours < 24) return hours + "시간 전";
+        if (hours < 24) return hours + "h ago";
 
         long days = duration.toDays();
-        if (days < 7) return days + "일 전";
-        if (days < 30) return (days / 7) + "주 전";
-        if (days < 365) return (days / 30) + "개월 전";
+        if (days < 7) return days + "d ago";
+        if (days < 30) return (days / 7) + "w ago";
+        if (days < 365) return (days / 30) + "mo ago";
 
-        return (days / 365) + "년 전";
+        return (days / 365) + "y ago";
     }
 
     private String resolveImagePath(String path) {
@@ -554,11 +388,11 @@ public class ProductService {
     }
 
     /**
-     * 현재 인증된 사용자 조회
+     * 인증 사용자 조회
      */
     private User resolveCurrentUser(String currentUserNick) {
         if (!StringUtils.hasText(currentUserNick)) {
-            throw new AccessDeniedException("인증된 사용자만 접근할 수 있습니다.");
+            throw new AccessDeniedException("인증된 사용자만 접근 가능합니다.");
         }
 
         User user = userRepository.findByNick(currentUserNick);
@@ -573,11 +407,11 @@ public class ProductService {
      */
     private Category resolveCategory(Integer categoryId) {
         if (categoryId == null) {
-            throw new IllegalArgumentException("카테고리를 선택해 주세요.");
+            throw new IllegalArgumentException("카테고리를 선택해 주세요");
         }
 
         return categoryRepository.findById(categoryId.longValue())
-                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 카테고리입니다."));
+                .orElseThrow(() -> new IllegalArgumentException("존재하지 않는 카테고리입니다"));
     }
 
     /**
@@ -622,7 +456,7 @@ public class ProductService {
             ProductDtos.ImageItem item = imageItems.get(i);
             boolean isMain = Boolean.TRUE.equals(item.getIsMain());
 
-            // 메인 이미지가 없으면 첫 번째를 메인으로 지정
+            // 메인 이미지가 없으면 첫번째를 메인으로 지정
             if (!hasMain && i == 0) {
                 isMain = true;
             }
@@ -639,18 +473,18 @@ public class ProductService {
     }
 
     /**
-     * temp 폴더의 이미지를 products/{productId}/ 폴더로 이동
+     * temp 폴더의 이미지가 products/{productId}/ 폴더로 이동
      */
     private void migrateImagesToProductFolder(Product product) {
         if (CollectionUtils.isEmpty(product.getImages())) {
-            log.info("이미지가 없어 마이그레이션을 건너뜁니다: productId={}", product.getId());
+            log.info("이미지가 없어 마이그레이션을 건너뜁니다 productId={}", product.getId());
             return;
         }
 
         for (ProductImage image : product.getImages()) {
             String tempPath = image.getPath();
 
-            // 이미 절대 경로이거나 URL인 경우 건너뛰기
+            // 외부 경로거나 URL인 경우 건너뛰기
             if (tempPath == null || tempPath.startsWith("http") || tempPath.startsWith("/api/")) {
                 continue;
             }
@@ -663,13 +497,13 @@ public class ProductService {
                     image.getIs_main()
                 );
 
-                // DB에 새 경로 업데이트
+                // DB의 경로 업데이트
                 image.setPath(newPath);
 
                 log.info("이미지 이동 완료: {} -> {}", tempPath, newPath);
             } catch (Exception e) {
                 log.error("이미지 이동 실패: tempPath={}, productId={}", tempPath, product.getId(), e);
-                // 이동 실패해도 계속 진행 (기존 경로 유지)
+                // 이동 실패여도 계속 진행 (기존 경로 유지)
             }
         }
     }
@@ -681,10 +515,108 @@ public class ProductService {
         return value == null ? null : BigDecimal.valueOf(value);
     }
 
+    private Sort resolveSort(String sortBy) {
+        if (!StringUtils.hasText(sortBy)) {
+            return Sort.by(Sort.Direction.DESC, "createdAt");
+        }
+        return switch (sortBy.toLowerCase()) {
+            case "popular" -> Sort.by(Sort.Direction.DESC, "view_count");
+            case "priceasc" -> Sort.by(Sort.Direction.ASC, "price");
+            case "pricedesc" -> Sort.by(Sort.Direction.DESC, "price");
+            default -> Sort.by(Sort.Direction.DESC, "createdAt");
+        };
+    }
+
+    private ProductDtos.ListItem toListItem(Product product, Map<Long, Long> favoriteCountMap) {
+        String mainImagePath = resolveMainImage(product);
+        return ProductDtos.ListItem.builder()
+                .id(product.getId() != null ? product.getId().intValue() : null)
+                .mainImage(mainImagePath)
+                .thumbnailImage(resolveThumbnailPath(mainImagePath))
+                .title(product.getTitle())
+                .price(product.getPrice() != null ? product.getPrice().doubleValue() : null)
+                .status(product.getStatus())
+                .locationNm(product.getLocation_nm())
+                .latitude(product.getLatitude() != null ? product.getLatitude().doubleValue() : null)
+                .longitude(product.getLongitude() != null ? product.getLongitude().doubleValue() : null)
+                .createdAt(product.getCreatedAt())
+                .viewCount(product.getView_count())
+                .favoriteCount(favoriteCountMap.getOrDefault(product.getId(), 0L))
+                .timeAgo(product.getCreatedAt() != null ? getTimeAgo(product.getCreatedAt()) : null)
+                .isResell(product.getIsResell())
+                .seller(ProductDtos.SellerInfo.builder()
+                        .id(product.getSeller() != null ? product.getSeller().getId().intValue() : null)
+                        .nick(product.getSeller() != null ? product.getSeller().getNick() : null)
+                        .name(product.getSeller() != null ? product.getSeller().getName() : null)
+                        .build())
+                .build();
+    }
+
+    private ProductDtos.DetailResponse toDetailResponse(Product product, Long requestUserId) {
+        String mainImagePath = resolveMainImage(product);
+        List<ProductImage> sortedImages = new ArrayList<>(product.getImages() == null ? List.of() : product.getImages());
+        sortedImages.sort(Comparator.comparing(ProductImage::getIs_main).reversed());
+
+        List<ProductDtos.ImageResponse> imageResponses = sortedImages.stream()
+                .map(img -> ProductDtos.ImageResponse.builder()
+                        .id(img.getId() != null ? img.getId().intValue() : null)
+                        .pImg(resolveImagePath(img.getPath()))
+                        .isMain(img.getIs_main())
+                        .createdAt(img.getCreatedAt())
+                        .updatedAt(img.getUpdatedAt())
+                        .productId(product.getId() != null ? product.getId().intValue() : null)
+                        .thumbnailPath(resolveThumbnailPath(img.getPath()))
+                        .build())
+                .toList();
+
+        long favoriteCount = favoriteService.getFavoriteCount(product.getId());
+        boolean likedByMe = requestUserId != null && favoriteService.isFavorite(product.getId(), requestUserId);
+
+        Double sellerRating = reviewService.getAverageRating(product.getSeller().getId());
+        Long sellerRatingCount = reviewService.getReviewCount(product.getSeller().getId());
+        String sellerGrade = reviewService.calculateUserGrade(product.getSeller().getId());
+
+        return ProductDtos.DetailResponse.builder()
+                .id(product.getId() != null ? product.getId().intValue() : null)
+                .title(product.getTitle())
+                .price(product.getPrice() != null ? product.getPrice().doubleValue() : null)
+                .content(product.getContent())
+                .status(product.getStatus())
+                .locationNm(product.getLocation_nm())
+                .latitude(product.getLatitude() != null ? product.getLatitude().doubleValue() : null)
+                .longitude(product.getLongitude() != null ? product.getLongitude().doubleValue() : null)
+                .viewCount(product.getView_count())
+                .favoriteCount(favoriteCount)
+                .timeAgo(product.getCreatedAt() != null ? getTimeAgo(product.getCreatedAt()) : null)
+                .createdAt(product.getCreatedAt())
+                .categoryId(product.getCategory() != null ? product.getCategory().getId().intValue() : null)
+                .images(imageResponses)
+                .mainImage(resolveImagePath(mainImagePath))
+                .sellerId(product.getSeller() != null ? product.getSeller().getId().intValue() : null)
+                .sellerName(product.getSeller() != null ? product.getSeller().getName() : null)
+                .sellerNick(product.getSeller() != null ? product.getSeller().getNick() : null)
+                .sellerProfileImg(product.getSeller() != null ? product.getSeller().getProfileImg() : null)
+                .sellerRatingAvg(sellerRating)
+                .sellerRatingCount(sellerRatingCount)
+                .sellerGrade(sellerGrade)
+                .likedByMe(likedByMe)
+                .isResell(product.getIsResell())
+                .build();
+    }
+
+    private String resolveMainImage(Product product) {
+        if (product.getImages() == null || product.getImages().isEmpty()) {
+            return null;
+        }
+        return product.getImages().stream()
+                .sorted(Comparator.comparing(ProductImage::getIs_main).reversed())
+                .map(ProductImage::getPath)
+                .findFirst()
+                .orElse(null);
+    }
+
     /**
-     * 90일 이상 소프트 삭제된 상품 자동 정리
-     * - 매일 새벽 3시 실행
-     * - 삭제된 지 90일이 넘은 상품의 이미지 파일 및 DB 레코드 완전 삭제
+     * 90일 이상 소프트삭제된 상품 자동 정리
      */
     @Transactional
     public int cleanupOldDeletedProducts() {
@@ -692,7 +624,7 @@ public class ProductService {
         List<Product> oldProducts = productRepository.findByIsDeleteTrueAndUpdatedAtBefore(cutoff);
 
         if (oldProducts.isEmpty()) {
-            log.info("정리할 오래된 삭제 상품이 없습니다.");
+            log.info("정리 대상이 되는 상품이 없습니다.");
             return 0;
         }
 
@@ -711,11 +643,11 @@ public class ProductService {
                     }
                 }
 
-                // 2. DB에서 상품 완전 삭제 (CASCADE로 관련 이미지도 자동 삭제)
+                // 2. DB에서 상품 영구 삭제 (CASCADE로 관련 이미지도 함께 삭제)
                 productRepository.delete(product);
                 deletedCount++;
 
-                log.info("상품 완전 삭제 완료: productId={}, title={}, deletedAt={}",
+                log.info("상품 영구 삭제 완료: productId={}, title={}, deletedAt={}",
                         product.getId(), product.getTitle(), product.getUpdatedAt());
             } catch (Exception e) {
                 log.error("상품 삭제 중 오류 발생: productId={}, error={}",
@@ -723,7 +655,7 @@ public class ProductService {
             }
         }
 
-        log.info("자동 정리 배치 작업 완료: 총 {}개 상품 삭제", deletedCount);
+        log.info("자동 정리 배치 작업 완료: 총 {}개의 상품 삭제", deletedCount);
         return deletedCount;
     }
 }

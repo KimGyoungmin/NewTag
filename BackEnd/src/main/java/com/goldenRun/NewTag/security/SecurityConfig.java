@@ -1,6 +1,7 @@
 package com.goldenRun.NewTag.security;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j; // Added Slf4j import
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -15,16 +16,20 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import org.springframework.beans.factory.annotation.Value;
 import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Collectors;
 
 
-
+@Slf4j // Added Slf4j annotation
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-
+    @Value("${app.cors.allowed-origins:http://localhost,https://localhost,http://localhost:*,http://127.0.0.1:*}")
+    private String allowedOriginPatterns;
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
@@ -44,21 +49,21 @@ public class SecurityConfig {
                 // CORS preflight 요청 (OPTIONS) 모두 허용
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // 정적 리소스 (이미지 등) 접근 허용
-                .requestMatchers("/api/v1/static/**").permitAll()
+                .requestMatchers("/v1/static/**").permitAll()
                 .requestMatchers("/static/**").permitAll()
-                .requestMatchers(HttpMethod.GET, "/api/v1/userprofile/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/v1/userprofile/**").permitAll()
                 // 이미지 업로드 (모든 메서드 임시 허용 - 개발용)
-                .requestMatchers("/api/v1/uploads/**").permitAll()
+                .requestMatchers("/v1/uploads/**").permitAll()
                 // 공개 카테고리 조회
-                .requestMatchers(HttpMethod.GET, "/api/v1/categories/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/v1/categories/**").permitAll()
                 // 데모용 찜 API 공개
-                .requestMatchers("/api/v1/favorites/**").permitAll()
+                .requestMatchers("/v1/favorites/**").permitAll()
                 // 공개 엔드포인트
-                .requestMatchers("/api/auth/**", "/api/health", "/api/test", "/api/encode-password", "/api/v1/login", "/api/v1/signup", "/api/v1/emailMatch", "/api/v1/idMatch", "/api/v1/auth/refresh", "/api/v1/auth/kakao/callback", "/api/v1/auth/google/callback", "/api/v1/auth/naver/callback").permitAll()
+                .requestMatchers("/auth/**", "/health", "/test", "/encode-password", "/v1/login", "/login","/v1/signup", "/v1/emailMatch", "/v1/idMatch", "/v1/auth/refresh", "/v1/auth/kakao/callback", "/v1/auth/google/callback", "/v1/auth/naver/callback").permitAll()
                 // 상품 관련 공개 API (로그인 없이 조회 가능)
-                .requestMatchers(HttpMethod.GET, "/api/v1/products", "/api/v1/products/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/v1/products", "/v1/products/**").permitAll()
                 // 리뷰 조회 공개 API (로그인 없이 조회 가능)
-                .requestMatchers(HttpMethod.GET, "/api/v1/reviews/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/v1/reviews/**").permitAll()
                 // 찜하기 API 임시 공개 (개발용 - 나중에 인증 필요로 변경)
                 // .requestMatchers("/api/v1/favorites/**").permitAll()
                 // 나머지는 인증 필요
@@ -76,10 +81,13 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
 
         // 허용할 Origin 명시적 지정 (allowCredentials 사용 시 필수)        
-        configuration.setAllowedOriginPatterns(Arrays.asList(
-            "http://localhost:*",
-            "http://127.0.0.1:*"
-        ));
+        List<String> origins = Arrays.stream(allowedOriginPatterns.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toList());
+        log.debug("Configured allowed origins: {}", origins); // Debug log
+
+        configuration.setAllowedOriginPatterns(origins);
 
         // 허용할 HTTP 메서드
         configuration.setAllowedMethods(Arrays.asList(
@@ -98,7 +106,7 @@ public class SecurityConfig {
         ));
 
         // 인증 정보 포함 허용 (쿠키, Authorization 헤더 등)
-        configuration.setAllowCredentials(true);
+        configuration.setAllowCredentials(true); // Reverted to true
 
         // preflight 요청 캐시 시간 (초)
         configuration.setMaxAge(3600L);
