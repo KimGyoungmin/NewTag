@@ -35,6 +35,18 @@ public class UploadController {
         ));
     }
 
+    @PostMapping("/fetch")
+    public ResponseEntity<Map<String, Object>> fetchImage(@RequestParam("url") String imageUrl) {
+        String path = fileStorageService.storeProductImageFromUrl(imageUrl, null, false);
+        String url = "/api/v1/static/" + path;
+
+        return ResponseEntity.ok(Map.of(
+                "success", true,
+                "path", path,
+                "url", url
+        ));
+    }
+
     @PostMapping("/profile")
     public ResponseEntity<Map<String, Object>> uploadProfileImage(
             @AuthenticationPrincipal UserDetails userDetails,

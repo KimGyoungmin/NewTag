@@ -5,6 +5,7 @@ KREAM 시계열 크롤러 - CDP를 사용하여 API 네트워크 요청 가로�
 Chrome DevTools Protocol을 사용하여 브라우저가 호출하는 API 응답을 직접 캡처합니다
 """
 
+import os
 import sys
 import time
 import json
@@ -18,7 +19,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
-from webdriver_manager.utils import ChromeType
 
 # Windows 콘솔 UTF-8 인코딩 설정
 if sys.platform == 'win32':
@@ -31,7 +31,7 @@ CRAWLED_LOG_PATH = DATA_DIR / 'crawled_product_ids.txt'
 
 
 def setup_driver_with_cdp(use_persistent_profile=True):
-    """CDP를 활성화한 Chrome 드라이버 설정"""
+    """CDP? ???? Chrome ???? ??"""
     chrome_options = Options()
     chrome_options.add_argument('--start-maximized')
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
@@ -39,38 +39,72 @@ def setup_driver_with_cdp(use_persistent_profile=True):
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
 
-    # 로컬 크롬 위치 명시 (142.x 설치 기준)
-    chrome_binary = Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe")
-    if chrome_binary.exists():
-        chrome_options.binary_location = str(chrome_binary)
+    # Headless ?? (????/CI ??) - CHROME_HEADLESS=false ? ? ? ??
+    if os.getenv("CHROME_HEADLESS", "true").lower() != "false":
+        chrome_options.add_argument('--headless=new')
+    chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_options.add_argument('--no-sandbox')
 
-    # Selenium 전용 프로필 사용 (쿠키 유지)
-    if use_persistent_profile:
-        import os
-        # 현재 스크립트가 있는 디렉토리에 selenium_profile 폴더 생성
+    # ??/???? ?? ???? ?? (???? ??)
+    candidate = os.getenv("CHROME_BINARY")
+    if candidate and Path(candidate).exists():
+        chrome_options.binary_location = str(Path(candidate))
+    if not getattr(chrome_options, "binary_location", None):
+        for path in [
+            Path('/usr/bin/google-chrome'),
+            Path('/usr/bin/chromium'),
+            Path('/usr/bin/chromium-browser'),
+            Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
+            Path(r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"),
+        ]:
+            if path.exists():
+                chrome_options.binary_location = str(path)
+                break
+
+    # Selenium ?? ??? ??? (?? ???) - env? ??/??? ??
+    env_use_profile = os.getenv("USE_PERSISTENT_PROFILE", "true").lower() != "false"
+    env_reset_profile = os.getenv("RESET_PROFILE", "false").lower() == "true"
+    if env_use_profile and use_persistent_profile:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         profile_dir = os.path.join(script_dir, 'selenium_profile')
-
-        # 디렉토리가 없으면 생성
+        if env_reset_profile and os.path.exists(profile_dir):
+            import shutil
+            shutil.rmtree(profile_dir, ignore_errors=True)
         if not os.path.exists(profile_dir):
-            os.makedirs(profile_dir)
-            print(f"✓ 새 프로필 디렉토리 생성: {profile_dir}")
+            os.makedirs(profile_dir, exist_ok=True)
+            print(f"[OK] ? ??? ???? ??: {profile_dir}")
         else:
-            print(f"✓ 기존 프로필 사용 (쿠키 유지됨): {profile_dir}")
-
+            print(f"[OK] ?? ??? ?? (?? ???): {profile_dir}")
         chrome_options.add_argument(f'--user-data-dir={profile_dir}')
         chrome_options.add_argument('--profile-directory=Default')
 
-    # CDP 로깅 활성화
-    chrome_options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
+    # ?? Selenium (?: selenium/standalone-chrome VNC) ?? ??
+    remote_url = os.getenv('SELENIUM_REMOTE_URL')
+    if remote_url:
+        driver = webdriver.Remote(command_executor=remote_url, options=chrome_options)
+    else:
+        # ???? ??? ??? ?? ?? (????? chromium-driver ?)
+        driver_path = os.getenv('CHROME_DRIVER_PATH')
+        if not driver_path:
+            for candidate in [
+                '/usr/bin/chromedriver',
+                '/usr/lib/chromium/chromedriver',
+                'C:/Program Files/Google/Chrome/Application/chromedriver.exe',
+            ]:
+                if Path(candidate).exists():
+                    driver_path = candidate
+                    break
 
-    # 설치된 크롬(142.x)에 맞춰 드라이버 버전 지정
-    service = Service(ChromeDriverManager(chrome_type=ChromeType.GOOGLE, version="142.0.0").install())
-    driver = webdriver.Chrome(service=service, options=chrome_options)
+        if driver_path and Path(driver_path).exists():
+            service = Service(driver_path)
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+        else:
+            # webdriver_manager 최신 버전에서는 version 인자가 없을 수 있어 기본값 사용
+            driver = webdriver.Chrome(options=chrome_options)
 
-    # CDP 네트워크 추적 활성화
+
+    # CDP ???? ?? ???
     driver.execute_cdp_cmd('Network.enable', {})
-
     return driver
 
 
@@ -949,8 +983,13 @@ def crawl_kream_with_cdp(product_url, naver_id=None, naver_pw=None, phone_number
         name_data = driver.execute_script("""
             const getText = (selectors) => {
                 for (const sel of selectors) {
-                    const el = document.querySelector(sel);
-                    if (el && el.textContent) return el.textContent.trim();
+                    try {
+                        const el = document.querySelector(sel);
+                        if (el && el.textContent) return el.textContent.trim();
+                    } catch (e) {
+                        // skip invalid selector
+                        continue;
+                    }
                 }
                 return '';
             };
@@ -969,7 +1008,6 @@ def crawl_kream_with_cdp(product_url, naver_id=None, naver_pw=None, phone_number
             // ?? ?? ??
             const primary = getText([
                 '#wrap .product-detail-left-section p',
-                '#wrap > div.layout__main--without-search > div > div > div.product-detail-left-section > div:nth-child(4) > div > div.layout_list_vertical.pc\\:cgap-2.mo\\:cgap-2.list-vertical-fill-available > div:nth-child(4) > div.layout_list_horizontal.sdui-fit-content > div > div > div:nth-child(1) > p',
                 '.text-lookup',
                 'p.text-lookup',
                 'p.text-lookup.display_paragraph',

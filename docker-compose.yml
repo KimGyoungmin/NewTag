@@ -48,6 +48,39 @@ services:
       - newtag-network
 
 
+  # Crawling Service (Selenium + Chromium)
+  crawler:
+    build:
+      context: ./model
+      dockerfile: ./crawling/Dockerfile
+    container_name: newtag-crawler
+    restart: unless-stopped
+    environment:
+      - CHROME_HEADLESS=true
+      - CHROME_TYPE=chromium
+      - USE_PERSISTENT_PROFILE=false
+      - RESET_PROFILE=true
+      - SELENIUM_REMOTE_URL=http://selenium:4444/wd/hub
+    volumes:
+      - ./model:/app
+    networks:
+      - newtag-network
+
+  # Selenium with VNC (real Chrome UI, no headless needed)
+  selenium:
+    image: selenium/standalone-chrome:latest
+    container_name: newtag-selenium
+    restart: unless-stopped
+    shm_size: 2g
+    environment:
+      - SE_NODE_MAX_SESSIONS=1
+      - SE_NODE_OVERRIDE_MAX_SESSIONS=true
+    ports:
+      - "4444:4444"   # WebDriver endpoint
+      - "7900:7900"   # noVNC (http://localhost:7900, password: secret)
+    networks:
+      - newtag-network
+
 
   # Caddy Reverse Proxy
   # The main entry point for all traffic.
