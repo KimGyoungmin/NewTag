@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, Calendar } from "lucide-react";
 import { RESELL_PRODUCTS, ResellProductRecord } from "../data/resellProducts";
 import { Button } from "../components/ui/button";
@@ -79,27 +79,44 @@ function sortHistoryChronologically(history: ResellProductRecord["priceHistory"]
 }
 
 export function ResellDetailPage({ productId, onNavigate, products }: ResellDetailPageProps) {
-  const productList = products && products.length ? products : RESELL_PRODUCTS;
+  const [remoteProducts, setRemoteProducts] = useState<ResellProductRecord[]>([]);
+  useEffect(() => {
+    if (products && products.length) return;
+    let cancelled = false;
+    const load = async () => {
+      try {
+        const res = await fetch(`/resell_auto.json?t=${Date.now()}`, { cache: "no-store" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data) && data.length) {
+          setRemoteProducts(data);
+        }
+      } catch (err) {
+        console.info("resell_auto.json load failed in detail page", err);
+      }
+    };
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [products]);
+
+  const productList =
+    (products && products.length ? products : undefined) ??
+    (remoteProducts.length ? remoteProducts : RESELL_PRODUCTS);
   const product = useMemo(() => productList.find((item) => item.id === productId), [productId, productList]);
   const [selectedPeriod, setSelectedPeriod] = useState<PeriodKey>("month");
-  const chartContainerRef = useRef<HTMLDivElement | null>(null);
-  const [chartSize, setChartSize] = useState<{ w: number; h: number }>({ w: 800, h: 240 });
+  const [chartAspect, setChartAspect] = useState(2.2);
 
   useEffect(() => {
-    const el = chartContainerRef.current;
-    if (!el) return;
-
-    const resize = () => {
-      setChartSize({
-        w: Math.max(el.clientWidth, 1),
-        h: Math.max(el.clientHeight, 200),
-      });
+    const handleResize = () => {
+      const width = window.innerWidth || 1;
+      // 좁은 화면에서는 좀 더 세로 길게, 넓은 화면은 가로 길게
+      setChartAspect(width < 768 ? 1.6 : 2.4);
     };
-
-    resize();
-    const observer = new ResizeObserver(resize);
-    observer.observe(el);
-    return () => observer.disconnect();
+    handleResize();
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   if (!product) {
@@ -240,9 +257,9 @@ export function ResellDetailPage({ productId, onNavigate, products }: ResellDeta
               ))}
             </div>
           </CardHeader>
-          <CardContent className="h-72 min-w-0 w-full overflow-x-auto" ref={chartContainerRef}>
+          <CardContent className="min-h-[280px] w-full overflow-x-auto">
             {chartData.length > 0 ? (
-              <ResponsiveContainer width={chartSize.w} height={chartSize.h}>
+              <ResponsiveContainer width="100%" aspect={chartAspect}>
                 <LineChart data={chartData}>
                   <XAxis
                     dataKey="label"

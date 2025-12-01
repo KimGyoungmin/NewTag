@@ -44,7 +44,7 @@ export function ResellPage({ onNavigate, products, onProductsChange }: ResellPag
     let cancelled = false;
     const load = async () => {
       try {
-        const res = await fetch("/resell_auto.json", { cache: "no-store" });
+        const res = await fetch(`/resell_auto.json?t=${Date.now()}`, { cache: "no-store" });
         if (!res.ok) return;
         const data = await res.json();
         if (!Array.isArray(data) || data.length === 0) return;
