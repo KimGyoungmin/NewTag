@@ -18,10 +18,10 @@ services:
       context: ./BackEnd
     container_name: newtag-backend
     restart: unless-stopped
-    volumes:
-      - uploads:/app/uploads
     # The backend requires environment variables (e.g., database credentials, JWT secret).
     # Create a file at ./BackEnd/.env with the necessary key-value pairs.
+    volumes:
+      - uploads:/app/uploads
     env_file:
       - ./BackEnd/.env
     networks:
@@ -46,6 +46,8 @@ services:
       - ./model/img_model/.env
     networks:
       - newtag-network
+
+
 
   # Caddy Reverse Proxy
   # The main entry point for all traffic.

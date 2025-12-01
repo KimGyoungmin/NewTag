@@ -430,7 +430,7 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
                                 isMine ? "text-white" : "text-foreground"
                               }`}
                             >
-                              ?????? ??
+                              자세히 보기
                             </a>
                           )}
                         </div>
@@ -457,7 +457,7 @@ export function ChatPage({ chatId, onNavigate }: ChatPageProps) {
                               )
                             }
                           >
-                            {reviewed ? "?? ?? ??" : "?? ????"}
+                            {reviewed ? "후기 작성 완료" : "후기 작성하기"}
                           </Button>
                         </div>
                       )}
