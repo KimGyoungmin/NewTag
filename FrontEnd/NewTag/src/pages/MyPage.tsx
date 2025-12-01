@@ -42,7 +42,9 @@ import { productApi } from "../api/productApi";
 import { reviewApi } from "../api/reviewApi";
 import { authApi } from "../api/auth";
 import { userApi } from "../api/userApi";
+import { myPageApi } from '../api/myPageApi';
 import { resolveImageUrl } from "../utils/image";
+import { formatTimeAgo } from '../utils/time';
 import {
   UserProfile,
   getUserProfile,
@@ -116,23 +118,7 @@ const toApiStatus = (status: UiProductStatus): ApiProductStatus => {
   }
 };
 
-const formatTimeAgo = (dateInput?: string | number | Date) => {
-  if (!dateInput) return "";
-  const now = new Date();
-  const date = new Date(dateInput);
-  const diffMs = now.getTime() - date.getTime();
-  const minutes = Math.floor(diffMs / 60000);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
 
-  if (minutes < 1) return "방금 전";
-  if (minutes < 60) return `${minutes}분 전`;
-  if (hours < 24) return `${hours}시간 전`;
-  if (days < 7) return `${days}일 전`;
-  if (days < 30) return `${Math.floor(days / 7)}주 전`;
-  if (days < 365) return `${Math.floor(days / 30)}개월 전`;
-  return `${Math.floor(days / 365)}년 전`;
-};
 
 const buildProfileFromAuth = (fallback?: UserProfile): UserProfile => {
   const authUser = authApi.getCurrentUser();
@@ -201,27 +187,8 @@ export function MyPage({ onNavigate }: MyPageProps) {
   const fetchWishlist = async (userId: number) => {
     setWishlistLoading(true);
     try {
-      const productIds = await favoriteApi.getMyFavoriteProducts(userId);
-      const products = await Promise.all(
-        productIds.map(async (id) => {
-          const detail = await productApi.getById(id, userId);
-          if (!detail) return null;
-          return {
-            id: detail.id.toString(),
-            image: resolveImageUrl(detail.thumbnailImage ?? detail.mainImage),
-            title: detail.title,
-            price: detail.price,
-            location: detail.locationNm,
-            timeAgo: formatTimeAgo(detail.createdAt),
-            likes: detail.favoriteCount ?? 0,
-            chatCount: detail.viewCount,
-            status: toUiStatus(detail.status),
-            sellerNick: detail.seller?.nick,
-          } as WishlistItem;
-        })
-      );
-
-      setWishlistItems(products.filter(Boolean) as WishlistItem[]);
+      const items = await myPageApi.fetchWishlist(userId);
+      setWishlistItems(items);
     } catch (error) {
       console.error("Failed to load wishlist:", error);
       setWishlistItems([]);
@@ -233,40 +200,8 @@ export function MyPage({ onNavigate }: MyPageProps) {
   const fetchMyProducts = async (userId: number) => {
     setMyProductsLoading(true);
     try {
-      const response = await api.get(`/products/seller/${userId}`, {
-        params: { page: 0, size: 50 },
-      });
-      const listItems: any[] = response.data?.products ?? [];
-
-      const products = await Promise.all(
-        listItems.map(async (item) => {
-          const detail = await productApi.getById(Number(item.id), userId);
-          const image =
-            item.thumbnailImage ??
-            item.mainImage ??
-            detail?.thumbnailImage ??
-            detail?.mainImage;
-
-          return {
-            id: String(item.id ?? detail?.id),
-            image: resolveImageUrl(image),
-            title: item.title ?? detail?.title ?? "상품",
-            price: Number(item.price ?? detail?.price ?? 0),
-            location: item.locationNm ?? detail?.locationNm ?? "",
-            timeAgo: item.timeAgo ?? formatTimeAgo(detail?.createdAt),
-            likes: Number(item.favoriteCount ?? detail?.favoriteCount ?? 0),
-            chatCount: Number(item.viewCount ?? detail?.viewCount ?? 0),
-            status: toUiStatus(detail?.status),
-            sellerNick: detail?.seller?.nick,
-          } as WishlistItem;
-        })
-      );
-
-      const filtered = products
-        .filter((p) => p && p.id)
-        // 판매 완료(SOLD_OUT) 상품은 제외
-        .filter((p) => p.status !== "sold") as WishlistItem[];
-      setMyProducts(filtered);
+      const products = await myPageApi.fetchMyProducts(userId);
+      setMyProducts(products);
     } catch (error) {
       console.error("Failed to load my products:", error);
       setMyProducts([]);

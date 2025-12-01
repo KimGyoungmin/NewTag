@@ -25,6 +25,7 @@ import {
   AlertDialogTitle,
 } from "../components/ui/alert-dialog";
 import { productApi } from "../api/productApi";
+import { productsApi } from "../api/products"; // Added
 import { reviewApi } from "../api/reviewApi";
 import { favoriteApi } from "../api/favoriteApi";
 import { authApi } from "../api/auth";
@@ -84,11 +85,22 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
       setError(null);
 
       try {
-        const data = await productApi.getById(numericProductId);
+        const data = await productApi.getById(numericProductId, currentUser?.id);
         if (data) {
           setProduct(data);
           // likedByMe 필드 사용 (백엔드에서 제공)
           setIsLiked(data.likedByMe || false);
+
+          // 조회수 증가 (백엔드 호출 및 프론트엔드 상태 업데이트)
+          if (data.id) {
+            await productsApi.incrementViewCount(data.id);
+            setProduct((prevProduct) => {
+              if (prevProduct) {
+                return { ...prevProduct, viewCount: (prevProduct.viewCount ?? 0) + 1 };
+              }
+              return prevProduct;
+            });
+          }
 
           // 판매자 리뷰 로드
           if (data.seller?.id) {
