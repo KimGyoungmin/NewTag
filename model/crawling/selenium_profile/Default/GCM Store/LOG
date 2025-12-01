@@ -1,0 +1,8 @@
+<<<<<<< HEAD
+2025/11/25-09:26:19.992 444c Reusing MANIFEST C:\NT\NewTag\model\crawling\selenium_profile\Default\GCM Store/MANIFEST-000001
+2025/11/25-09:26:19.993 444c Recovering log #3
+2025/11/25-09:26:19.993 444c Reusing old log C:\NT\NewTag\model\crawling\selenium_profile\Default\GCM Store/000003.log 
+=======
+2025/11/20-17:06:03.468 3564 Creating DB C:\Users\USER\Desktop\NewTag\model\crawling\selenium_profile\Default\GCM Store since it was missing.
+2025/11/20-17:06:03.473 3564 Reusing MANIFEST C:\Users\USER\Desktop\NewTag\model\crawling\selenium_profile\Default\GCM Store/MANIFEST-000001
+>>>>>>> origin/dev

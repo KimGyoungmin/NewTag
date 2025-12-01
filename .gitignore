@@ -1,0 +1,86 @@
+# ============================================
+# Claude AI Workflow
+# ============================================
+.claude
+.ai-workflow
+
+# ============================================
+# Environment Variables
+# ============================================
+.env
+.env.local
+.env.*.local
+
+# ============================================
+# Database
+# ============================================
+# SQL 파일 중 실제 데이터는 제외하고 스키마만 포함
+# *.sql  # 주석 처리 - DDL.sql, DML.sql은 포함해야 함
+nul
+
+# ============================================
+# Archive & Temporary Files
+# ============================================
+archive/
+data/
+logs/
+*.log
+
+# ============================================
+# Uploaded Files (사용자 업로드 이미지)
+# ============================================
+BackEnd/src/main/resources/static/products/
+!BackEnd/src/main/resources/static/products/.gitkeep
+
+
+# Python temporary files
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# ============================================
+# OS Files
+# ============================================
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ============================================
+# IDE
+# ============================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ============================================
+# Node (FrontEnd에서 처리하지만 루트에도 추가)
+# ============================================
+node_modules/
+dist/
+
+# ============================================
+# Java/Spring (BackEnd에서 처리하지만 루트에도 추가)
+# ============================================
+target/
+*.class
+*.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+/venv
+.venv
+venv/
+
+# ============================================
+# Model/Crawling generated artifacts
+# ============================================
+model/Best_test/OutPut/
+model/crawling/selenium_profile/
+FrontEnd/NewTag/public/resell_auto.json
+FrontEnd/NewTag/public/resell_images/
+
+model/crawling/crawl_kream_cdp.py
