@@ -5,6 +5,7 @@ KREAM 시계열 크롤러 - CDP를 사용하여 API 네트워크 요청 가로�
 Chrome DevTools Protocol을 사용하여 브라우저가 호출하는 API 응답을 직접 캡처합니다
 """
 
+import os
 import sys
 import time
 import json
@@ -19,6 +20,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 from webdriver_manager.utils import ChromeType
+from webdriver_manager.utils import ChromeType
 
 # Windows 콘솔 UTF-8 인코딩 설정
 if sys.platform == 'win32':
@@ -31,7 +33,7 @@ CRAWLED_LOG_PATH = DATA_DIR / 'crawled_product_ids.txt'
 
 
 def setup_driver_with_cdp(use_persistent_profile=True):
-    """CDP를 활성화한 Chrome 드라이버 설정"""
+    """CDP? ???? Chrome ???? ??"""
     chrome_options = Options()
     chrome_options.add_argument('--start-maximized')
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
@@ -39,38 +41,54 @@ def setup_driver_with_cdp(use_persistent_profile=True):
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
 
-    # 로컬 크롬 위치 명시 (142.x 설치 기준)
-    chrome_binary = Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe")
-    if chrome_binary.exists():
-        chrome_options.binary_location = str(chrome_binary)
+    # Headless ?? (????/CI ??) - CHROME_HEADLESS=false ? ? ? ??
+    if os.getenv("CHROME_HEADLESS", "true").lower() != "false":
+        chrome_options.add_argument('--headless=new')
+    chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_options.add_argument('--no-sandbox')
 
-    # Selenium 전용 프로필 사용 (쿠키 유지)
+    # ??/???? ?? ???? ?? (???? ??)
+    candidate = os.getenv("CHROME_BINARY")
+    if candidate and Path(candidate).exists():
+        chrome_options.binary_location = str(Path(candidate))
+    if not getattr(chrome_options, "binary_location", None):
+        for path in [
+            Path('/usr/bin/google-chrome'),
+            Path('/usr/bin/chromium'),
+            Path('/usr/bin/chromium-browser'),
+            Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe"),
+            Path(r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe"),
+        ]:
+            if path.exists():
+                chrome_options.binary_location = str(path)
+                break
+
+    # Selenium ?? ??? ??? (?? ???)
     if use_persistent_profile:
-        import os
-        # 현재 스크립트가 있는 디렉토리에 selenium_profile 폴더 생성
         script_dir = os.path.dirname(os.path.abspath(__file__))
         profile_dir = os.path.join(script_dir, 'selenium_profile')
-
-        # 디렉토리가 없으면 생성
         if not os.path.exists(profile_dir):
             os.makedirs(profile_dir)
-            print(f"✓ 새 프로필 디렉토리 생성: {profile_dir}")
+            print(f"[OK] ? ??? ???? ??: {profile_dir}")
         else:
-            print(f"✓ 기존 프로필 사용 (쿠키 유지됨): {profile_dir}")
-
+            print(f"[OK] ?? ??? ?? (?? ???): {profile_dir}")
         chrome_options.add_argument(f'--user-data-dir={profile_dir}')
         chrome_options.add_argument('--profile-directory=Default')
 
-    # CDP 로깅 활성화
-    chrome_options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
+    # ???? ??/?? ?? (????? ????? ??)
+    driver_version = os.getenv('CHROME_DRIVER_VERSION') or None
+    chrome_type_env = os.getenv('CHROME_TYPE', '').lower()
+    chrome_type = ChromeType.GOOGLE
+    if 'chromium' in chrome_type_env:
+        chrome_type = ChromeType.CHROMIUM
+    if getattr(chrome_options, 'binary_location', '') and 'chromium' in chrome_options.binary_location.lower():
+        chrome_type = ChromeType.CHROMIUM
 
-    # 설치된 크롬(142.x)에 맞춰 드라이버 버전 지정
-    service = Service(ChromeDriverManager(chrome_type=ChromeType.GOOGLE, version="142.0.0").install())
+    service = Service(ChromeDriverManager(chrome_type=chrome_type, version=driver_version).install())
     driver = webdriver.Chrome(service=service, options=chrome_options)
 
-    # CDP 네트워크 추적 활성화
+    # CDP ???? ?? ???
     driver.execute_cdp_cmd('Network.enable', {})
-
     return driver
 
 
