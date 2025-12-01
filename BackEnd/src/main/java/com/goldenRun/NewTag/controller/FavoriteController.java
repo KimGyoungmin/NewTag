@@ -15,7 +15,7 @@ import java.util.Map;
 import java.util.Set;
 
 @RestController
-@RequestMapping("/api/v1/favorites")
+@RequestMapping("/v1/favorites")
 @RequiredArgsConstructor
 public class FavoriteController {
 
