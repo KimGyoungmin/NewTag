@@ -36,7 +36,7 @@ const loadKakaoMapScript = (): Promise<void> => {
     isLoading = true;
 
     const KAKAO_MAP_KEY = import.meta.env.VITE_KAKAO_MAP_APP_KEY;
-
+    console.log('카카오맵 API 키:', KAKAO_MAP_KEY);
     if (!KAKAO_MAP_KEY) {
       reject(new Error('카카오맵 API 키가 설정되지 않았습니다. .env 파일을 확인해주세요.'));
       isLoading = false;
@@ -46,7 +46,7 @@ const loadKakaoMapScript = (): Promise<void> => {
     const script = document.createElement('script');
     script.type = 'text/javascript';
     script.src = `//dapi.kakao.com/v2/maps/sdk.js?appkey=${KAKAO_MAP_KEY}&libraries=services,clusterer,drawing&autoload=false`;
-
+    console.log(script);
     script.onload = () => {
       isLoading = false;
       isLoaded = true;
