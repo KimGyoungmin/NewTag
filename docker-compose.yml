@@ -34,6 +34,10 @@ services:
       context: ./model/img_model
     container_name: newtag-model
     restart: unless-stopped
+    environment:
+      - STATIC_ROOT=/app/uploads
+    volumes:
+      - uploads:/app/uploads
     # The model server requires API keys.
     # Create a file at ./model/img_model/.env with the following content:
     # GOOGLE_VISION_KEY=your_google_vision_api_key
@@ -42,10 +46,6 @@ services:
       - ./model/img_model/.env
     networks:
       - newtag-network
-    environment:
-      - STATIC_ROOT=/app/uploads
-    volumes:
-      - uploads:/app/uploads
 
 
 

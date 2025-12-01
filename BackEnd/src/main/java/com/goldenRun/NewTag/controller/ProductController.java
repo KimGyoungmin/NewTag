@@ -156,19 +156,27 @@ public class ProductController {
 
     @GetMapping("/search/recent")
     public ResponseEntity<List<String>> getRecentKeywords(
-            @RequestParam Long userId,
+            @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam(defaultValue = "10") int limit
     ) {
-        List<String> keywords = searchLogService.getRecentKeywords(userId, limit);
+        User user = userRepository.findByNick(userDetails.getUsername());
+        if (user == null) {
+            throw new IllegalArgumentException("사용자를 찾을 수 없습니다.");
+        }
+        List<String> keywords = searchLogService.getRecentKeywords(user.getId(), limit);
         return ResponseEntity.ok(keywords);
     }
 
     @DeleteMapping("/search/recent")
     public ResponseEntity<Map<String, Object>> deleteRecentKeyword(
-            @RequestParam Long userId,
+            @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam String keyword
     ) {
-        searchLogService.deleteRecentKeyword(userId, keyword);
+        User user = userRepository.findByNick(userDetails.getUsername());
+        if (user == null) {
+            throw new IllegalArgumentException("사용자를 찾을 수 없습니다.");
+        }
+        searchLogService.deleteRecentKeyword(user.getId(), keyword);
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Keyword deleted"
@@ -177,9 +185,13 @@ public class ProductController {
 
     @DeleteMapping("/search/recent/all")
     public ResponseEntity<Map<String, Object>> deleteAllRecentKeywords(
-            @RequestParam Long userId
+            @AuthenticationPrincipal UserDetails userDetails
     ) {
-        searchLogService.deleteAllRecentKeywords(userId);
+        User user = userRepository.findByNick(userDetails.getUsername());
+        if (user == null) {
+            throw new IllegalArgumentException("사용자를 찾을 수 없습니다.");
+        }
+        searchLogService.deleteAllRecentKeywords(user.getId());
         return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "All keywords deleted"

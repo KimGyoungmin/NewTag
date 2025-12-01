@@ -12,5 +12,3 @@
 무기,armament
 위조지폐,counterfeit
 성인용품,adult,toy
-빼빼로, pepero
-강아지, 개, 애완동물, 반려견

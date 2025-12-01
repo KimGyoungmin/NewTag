@@ -104,13 +104,19 @@ public class AiListingService {
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         // DTO 媛앹껜 ?ъ슜 (Map ???
+        // ??? STATIC_ROOT ???? ?? ? ??? ????? relative? ??
+        java.util.List<String> modelPaths = absolutePaths.stream()
+                .map(this::toModelImagePath)
+                .toList();
+
         AutoListingModelRequest requestDto = AutoListingModelRequest.builder()
-                .imagePaths(absolutePaths)
+                .imagePaths(modelPaths)
                 .build();
 
-        log.info("[AI Listing] AI ?쒕쾭 ?몄텧 - endpoint: {}", endpoint);
-        log.info("[AI Listing] ?꾩넚??requestDto: {}", requestDto);
-        log.info("[AI Listing] absolutePaths 媛쒖닔: {}, ?댁슜: {}", absolutePaths.size(), absolutePaths);
+        log.info("[AI Listing] AI ?? ?? - endpoint: {}", endpoint);
+        log.info("[AI Listing] ?? requestDto: {}", requestDto);
+        log.info("[AI Listing] absolutePaths ??: {}, ??: {}", absolutePaths.size(), absolutePaths);
+        log.info("[AI Listing] modelPaths ??: {}, ??: {}", modelPaths.size(), modelPaths);
 
         HttpEntity<AutoListingModelRequest> requestEntity = new HttpEntity<>(requestDto, headers);
 
@@ -176,10 +182,18 @@ public class AiListingService {
         log.debug("[AI Listing] uploadBaseDir ?ㅼ젙媛? {}", uploadBaseDir);
 
         String normalized = rawPath.replace("\\", "/").strip();
+        normalized = stripUrlPrefix(normalized);
         Path initial = Paths.get(normalized);
 
         log.debug("[AI Listing] normalized path: {}", normalized);
         log.debug("[AI Listing] initial path isAbsolute: {}", initial.isAbsolute());
+
+        // /uploads, /static, /api, /v1 로 시작하는 절대경로 스타일은 relative로 재해석
+        if (initial.isAbsolute() && (normalized.startsWith("/uploads/") || normalized.startsWith("/static/") || normalized.startsWith("/api/") || normalized.startsWith("/v1/"))) {
+            normalized = normalized.replaceFirst("^/+", "");
+            initial = Paths.get(normalized);
+            log.debug("[AI Listing] converted absolute-like path to relative: {}", initial);
+        }
 
         if (initial.isAbsolute()) {
             if (!Files.exists(initial)) {
@@ -229,6 +243,38 @@ public class AiListingService {
             relative = relative.substring("uploads/".length());
         }
         return normalizedBase.resolve(relative).normalize();
+    }
+
+        private String toModelImagePath(String absolutePath) {
+        Path path = Paths.get(absolutePath).normalize();
+        Path uploadBase = Paths.get(uploadBaseDir).toAbsolutePath().normalize();
+        Path upload = Paths.get(uploadDir).toAbsolutePath().normalize();
+
+        if (path.startsWith(uploadBase)) {
+            return uploadBase.relativize(path).toString().replace("\\", "/");
+        }
+        if (path.startsWith(upload)) {
+            return upload.relativize(path).toString().replace("\\", "/");
+        }
+        return path.toString().replace("\\", "/");
+    }
+
+private String stripUrlPrefix(String value) {
+        String result = value;
+        if (result.contains("://")) {
+            try {
+                java.net.URI uri = java.net.URI.create(result);
+                result = uri.getPath() != null ? uri.getPath() : result;
+            } catch (Exception ignored) {}
+        }
+
+        result = result.replaceFirst("^/api/v1/static/", "")
+                .replaceFirst("^/v1/static/", "")
+                .replaceFirst("^/api/v1/", "")
+                .replaceFirst("^/v1/", "")
+                .replaceFirst("^/static/", "")
+                .replaceFirst("^/uploads/", "uploads/");
+        return result;
     }
 
     private static String normalize(String input) {

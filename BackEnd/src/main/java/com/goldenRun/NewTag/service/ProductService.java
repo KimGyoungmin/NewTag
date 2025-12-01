@@ -119,6 +119,7 @@ public class ProductService {
                 .toList();
     }
 
+    @Transactional
     public Page<ProductDtos.ListItem> searchProducts(
             String keyword,
             Long userId,
