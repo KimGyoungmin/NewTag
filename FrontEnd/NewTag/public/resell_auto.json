@@ -459,40 +459,40 @@
       {
         "horizon": 1,
         "truePrice": null,
-        "predictedPrice": 95220.20999999999
+        "predictedPrice": 98130.44
       },
       {
         "horizon": 2,
         "truePrice": null,
-        "predictedPrice": 96184.075
+        "predictedPrice": 93991.69
       },
       {
         "horizon": 3,
         "truePrice": null,
-        "predictedPrice": 100785.475
+        "predictedPrice": 97345.0
       },
       {
         "horizon": 4,
         "truePrice": null,
-        "predictedPrice": 98667.26
+        "predictedPrice": 98165.94399999999
       },
       {
         "horizon": 5,
         "truePrice": null,
-        "predictedPrice": 101171.425
+        "predictedPrice": 99440.79000000001
       },
       {
         "horizon": 6,
         "truePrice": null,
-        "predictedPrice": 103086.85
+        "predictedPrice": 101939.175
       },
       {
         "horizon": 7,
         "truePrice": null,
-        "predictedPrice": 102363.906
+        "predictedPrice": 101645.56
       }
     ],
-    "image": null
+    "image": "/resell_images/101705.png"
   },
   {
     "id": "kream_20501",
@@ -6684,40 +6684,40 @@
       {
         "horizon": 1,
         "truePrice": null,
-        "predictedPrice": 1444529.0
+        "predictedPrice": 1438858.5
       },
       {
         "horizon": 2,
         "truePrice": null,
-        "predictedPrice": 1430377.4
+        "predictedPrice": 1401429.3
       },
       {
         "horizon": 3,
         "truePrice": null,
-        "predictedPrice": 1273619.4
+        "predictedPrice": 1252964.1
       },
       {
         "horizon": 4,
         "truePrice": null,
-        "predictedPrice": 1553244.5
+        "predictedPrice": 1565800.9
       },
       {
         "horizon": 5,
         "truePrice": null,
-        "predictedPrice": 1499885.0
+        "predictedPrice": 1536880.3
       },
       {
         "horizon": 6,
         "truePrice": null,
-        "predictedPrice": 1126232.9
+        "predictedPrice": 1132034.2
       },
       {
         "horizon": 7,
         "truePrice": null,
-        "predictedPrice": 1431053.2
+        "predictedPrice": 1382541.3
       }
     ],
-    "image": null
+    "image": "/resell_images/20501.png"
   },
   {
     "id": "kream_264837",
@@ -7377,40 +7377,40 @@
       {
         "horizon": 1,
         "truePrice": null,
-        "predictedPrice": 27534.571999999996
+        "predictedPrice": 27509.996999999996
       },
       {
         "horizon": 2,
         "truePrice": null,
-        "predictedPrice": 28017.765999999996
+        "predictedPrice": 28000.428000000004
       },
       {
         "horizon": 3,
         "truePrice": null,
-        "predictedPrice": 28515.744
+        "predictedPrice": 28497.638
       },
       {
         "horizon": 4,
         "truePrice": null,
-        "predictedPrice": 28262.98
+        "predictedPrice": 28254.203
       },
       {
         "horizon": 5,
         "truePrice": null,
-        "predictedPrice": 29024.140000000003
+        "predictedPrice": 29002.566
       },
       {
         "horizon": 6,
         "truePrice": null,
-        "predictedPrice": 28973.311999999998
+        "predictedPrice": 29003.556
       },
       {
         "horizon": 7,
         "truePrice": null,
-        "predictedPrice": 29553.061999999998
+        "predictedPrice": 29546.829999999998
       }
     ],
-    "image": null
+    "image": "/resell_images/264837.png"
   },
   {
     "id": "kream_288640",
@@ -12696,40 +12696,40 @@
       {
         "horizon": 1,
         "truePrice": null,
-        "predictedPrice": 374721.22000000003
+        "predictedPrice": 374628.6
       },
       {
         "horizon": 2,
         "truePrice": null,
-        "predictedPrice": 380002.62
+        "predictedPrice": 379955.22000000003
       },
       {
         "horizon": 3,
         "truePrice": null,
-        "predictedPrice": 379125.82
+        "predictedPrice": 379045.42000000004
       },
       {
         "horizon": 4,
         "truePrice": null,
-        "predictedPrice": 379974.3
+        "predictedPrice": 379694.32
       },
       {
         "horizon": 5,
         "truePrice": null,
-        "predictedPrice": 391452.2
+        "predictedPrice": 391598.8
       },
       {
         "horizon": 6,
         "truePrice": null,
-        "predictedPrice": 382890.92000000004
+        "predictedPrice": 382984.12
       },
       {
         "horizon": 7,
         "truePrice": null,
-        "predictedPrice": 380163.05
+        "predictedPrice": 380244.68
       }
     ],
-    "image": null
+    "image": "/resell_images/288640.png"
   },
   {
     "id": "kream_37430",
@@ -18507,40 +18507,40 @@
       {
         "horizon": 1,
         "truePrice": null,
-        "predictedPrice": 897201.6
+        "predictedPrice": 896045.2
       },
       {
         "horizon": 2,
         "truePrice": null,
-        "predictedPrice": 865514.7
+        "predictedPrice": 864715.8
       },
       {
         "horizon": 3,
         "truePrice": null,
-        "predictedPrice": 859313.6
+        "predictedPrice": 851228.9
       },
       {
         "horizon": 4,
         "truePrice": null,
-        "predictedPrice": 922295.8
+        "predictedPrice": 921721.7
       },
       {
         "horizon": 5,
         "truePrice": null,
-        "predictedPrice": 915102.2
+        "predictedPrice": 918354.7
       },
       {
         "horizon": 6,
         "truePrice": null,
-        "predictedPrice": 919463.0
+        "predictedPrice": 917860.9
       },
       {
         "horizon": 7,
         "truePrice": null,
-        "predictedPrice": 916475.3
+        "predictedPrice": 918863.7
       }
     ],
-    "image": null
+    "image": "/resell_images/37430.png"
   },
   {
     "id": "kream_45128",
@@ -23184,40 +23184,40 @@
       {
         "horizon": 1,
         "truePrice": null,
-        "predictedPrice": 1066727.2
+        "predictedPrice": 1066857.7
       },
       {
         "horizon": 2,
         "truePrice": null,
-        "predictedPrice": 1022224.8
+        "predictedPrice": 1029445.7
       },
       {
         "horizon": 3,
         "truePrice": null,
-        "predictedPrice": 1062810.2
+        "predictedPrice": 1062736.6
       },
       {
         "horizon": 4,
         "truePrice": null,
-        "predictedPrice": 1017906.0
+        "predictedPrice": 1023179.3
       },
       {
         "horizon": 5,
         "truePrice": null,
-        "predictedPrice": 1065706.0
+        "predictedPrice": 1065477.6
       },
       {
         "horizon": 6,
         "truePrice": null,
-        "predictedPrice": 1066998.0
+        "predictedPrice": 1074345.1
       },
       {
         "horizon": 7,
         "truePrice": null,
-        "predictedPrice": 1044093.3
+        "predictedPrice": 1049475.5
       }
     ],
-    "image": null
+    "image": "/resell_images/45128.png"
   },
   {
     "id": "kream_60246",
@@ -25137,40 +25137,40 @@
       {
         "horizon": 1,
         "truePrice": null,
-        "predictedPrice": 210981.77999999997
+        "predictedPrice": 211428.72000000003
       },
       {
         "horizon": 2,
         "truePrice": null,
-        "predictedPrice": 212309.58
+        "predictedPrice": 212241.3
       },
       {
         "horizon": 3,
         "truePrice": null,
-        "predictedPrice": 212385.4
+        "predictedPrice": 212412.1
       },
       {
         "horizon": 4,
         "truePrice": null,
-        "predictedPrice": 210406.6
+        "predictedPrice": 210543.87999999998
       },
       {
         "horizon": 5,
         "truePrice": null,
-        "predictedPrice": 210291.75
+        "predictedPrice": 210351.6
       },
       {
         "horizon": 6,
         "truePrice": null,
-        "predictedPrice": 209476.45
+        "predictedPrice": 209564.31
       },
       {
         "horizon": 7,
         "truePrice": null,
-        "predictedPrice": 212410.75
+        "predictedPrice": 212065.9
       }
     ],
-    "image": null
+    "image": "/resell_images/60246.png"
   },
   {
     "id": "kream_75881",
@@ -29580,39 +29580,39 @@
       {
         "horizon": 1,
         "truePrice": null,
-        "predictedPrice": 40095.544
+        "predictedPrice": 40340.712
       },
       {
         "horizon": 2,
         "truePrice": null,
-        "predictedPrice": 38454.344
+        "predictedPrice": 38126.794
       },
       {
         "horizon": 3,
         "truePrice": null,
-        "predictedPrice": 38886.638
+        "predictedPrice": 38673.353
       },
       {
         "horizon": 4,
         "truePrice": null,
-        "predictedPrice": 38718.938
+        "predictedPrice": 38735.78
       },
       {
         "horizon": 5,
         "truePrice": null,
-        "predictedPrice": 39218.825
+        "predictedPrice": 39235.706
       },
       {
         "horizon": 6,
         "truePrice": null,
-        "predictedPrice": 39391.270000000004
+        "predictedPrice": 39964.65
       },
       {
         "horizon": 7,
         "truePrice": null,
-        "predictedPrice": 41680.246999999996
+        "predictedPrice": 42260.659999999996
       }
     ],
-    "image": null
+    "image": "/resell_images/75881.png"
   }
 ]

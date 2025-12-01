@@ -19,8 +19,6 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
-from webdriver_manager.utils import ChromeType
-from webdriver_manager.utils import ChromeType
 
 # Windows 콘솔 UTF-8 인코딩 설정
 if sys.platform == 'win32':
@@ -63,29 +61,47 @@ def setup_driver_with_cdp(use_persistent_profile=True):
                 chrome_options.binary_location = str(path)
                 break
 
-    # Selenium ?? ??? ??? (?? ???)
-    if use_persistent_profile:
+    # Selenium ?? ??? ??? (?? ???) - env? ??/??? ??
+    env_use_profile = os.getenv("USE_PERSISTENT_PROFILE", "true").lower() != "false"
+    env_reset_profile = os.getenv("RESET_PROFILE", "false").lower() == "true"
+    if env_use_profile and use_persistent_profile:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         profile_dir = os.path.join(script_dir, 'selenium_profile')
+        if env_reset_profile and os.path.exists(profile_dir):
+            import shutil
+            shutil.rmtree(profile_dir, ignore_errors=True)
         if not os.path.exists(profile_dir):
-            os.makedirs(profile_dir)
+            os.makedirs(profile_dir, exist_ok=True)
             print(f"[OK] ? ??? ???? ??: {profile_dir}")
         else:
             print(f"[OK] ?? ??? ?? (?? ???): {profile_dir}")
         chrome_options.add_argument(f'--user-data-dir={profile_dir}')
         chrome_options.add_argument('--profile-directory=Default')
 
-    # ???? ??/?? ?? (????? ????? ??)
-    driver_version = os.getenv('CHROME_DRIVER_VERSION') or None
-    chrome_type_env = os.getenv('CHROME_TYPE', '').lower()
-    chrome_type = ChromeType.GOOGLE
-    if 'chromium' in chrome_type_env:
-        chrome_type = ChromeType.CHROMIUM
-    if getattr(chrome_options, 'binary_location', '') and 'chromium' in chrome_options.binary_location.lower():
-        chrome_type = ChromeType.CHROMIUM
+    # ?? Selenium (?: selenium/standalone-chrome VNC) ?? ??
+    remote_url = os.getenv('SELENIUM_REMOTE_URL')
+    if remote_url:
+        driver = webdriver.Remote(command_executor=remote_url, options=chrome_options)
+    else:
+        # ???? ??? ??? ?? ?? (????? chromium-driver ?)
+        driver_path = os.getenv('CHROME_DRIVER_PATH')
+        if not driver_path:
+            for candidate in [
+                '/usr/bin/chromedriver',
+                '/usr/lib/chromium/chromedriver',
+                'C:/Program Files/Google/Chrome/Application/chromedriver.exe',
+            ]:
+                if Path(candidate).exists():
+                    driver_path = candidate
+                    break
 
-    service = Service(ChromeDriverManager(chrome_type=chrome_type, version=driver_version).install())
-    driver = webdriver.Chrome(service=service, options=chrome_options)
+        if driver_path and Path(driver_path).exists():
+            service = Service(driver_path)
+            driver = webdriver.Chrome(service=service, options=chrome_options)
+        else:
+            # webdriver_manager 최신 버전에서는 version 인자가 없을 수 있어 기본값 사용
+            driver = webdriver.Chrome(options=chrome_options)
+
 
     # CDP ???? ?? ???
     driver.execute_cdp_cmd('Network.enable', {})
@@ -967,8 +983,13 @@ def crawl_kream_with_cdp(product_url, naver_id=None, naver_pw=None, phone_number
         name_data = driver.execute_script("""
             const getText = (selectors) => {
                 for (const sel of selectors) {
-                    const el = document.querySelector(sel);
-                    if (el && el.textContent) return el.textContent.trim();
+                    try {
+                        const el = document.querySelector(sel);
+                        if (el && el.textContent) return el.textContent.trim();
+                    } catch (e) {
+                        // skip invalid selector
+                        continue;
+                    }
                 }
                 return '';
             };
@@ -987,7 +1008,6 @@ def crawl_kream_with_cdp(product_url, naver_id=None, naver_pw=None, phone_number
             // ?? ?? ??
             const primary = getText([
                 '#wrap .product-detail-left-section p',
-                '#wrap > div.layout__main--without-search > div > div > div.product-detail-left-section > div:nth-child(4) > div > div.layout_list_vertical.pc\\:cgap-2.mo\\:cgap-2.list-vertical-fill-available > div:nth-child(4) > div.layout_list_horizontal.sdui-fit-content > div > div > div:nth-child(1) > p',
                 '.text-lookup',
                 'p.text-lookup',
                 'p.text-lookup.display_paragraph',

@@ -24,12 +24,15 @@ CURRENT_DIR = Path(__file__).resolve().parent
 if str(CURRENT_DIR) not in sys.path:
     sys.path.insert(0, str(CURRENT_DIR))
 
+from bs4 import BeautifulSoup  # noqa: E402
+import requests  # noqa: E402
 from crawl_kream_cdp import crawl_kream_with_cdp  # noqa: E402
 
 BASE_DIR = CURRENT_DIR.parent
 DATA_DIR = BASE_DIR / "Best_test" / "Data"
 OUTPUT_DIR = BASE_DIR / "Best_test" / "OutPut"
 FRONTEND_RESELL_JSON = BASE_DIR.parent / "FrontEnd" / "NewTag" / "public" / "resell_auto.json"
+FRONTEND_RESELL_IMG_DIR = FRONTEND_RESELL_JSON.parent / "resell_images"
 PRODUCT_ID_LIST = BASE_DIR / "Best_test" / "product_id.txt"
 
 # Reuse the same login credentials as the legacy script
@@ -96,6 +99,51 @@ def load_existing_transactions(latest_path: Path) -> tuple[list[dict], set[str]]
         return [], set()
 
 
+def download_product_image(product_url: str, pid: str) -> Path | None:
+    """
+    Fetch the product page and download og:image into public/resell_images/{pid}.png.
+    Returns the local path if saved, otherwise None.
+    """
+    FRONTEND_RESELL_IMG_DIR.mkdir(parents=True, exist_ok=True)
+    dest_path = FRONTEND_RESELL_IMG_DIR / f"{pid}.png"
+
+    if dest_path.exists():
+        return dest_path
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (compatible; NewTagCrawler/1.0; +https://example.com)"
+    }
+
+    try:
+        resp = requests.get(product_url, headers=headers, timeout=10)
+        if resp.status_code != 200:
+            print(f"[WARN] ({pid}) failed to fetch product page: {resp.status_code}")
+            return None
+        soup = BeautifulSoup(resp.text, "html.parser")
+        og = soup.find("meta", property="og:image")
+        img_url = og.get("content") if og else None
+        if not img_url:
+            print(f"[WARN] ({pid}) og:image not found")
+            return None
+        if img_url.startswith("//"):
+            img_url = "https:" + img_url
+        if img_url.startswith("/"):
+            # Relative path; prepend host
+            base = re.match(r"^https?://[^/]+", product_url)
+            if base:
+                img_url = base.group(0) + img_url
+        img_resp = requests.get(img_url, headers=headers, timeout=10)
+        if img_resp.status_code != 200:
+            print(f"[WARN] ({pid}) failed to download image: {img_resp.status_code}")
+            return None
+        dest_path.write_bytes(img_resp.content)
+        print(f"[OK] ({pid}) downloaded image -> {dest_path.name}")
+        return dest_path
+    except Exception as exc:
+        print(f"[WARN] ({pid}) image download failed: {exc}")
+        return None
+
+
 def save_result(pid: str, result: dict, data_dir: Path) -> None:
     """Save merged crawl result to kream_{pid}_{timestamp}.json."""
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -105,8 +153,10 @@ def save_result(pid: str, result: dict, data_dir: Path) -> None:
     print(f"[OK] Saved: {out_path}")
 
 
-def crawl_and_merge(pid: str, data_dir: Path) -> None:
-    """Crawl a single product_id and merge with previous transactions."""
+def crawl_and_merge(pid: str, data_dir: Path) -> bool:
+    """Crawl a single product_id and merge with previous transactions.
+    Returns True when new data was saved, False when skipped.
+    """
     latest_path = find_latest_file_for_pid(data_dir, pid)
     existing_transactions: list[dict] = []
     existing_ids: set[str] = set()
@@ -115,7 +165,7 @@ def crawl_and_merge(pid: str, data_dir: Path) -> None:
         ts = parse_timestamp_from_filename(latest_path)
         if ts and ts.date() == datetime.now().date():
             print(f"- {pid}: already crawled today -> {latest_path.name} (skip)")
-            return
+            return False
         existing_transactions, existing_ids = load_existing_transactions(latest_path)
         print(f"- {pid}: loaded {len(existing_transactions)} existing rows from {latest_path.name}")
 
@@ -135,13 +185,14 @@ def crawl_and_merge(pid: str, data_dir: Path) -> None:
 
     if not new_transactions:
         print(f"- {pid}: no new transactions (skip)")
-        return
+        return False
 
     combined = existing_transactions + new_transactions
     result["transactions"] = combined
     result["total_transactions"] = len(combined)
 
     save_result(pid, result, data_dir)
+    return True
 
 
 def normalize_source_name(name: str) -> str:
@@ -320,9 +371,11 @@ def build_resell_feed(data_dir: Path, output_root: Path) -> None:
                     print(f"[INFO] Scaled predictions by 1/10 for pid={pid} (outlier correction)")
 
         name_ko, name_en = pick_names(data)
-        # Try to use a pre-downloaded image if present (public/resell_images/{pid}.png)
-        local_image_path = (FRONTEND_RESELL_JSON.parent / "resell_images" / f"{pid}.png")
-        local_image_url = f"/resell_images/{pid}.png" if local_image_path.exists() else None
+        # Ensure product image is available (download og:image once per pid)
+        local_image_path = download_product_image(product_url, pid)
+        if local_image_path and not local_image_path.exists():
+            local_image_path = None
+        local_image_url = f"/resell_images/{pid}.png" if local_image_path else None
 
         record = {
             "id": f"kream_{pid}",
@@ -386,13 +439,20 @@ def main() -> None:
     run_tag = f"resell_auto_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
     print(f"Target product_ids: {sorted(product_ids)}")
+    any_crawled = False
     if not skip_crawl:
         for pid in sorted(product_ids):
-            crawl_and_merge(pid, DATA_DIR)
+            if crawl_and_merge(pid, DATA_DIR):
+                any_crawled = True
     else:
         print("Skipping crawl (--no-crawl/--feed-only)")
 
     print("\nAll crawling steps finished.")
+
+    # If 오늘 크롤링 결과가 모두 스킵되었다면, 학습도 스킵하고 기존 예측을 재사용
+    if not skip_predict and not any_crawled:
+        skip_predict = True
+        print("No new crawl today -> skip forecast and reuse latest predictions.")
 
     if skip_predict:
         if output_override and output_override.exists():
@@ -402,7 +462,7 @@ def main() -> None:
         if not output_root:
             print("Prediction skipped but no previous OutPut found. Provide --use-output=PATH or run without --no-predict.")
             sys.exit(1)
-        print(f"Skipping forecast (--no-predict/--feed-only). Reusing: {output_root}")
+        print(f"Skipping forecast (--no-predict/--feed-only or no new crawl). Reusing: {output_root}")
     else:
         output_root = run_forecast_all(DATA_DIR, run_tag)
 
