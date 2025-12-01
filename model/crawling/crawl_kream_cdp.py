@@ -18,6 +18,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
+from webdriver_manager.utils import ChromeType
 
 # Windows 콘솔 UTF-8 인코딩 설정
 if sys.platform == 'win32':
@@ -37,6 +38,11 @@ def setup_driver_with_cdp(use_persistent_profile=True):
     chrome_options.add_argument('--lang=ko-KR')
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
+
+    # 로컬 크롬 위치 명시 (142.x 설치 기준)
+    chrome_binary = Path(r"C:\Program Files\Google\Chrome\Application\chrome.exe")
+    if chrome_binary.exists():
+        chrome_options.binary_location = str(chrome_binary)
 
     # Selenium 전용 프로필 사용 (쿠키 유지)
     if use_persistent_profile:
@@ -58,7 +64,8 @@ def setup_driver_with_cdp(use_persistent_profile=True):
     # CDP 로깅 활성화
     chrome_options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
 
-    service = Service(ChromeDriverManager().install())
+    # 설치된 크롬(142.x)에 맞춰 드라이버 버전 지정
+    service = Service(ChromeDriverManager(chrome_type=ChromeType.GOOGLE, version="142.0.0").install())
     driver = webdriver.Chrome(service=service, options=chrome_options)
 
     # CDP 네트워크 추적 활성화

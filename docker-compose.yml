@@ -18,6 +18,8 @@ services:
       context: ./BackEnd
     container_name: newtag-backend
     restart: unless-stopped
+    volumes:
+      - uploads:/app/uploads
     # The backend requires environment variables (e.g., database credentials, JWT secret).
     # Create a file at ./BackEnd/.env with the necessary key-value pairs.
     env_file:
@@ -32,6 +34,10 @@ services:
       context: ./model/img_model
     container_name: newtag-model
     restart: unless-stopped
+    environment:
+      - STATIC_ROOT=/app/uploads
+    volumes:
+      - uploads:/app/uploads
     # The model server requires API keys.
     # Create a file at ./model/img_model/.env with the following content:
     # GOOGLE_VISION_KEY=your_google_vision_api_key
@@ -74,3 +80,4 @@ networks:
 volumes:
   caddy_data:
   caddy_config:
+  uploads:
