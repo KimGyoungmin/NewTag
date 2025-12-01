@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { AtSign, Lock, Eye, EyeOff, Shield, Loader2 } from "lucide-react";
+﻿import { useState } from "react";
+import { AtSign, Lock, Eye, EyeOff, Loader2 } from "lucide-react";
 import { isAxiosError } from "axios";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -23,7 +23,7 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
     if (isAxiosError(error)) {
       return (
         error.response?.data?.message ||
-        "로그인 중 문제가 발생했어요. 다시 시도해 주세요."
+        "로그인 중 문제가 발생했어요. 다시 시도해주세요."
       );
     }
 
@@ -31,7 +31,7 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
       return error.message;
     }
 
-    return "로그인 중 문제가 발생했어요. 다시 시도해 주세요.";
+    return "로그인 중 문제가 발생했어요. 다시 시도해주세요.";
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -40,7 +40,7 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
 
     const trimmedNick = nick.trim();
     if (!trimmedNick) {
-      setErrorMessage("닉네임을 입력해 주세요.");
+      setErrorMessage("닉네임을 입력해주세요.");
       return;
     }
 
@@ -51,11 +51,8 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
         password,
       });
 
-      console.log('[Login] Response:', response);
-      console.log('[Login] Token stored:', localStorage.getItem('access_token'));
-
       if (response.success) {
-        toast.success("로그인에 성공했어요!");
+        toast.success("로그인에 성공했어요.");
         onNavigate("home");
       } else {
         const message = response.message || "로그인에 실패했어요.";
@@ -72,44 +69,21 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
   };
 
   const handleSocialLogin = (provider: string) => {
-    if (provider === 'kakao') {
-      try {
+    try {
+      if (provider === "kakao") {
         authApi.loginWithKakao();
-      } catch (error) {
-        toast.error('카카오 로그인 중 오류가 발생했습니다.');
-        console.error('Kakao login error:', error);
-      }
-    } else if (provider === 'google') {
-      try {
+      } else if (provider === "google") {
         authApi.loginWithGoogle();
-      } catch (error) {
-        toast.error('구글 로그인 중 오류가 발생했습니다.');
-        console.error('Google login error:', error);
-      }
-    } else if (provider === 'naver') {
-      try {
+      } else if (provider === "naver") {
         authApi.loginWithNaver();
-      } catch (error) {
-        toast.error('네이버 로그인 중 오류가 발생했습니다.');
-        console.error('Naver login error:', error);
+      } else {
+        toast.info(`${provider} 로그인은 준비 중입니다.`);
       }
-    } else {
-      console.log("Social login:", provider);
-      toast.info(`${provider} 로그인은 준비 중입니다.`);
+    } catch (error) {
+      toast.error("소셜 로그인 중 오류가 발생했어요.");
+      console.error("Social login error:", error);
     }
   };
-
-
-
-  const handleAdminMode = () => {
-
-    console.log("Admin mode activated");
-
-    toast.info("??? ??? ?? ????.");
-
-  };
-
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 to-white flex items-center justify-center p-4">
@@ -117,7 +91,7 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
         {/* Logo/Brand */}
         <div className="text-center mb-8">
           <h1 className="text-4xl mb-2 text-teal-600">NewTag</h1>
-          <p className="text-muted-foreground">안전한 중고거래의 시작</p>
+          <p className="text-muted-foreground">안전한 중고거래를 위한 시작</p>
         </div>
 
         {/* Login Card */}
@@ -133,7 +107,7 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
                 <Input
                   id="nick"
                   type="text"
-                  placeholder="닉네임 또는 아이디"
+                  placeholder="닉네임을 입력해주세요"
                   value={nick}
                   onChange={(e) => setNick(e.target.value)}
                   className="pl-10"
@@ -151,7 +125,7 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="비밀번호를 입력해 주세요"
+                  placeholder="비밀번호를 입력해주세요"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="pl-10 pr-10"
@@ -204,20 +178,6 @@ export function LoginPage({ onNavigate }: LoginPageProps) {
               )}
             </Button>
           </form>
-
-          {/* Admin Mode Button */}
-          <div className="mt-4">
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full border-2 border-orange-400 text-orange-600 hover:bg-orange-50"
-              size="lg"
-              onClick={handleAdminMode}
-            >
-              <Shield className="mr-2 h-5 w-5" />
-              관리자모드 (데모)
-            </Button>
-          </div>
 
           {/* Divider */}
           <div className="flex items-center gap-4 my-6">

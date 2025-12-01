@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -81,6 +83,41 @@ public class FileStorageService {
             throw new RuntimeException("이미지 업로드에 실패했습니다: " + e.getMessage());
         }
     }
+
+    /**
+     * ?? ??? URL? ????? ?? ???? ??
+     */
+    public String storeProductImageFromUrl(String imageUrl, Long productId, boolean isMain) {
+        if (imageUrl == null || imageUrl.isBlank()) {
+            throw new IllegalArgumentException("??? URL? ?? ????.");
+        }
+
+        String extension = getFileExtension(imageUrl);
+        if (extension == null || extension.isBlank()) {
+            extension = ".jpg";
+        }
+        String filename = generateFilename(isMain, extension);
+        String folder = productId != null ? String.valueOf(productId) : "temp";
+
+        try (InputStream in = new URL(imageUrl).openStream()) {
+            Path productFolder = getProductFolder(folder);
+            Files.createDirectories(productFolder);
+
+            Path targetLocation = productFolder.resolve(filename);
+            Files.copy(in, targetLocation, StandardCopyOption.REPLACE_EXISTING);
+
+            optimizeImageFile(targetLocation);
+            createThumbnailFile(targetLocation);
+
+            String relativePath = productDir + "/" + folder + "/" + filename;
+            log.info("Downloaded product image: {} -> {}", imageUrl, targetLocation);
+            return relativePath.replace("\\", "/");
+        } catch (IOException e) {
+            log.error("Failed to download image from url: {}", imageUrl, e);
+            throw new RuntimeException("?? ??? ????? ??????: " + e.getMessage());
+        }
+    }
+
 
     /**
      * 프로필 이미지 저장
