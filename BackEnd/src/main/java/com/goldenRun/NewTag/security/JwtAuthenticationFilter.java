@@ -1,57 +1,91 @@
 package com.goldenRun.NewTag.security;
 
-
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j; // Added Slf4j import
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
-import org.springframework.web.filter.GenericFilterBean;
+import org.springframework.util.AntPathMatcher;
+import org.springframework.web.filter.OncePerRequestFilter;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
-import jakarta.servlet.ServletRequest;
-import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.List;
 
+
+@Slf4j // Added Slf4j annotation
 @Component
 @RequiredArgsConstructor
-public class JwtAuthenticationFilter extends GenericFilterBean {
+public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
-	
     private final JwtTokenProvider jwtTokenProvider;
 
+    private static final List<String> EXCLUDE_URLS = List.of(
+            "/auth/**", // Changed from /api/auth/**
+            "/health", // Changed from /api/health
+            "/test", // Changed from /api/test
+            "/encode-password", // Changed from /api/encode-password
+            "/v1/login", // Changed from /api/v1/login
+            "/login",    // Added for the frontend calling /api/login
+            "/v1/signup", // Changed from /api/v1/signup
+            "/v1/emailMatch", // Changed from /api/v1/emailMatch
+            "/v1/idMatch", // Changed from /api/v1/idMatch
+            "/v1/auth/refresh", // Changed from /api/v1/auth/refresh
+            "/v1/auth/kakao/callback", // Changed from /api/v1/auth/kakao/callback
+            "/v1/auth/google/callback", // Changed from /api/v1/auth/google/callback
+            "/v1/auth/naver/callback", // Changed from /api/v1/auth/naver/callback
+            "/v1/static/**", // Changed from /api/v1/static/**
+            "/static/**",
+            "/v1/userprofile/**", // Changed from /api/v1/userprofile/**
+            "/v1/uploads/**", // Changed from /api/v1/uploads/**
+            "/v1/categories/**", // Changed from /api/v1/categories/**
+            "/v1/products", // Changed from /api/v1/products
+            "/v1/products/**", // Changed from /api/v1/products/**
+            "/v1/reviews/**" // Changed from /api/v1/reviews/**
+            // "/api/v1/favorites/**" -> 필요하다면 추가
+    );
+
+    private AntPathMatcher pathMatcher = new AntPathMatcher();
+
     @Override
-    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain)
+    protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {
+        String servletPath = request.getServletPath();
+        log.debug("[JWT Filter] Checking path for bypass: {}", servletPath); // Changed to log.debug
+        boolean shouldBypass = EXCLUDE_URLS.stream()
+                .anyMatch(exclude -> pathMatcher.match(exclude, servletPath));
+        if (shouldBypass) {
+            log.debug("[JWT Filter] Bypassing for path: {}", servletPath); // Changed to log.debug
+        }
+        return shouldBypass;
+    }
+
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws IOException, ServletException {
 
-        HttpServletRequest httpRequest = (HttpServletRequest) request;
+        log.debug("[JWT Filter] Request (applying filter): {} {}", request.getMethod(), request.getRequestURI()); // Changed to log.debug
 
-        System.out.println("[JWT Filter] Request: " + httpRequest.getMethod() + " " + httpRequest.getRequestURI());
 
-        // CORS preflight 요청(OPTIONS)은 토큰 검증 없이 통과
-        if ("OPTIONS".equalsIgnoreCase(httpRequest.getMethod())) {
-            chain.doFilter(request, response);
+        if ("OPTIONS".equalsIgnoreCase(request.getMethod())) {
+            filterChain.doFilter(request, response);
             return;
         }
 
-        // HTTP 요청 헤더에서 토큰을 추출
-        String token = resolveToken(httpRequest);
+        String token = resolveToken(request);
 
-        // 토큰 유효성 검증
         if (token != null && jwtTokenProvider.validateToken(token) && jwtTokenProvider.isAccessToken(token)) {
-            // 토큰이 유효하면 인증 객체를 생성
             Authentication auth = jwtTokenProvider.getAuthentication(token);
-            System.out.println("[JWT Filter] Authentication created: " + (auth != null ? auth.getName() : "null"));
-            // SecurityContextHolder에 인증 객체를 설정하여 인증 상태로 만듬
+            log.debug("[JWT Filter] Authentication created: {}", (auth != null ? auth.getName() : "null")); // Changed to log.debug
             SecurityContextHolder.getContext().setAuthentication(auth);
         } else {
-            System.out.println("[JWT Filter] Token validation failed or token is null");
+            log.debug("[JWT Filter] Token validation failed or token is null (applying filter)"); // Changed to log.debug
         }
-        chain.doFilter(request, response);
+        filterChain.doFilter(request, response);
     }
 
-    // HTTP 헤더에서 "Authorization: Bearer <token>" 형식으로 토큰 추출
     private String resolveToken(HttpServletRequest request) {
         String bearerToken = request.getHeader("Authorization");
         if (bearerToken != null && bearerToken.startsWith("Bearer ")) {

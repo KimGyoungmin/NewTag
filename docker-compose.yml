@@ -1,0 +1,76 @@
+# version: '3.8'
+
+services:
+  # Frontend Service (React)
+  # Built using the Dockerfile in FrontEnd/NewTag
+  frontend:
+    build:
+      context: ./FrontEnd/NewTag
+    container_name: newtag-frontend
+    restart: unless-stopped
+    networks:
+      - newtag-network
+
+  # Backend Service (Spring Boot)
+  # Built using the Dockerfile in BackEnd
+  backend:
+    build:
+      context: ./BackEnd
+    container_name: newtag-backend
+    restart: unless-stopped
+    # The backend requires environment variables (e.g., database credentials, JWT secret).
+    # Create a file at ./BackEnd/.env with the necessary key-value pairs.
+    env_file:
+      - ./BackEnd/.env
+    networks:
+      - newtag-network
+
+  # Model Server (FastAPI)
+  # Built using the Dockerfile in model/img_model
+  model:
+    build:
+      context: ./model/img_model
+    container_name: newtag-model
+    restart: unless-stopped
+    # The model server requires API keys.
+    # Create a file at ./model/img_model/.env with the following content:
+    # GOOGLE_VISION_KEY=your_google_vision_api_key
+    # GEMINI_API_KEY=your_gemini_api_key
+    env_file:
+      - ./model/img_model/.env
+    networks:
+      - newtag-network
+
+  # Caddy Reverse Proxy
+  # The main entry point for all traffic.
+  caddy:
+    image: caddy:2-alpine
+    container_name: newtag-caddy-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"       # For HTTP traffic and ACME HTTP-01 challenge
+      - "443:443"     # For HTTPS traffic
+      - "443:443/udp" # For HTTP/3
+    volumes:
+      # Mount the main Caddyfile
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      # Named volumes for persisting Caddy's state (certificates, etc.)
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - newtag-network
+    # Ensure other services are started before Caddy attempts to proxy to them.
+    depends_on:
+      - frontend
+      - backend
+      - model
+
+# Network for inter-service communication
+networks:
+  newtag-network:
+    driver: bridge
+
+# Named volumes for Caddy's data
+volumes:
+  caddy_data:
+  caddy_config:

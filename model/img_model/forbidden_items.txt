@@ -7,7 +7,8 @@
 대마,cannabis,marijuana,weed
 니코틴액상,nicotine,vape,vaping
 주류,alcohol,liquor
-담배,cigarette,tobacco,cigar
+담배,cigarette,tobacco,cigar, vape
+전자담배, vape, electronic-cigratte
 무기,armament
 위조지폐,counterfeit
 성인용품,adult,toy
