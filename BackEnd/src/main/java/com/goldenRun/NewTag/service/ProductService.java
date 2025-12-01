@@ -328,18 +328,18 @@ public class ProductService {
         Duration duration = Duration.between(createdAt, LocalDateTime.now());
 
         long minutes = duration.toMinutes();
-        if (minutes < 1) return "just now";
-        if (minutes < 60) return minutes + "m ago";
+        if (minutes < 1) return "방금 전";
+        if (minutes < 60) return minutes + "분 전";
 
         long hours = duration.toHours();
-        if (hours < 24) return hours + "h ago";
+        if (hours < 24) return hours + "시간 전";
 
         long days = duration.toDays();
-        if (days < 7) return days + "d ago";
-        if (days < 30) return (days / 7) + "w ago";
-        if (days < 365) return (days / 30) + "mo ago";
+        if (days < 7) return days + "일 전";
+        if (days < 30) return (days / 7) + "주 전";
+        if (days < 365) return (days / 30) + "개월 전";
 
-        return (days / 365) + "y ago";
+        return (days / 365) + "년 전";
     }
 
     private String resolveImagePath(String path) {
