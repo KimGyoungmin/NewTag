@@ -87,7 +87,7 @@ def load_forbidden_items() -> List[str]:
             token = token.strip()
             if token:
                 items.append(token)
-
+    
     for path in FORBIDDEN_FILES:
         if not path.exists():
             continue
@@ -113,7 +113,7 @@ def load_forbidden_items() -> List[str]:
 
 def detect_forbidden(attributes: Dict[str, Any]) -> Optional[str]:
     """Check vision attributes against forbidden keywords; return the matched keyword."""
-    forbidden = load_forbidden_items()
+    forbidden = load_forbidden_items()  
     if not forbidden:
         return None
 

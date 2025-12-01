@@ -16,7 +16,7 @@ import com.goldenRun.NewTag.entity.User;
 import java.util.Map;
 
 @RestController
-@RequestMapping("/api/v1/uploads")
+@RequestMapping("/v1/uploads")
 @RequiredArgsConstructor
 public class UploadController {
 

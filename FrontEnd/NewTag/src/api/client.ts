@@ -1,8 +1,9 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { tokenManager } from './tokenManager';
 
-const DEFAULT_SERVER_URL = 'http://localhost:8081/';
+const DEFAULT_SERVER_URL = 'http://localhost/api/v1/';
 const rawBaseUrl = import.meta.env.VITE_API_BASE_URL || DEFAULT_SERVER_URL;
+// const rawBaseUrl = DEFAULT_SERVER_URL;
 const normalizedBaseUrl = rawBaseUrl.replace(/\/$/, '');
 export const API_BASE_URL = normalizedBaseUrl.includes('/api')
   ? normalizedBaseUrl

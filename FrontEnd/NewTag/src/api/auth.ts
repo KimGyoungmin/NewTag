@@ -1,4 +1,4 @@
-﻿import { api } from './client';
+import { api } from './client';
 
 import { tokenManager } from './tokenManager';
 import type { LoginRequest, LoginResponse, SignupRequest, User, ApiResponse, AuthUser } from '../types';
@@ -74,8 +74,8 @@ export const authApi = {
    */
   loginWithKakao: (): void => {
     // @ts-ignore - Vite env
-    const KAKAO_CLIENT_ID = import.meta.env.VITE_KAKAO_CLIENT_ID || import.meta.env.VITE_KAKAO_MAP_APP_KEY;
-    const REDIRECT_URI = `${window.location.origin}/auth/kakao/callback`;
+    const KAKAO_CLIENT_ID = import.meta.env.VITE_KAKAO_CLIENT_ID;
+    const REDIRECT_URI = `http://localhost/auth/kakao/callback`;
 
     if (!KAKAO_CLIENT_ID) {
       throw new Error('Kakao OAuth Client ID is missing.');
@@ -103,7 +103,7 @@ export const authApi = {
   loginWithGoogle: (): void => {
     // @ts-ignore - Vite env
     const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    const REDIRECT_URI = `${window.location.origin}/auth/google/callback`;
+    const REDIRECT_URI = `http://localhost/auth/google/callback`;
 
     if (!GOOGLE_CLIENT_ID) {
       throw new Error('援ш? ?대씪?댁뼵??ID媛 ?ㅼ젙?섏? ?딆븯?듬땲??');
@@ -131,7 +131,7 @@ export const authApi = {
   loginWithNaver: (): void => {
     // @ts-ignore - Vite env
     const NAVER_CLIENT_ID = import.meta.env.VITE_NAVER_CLIENT_ID;
-    const REDIRECT_URI = `${window.location.origin}/auth/naver/callback`;
+    const REDIRECT_URI = `http://localhost/auth/naver/callback`;
     const STATE = Math.random().toString(36).substring(2, 15); // ?쒕뜡 state ?앹꽦
 
     if (!NAVER_CLIENT_ID) {

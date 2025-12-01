@@ -43,7 +43,7 @@ public class GoogleAuthService {
     @Value("${google.client-secret:}")
     private String googleClientSecret;
 
-    @Value("${google.redirect-uri:http://localhost:5173/auth/google/callback}")
+    @Value("${google.redirect-uri:http://localhost:5173/v1/auth/google/callback}")
     private String googleRedirectUri;
 
     private static final String GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token";

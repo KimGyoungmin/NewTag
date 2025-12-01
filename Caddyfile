@@ -1,0 +1,51 @@
+# Caddyfile for the main reverse proxy
+# This file orchestrates traffic to the frontend, backend, and model services.
+
+{
+    # Global options block
+    # Enable CORS for all origins for simplicity during development.
+    # In production, you should restrict this to your frontend's domain.
+    # For example: cors_headers { origin https://your-frontend.com }
+    http_port 80
+    https_port 443
+
+    log {
+        output stderr
+        level INFO
+    }
+}
+
+:80 {
+    # AI Model Server (Precise rule for API gateway)
+    handle_path /api/v1/model/* {
+        uri strip_prefix /api/v1/model
+        reverse_proxy model:8000 {
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+
+    # Backend API (Spring Boot) - General rule, comes after specific ones
+    handle_path /api/* {
+        reverse_proxy backend:8081 {
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+            header_up X-Forwarded-Host {host}
+        }
+    }
+
+    # Frontend (React served by its own Caddy)
+    # Forward all other requests to the frontend service.
+    handle {
+        reverse_proxy frontend:80 {
+            # Forward important headers
+            header_up Host {host}
+            header_up X-Real-IP {remote_host}
+            header_up X-Forwarded-For {remote_host}
+            header_up X-Forwarded-Proto {scheme}
+        }
+    }
+}
