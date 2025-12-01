@@ -42,8 +42,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/v1/userprofile/**", // Changed from /api/v1/userprofile/**
             "/v1/uploads/**", // Changed from /api/v1/uploads/**
             "/v1/categories/**", // Changed from /api/v1/categories/**
-            "/v1/products", // Changed from /api/v1/products
-            "/v1/products/**", // Changed from /api/v1/products/**
+            //"/v1/products", // Changed from /api/v1/products
+            //"/v1/products/**", // Changed from /api/v1/products/**
             "/v1/reviews/**" // Changed from /api/v1/reviews/**
             // "/api/v1/favorites/**" -> 필요하다면 추가
     );

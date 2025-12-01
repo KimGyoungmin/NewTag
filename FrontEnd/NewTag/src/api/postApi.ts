@@ -126,9 +126,8 @@ export const postApi = {
   },
 
   autoWrite: async (imagePaths: string[]): Promise<AutoWriteResponse> => {
-    // This endpoint goes to the model server, which is routed via /model/* by Caddy.
-    // We use the base `apiClient` from './client' to call this path directly, bypassing the /api/v1 prefix.
-    const response = await apiClient.post<AutoWriteResponse>('/model/auto-listing', { image_paths: imagePaths });
+    // Send to backend AI controller so it can resolve paths and map fields (price, categoryId, etc.)
+    const response = await api.post<AutoWriteResponse>('/ai/auto-listing', { imagePaths });
     return response.data;
   },
 };
