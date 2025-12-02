@@ -80,6 +80,13 @@ venv/
 # ============================================
 model/Best_test/OutPut/
 model/crawling/selenium_profile/
+# Explicitly ignore browser cache/cookies from selenium profile (permission issues)
+model/crawling/selenium_profile/**/Network/Cookies*
+model/crawling/selenium_profile/**/Local\ Storage/
+model/crawling/selenium_profile/**/IndexedDB/
+model/crawling/selenium_profile/**/Cache/
+model/crawling/selenium_profile/**/GPUCache/
+model/crawling/selenium_profile/**/Code\ Cache/
 FrontEnd/NewTag/public/resell_auto.json
 FrontEnd/NewTag/public/resell_images/
 

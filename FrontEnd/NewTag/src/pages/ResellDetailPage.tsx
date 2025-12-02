@@ -5,7 +5,7 @@ import { Button } from "../components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card";
 import { Badge } from "../components/ui/badge";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
-import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip } from "recharts";
+import { LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, Legend } from "recharts";
 
 interface ResellDetailPageProps {
   productId: string;
@@ -269,24 +269,39 @@ export function ResellDetailPage({ productId, onNavigate, products }: ResellDeta
                   />
                   <YAxis tickFormatter={(value) => `₩${(value / 1000).toFixed(0)}k`} domain={yDomain} />
                   <Tooltip
-                    formatter={(value: number | string | null) => {
+                    formatter={(value: number | string | null, name) => {
                       if (value == null) return ["값 없음", ""];
                       const numeric = typeof value === "number" ? value : Number(value);
-                      return [`₩ ${numeric.toLocaleString("ko-KR")}`, "가격"];
+                      const label = name === "predictedPrice" ? "예측" : "실거래";
+                      return [`₩ ${numeric.toLocaleString("ko-KR")}`, label];
                     }}
                   />
-                  <Line type="monotone" dataKey="actualPrice" stroke="#10b981" strokeWidth={2} dot={false} name="실거래" />
+                  <Line
+                    type="monotone"
+                    dataKey="actualPrice"
+                    stroke="#22c55e"
+                    strokeWidth={2}
+                    dot={{ r: 2 }}
+                    activeDot={{ r: 4 }}
+                    name="실거래"
+                  />
                   {hasPredictions && (
                     <Line
                       type="monotone"
                       dataKey="predictedPrice"
-                      stroke="#6366f1"
+                      stroke="#f97316"
                       strokeWidth={2}
-                      dot={false}
+                      dot={{ r: 4 }}
+                      activeDot={{ r: 5 }}
                       strokeDasharray="6 4"
                       name="예측"
                     />
                   )}
+                  <Legend
+                    verticalAlign="top"
+                    height={28}
+                    formatter={(value) => (value === "predictedPrice" ? "예측" : "실거래")}
+                  />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
@@ -294,26 +309,6 @@ export function ResellDetailPage({ productId, onNavigate, products }: ResellDeta
                 거래 그래프를 표시할 데이터가 부족합니다.
               </div>
             )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle>AI 자동 제안 (준비중)</CardTitle>
-            <p className="text-sm text-muted-foreground">
-              알림, 기간 요약, 가격 비교 등 부가 기능을 순차적으로 적용할 예정입니다.
-            </p>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm text-muted-foreground">
-            <div className="rounded-lg border bg-muted/30 p-4">
-              <p className="font-medium text-foreground">예정 로드맵</p>
-              <ul className="mt-2 list-disc space-y-1 pl-4">
-                <li>판매/구매 입찰 알림</li>
-                <li>기간별 거래 요약 카드</li>
-                <li>해외/국내 가격 비교</li>
-              </ul>
-            </div>
-            <p>차트·알림 등은 순차적으로 업데이트됩니다.</p>
           </CardContent>
         </Card>
 

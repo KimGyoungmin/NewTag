@@ -28,24 +28,74 @@ if sys.platform == 'win32':
 BASE_DIR = Path(__file__).resolve().parents[1]
 DATA_DIR = BASE_DIR / 'Best_test' / 'Data'
 CRAWLED_LOG_PATH = DATA_DIR / 'crawled_product_ids.txt'
+COOKIE_FILE = Path(__file__).resolve().parent / 'selenium_profile' / 'cookies.json'
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    """Read boolean-ish env var (1/true/on/yes)."""
+    val = os.getenv(name)
+    if val is None:
+        return default
+    return str(val).lower() in ("1", "true", "yes", "y", "on")
+
+
+def load_cookies(driver, cookie_path: Path) -> None:
+    """Load cookies from JSON into the current domain (best after visiting the site once)."""
+    if not cookie_path.exists():
+        return
+    try:
+        import json as _json
+        with open(cookie_path, encoding="utf-8") as f:
+            cookies = _json.load(f)
+        for ck in cookies:
+            if isinstance(ck, dict):
+                try:
+                    driver.add_cookie(ck)
+                except Exception:
+                    continue
+        print(f"[OK] Loaded cookies from {cookie_path.name}")
+    except Exception as exc:
+        print(f"[WARN] Failed to load cookies: {exc}")
+
+
+def save_cookies(driver, cookie_path: Path) -> None:
+    """Persist cookies to JSON (used for reusing login without full profile)."""
+    try:
+        cookie_path.parent.mkdir(parents=True, exist_ok=True)
+        cookies = driver.get_cookies()
+        with open(cookie_path, "w", encoding="utf-8") as f:
+            json.dump(cookies, f, ensure_ascii=False, indent=2)
+        print(f"[OK] Saved cookies to {cookie_path.name}")
+    except Exception as exc:
+        print(f"[WARN] Failed to save cookies: {exc}")
 
 
 def setup_driver_with_cdp(use_persistent_profile=True):
-    """CDP? ???? Chrome ???? ??"""
+    """CDP ?? Chrome ???? ?? (??/??, headless ??)."""
+    headless = _env_flag("CHROME_HEADLESS", False)
+    remote_url = os.getenv('SELENIUM_REMOTE_URL')
+
     chrome_options = Options()
     chrome_options.add_argument('--start-maximized')
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
     chrome_options.add_argument('--lang=ko-KR')
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
+    chrome_options.add_argument('--remote-allow-origins=*')
+    chrome_options.add_argument('--disable-extensions')
+    chrome_options.add_argument('--disable-features=Translate,BackForwardCache')
+    chrome_options.add_argument('--no-default-browser-check')
+    chrome_options.add_argument('--no-first-run')
 
-    # Headless ?? (????/CI ??) - CHROME_HEADLESS=false ? ? ? ??
-    if os.getenv("CHROME_HEADLESS", "true").lower() != "false":
+    if headless:
         chrome_options.add_argument('--headless=new')
-    chrome_options.add_argument('--disable-dev-shm-usage')
-    chrome_options.add_argument('--no-sandbox')
+    # 일부 Windows 환경에서 GPU가 충돌을 일으켜 Chrome이 바로 종료되는 사례가 있어 항상 off
+    chrome_options.add_argument('--disable-gpu')
 
-    # ??/???? ?? ???? ?? (???? ??)
+    if os.name != "nt":
+        chrome_options.add_argument('--disable-dev-shm-usage')
+        chrome_options.add_argument('--no-sandbox')
+
     candidate = os.getenv("CHROME_BINARY")
     if candidate and Path(candidate).exists():
         chrome_options.binary_location = str(Path(candidate))
@@ -61,9 +111,8 @@ def setup_driver_with_cdp(use_persistent_profile=True):
                 chrome_options.binary_location = str(path)
                 break
 
-    # Selenium ?? ??? ??? (?? ???) - env? ??/??? ??
-    env_use_profile = os.getenv("USE_PERSISTENT_PROFILE", "true").lower() != "false"
-    env_reset_profile = os.getenv("RESET_PROFILE", "false").lower() == "true"
+    env_use_profile = _env_flag("USE_PERSISTENT_PROFILE", True)
+    env_reset_profile = _env_flag("RESET_PROFILE", False)
     if env_use_profile and use_persistent_profile:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         profile_dir = os.path.join(script_dir, 'selenium_profile')
@@ -74,16 +123,17 @@ def setup_driver_with_cdp(use_persistent_profile=True):
             os.makedirs(profile_dir, exist_ok=True)
             print(f"[OK] ? ??? ???? ??: {profile_dir}")
         else:
-            print(f"[OK] ?? ??? ?? (?? ???): {profile_dir}")
+            print(f"[OK] ?? ??? ?? (?? ??): {profile_dir}")
+
         chrome_options.add_argument(f'--user-data-dir={profile_dir}')
         chrome_options.add_argument('--profile-directory=Default')
 
-    # ?? Selenium (?: selenium/standalone-chrome VNC) ?? ??
-    remote_url = os.getenv('SELENIUM_REMOTE_URL')
+    # CDP 로그 수집 (API 바디 파싱용) - loggingPrefs는 최신 크롬에서 거부하므로 goog:loggingPrefs만 설정
+    chrome_options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
+
     if remote_url:
         driver = webdriver.Remote(command_executor=remote_url, options=chrome_options)
     else:
-        # ???? ??? ??? ?? ?? (????? chromium-driver ?)
         driver_path = os.getenv('CHROME_DRIVER_PATH')
         if not driver_path:
             for candidate in [
@@ -97,16 +147,13 @@ def setup_driver_with_cdp(use_persistent_profile=True):
 
         if driver_path and Path(driver_path).exists():
             service = Service(driver_path)
-            driver = webdriver.Chrome(service=service, options=chrome_options)
         else:
-            # webdriver_manager 최신 버전에서는 version 인자가 없을 수 있어 기본값 사용
-            driver = webdriver.Chrome(options=chrome_options)
+            service = Service(ChromeDriverManager().install())
 
+        driver = webdriver.Chrome(service=service, options=chrome_options)
 
-    # CDP ???? ?? ???
     driver.execute_cdp_cmd('Network.enable', {})
     return driver
-
 
 def naver_login(driver, user_id, user_pw, phone_number=None):
     """네이버 로그인 (핸드폰 인증 포함)"""
@@ -756,6 +803,11 @@ def crawl_kream_with_cdp(product_url, naver_id=None, naver_pw=None, phone_number
     print(f"상품 ID: {product_id}")
 
     driver = setup_driver_with_cdp(use_persistent_profile=True)  # 프로필 사용으로 쿠키 유지
+    # Reuse cookie file when profile is reset (keeps login)
+    if _env_flag("USE_COOKIE_FILE", True) and COOKIE_FILE.exists():
+        driver.get("https://kream.co.kr")
+        load_cookies(driver, COOKIE_FILE)
+        driver.refresh()
 
     try:
         # KREAM 제품 페이지 접속
@@ -1082,6 +1134,9 @@ def crawl_kream_with_cdp(product_url, naver_id=None, naver_pw=None, phone_number
         return result
 
     finally:
+        # Save cookies for next run
+        if _env_flag("USE_COOKIE_FILE", True):
+            save_cookies(driver, COOKIE_FILE)
         print("\n브라우저를 종료합니다...")
         driver.quit()
 
