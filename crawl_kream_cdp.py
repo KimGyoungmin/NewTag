@@ -7,6 +7,7 @@ import sys
 import time
 import json
 import re
+import os
 from datetime import datetime
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -22,42 +23,59 @@ if sys.platform == 'win32':
     sys.stderr.reconfigure(encoding='utf-8')
 
 
+def _env_flag(name, default=False):
+    """Read boolean-ish env var (1/true/on/yes)."""
+    val = os.getenv(name)
+    if val is None:
+        return default
+    return str(val).lower() in ("1", "true", "yes", "y", "on")
+
+
 def setup_driver_with_cdp(use_persistent_profile=True):
-    """CDP를 활성화한 Chrome 드라이버 설정"""
+    """CDP ?? Chrome ???? ?? (SELENIUM_REMOTE_URL ??, headless ??)."""
+    remote_url = os.getenv("SELENIUM_REMOTE_URL")
+    headless = _env_flag("CHROME_HEADLESS", False)
+    chrome_type = os.getenv("CHROME_TYPE", "chrome").lower()
+
     chrome_options = Options()
     chrome_options.add_argument('--start-maximized')
     chrome_options.add_argument('--disable-blink-features=AutomationControlled')
     chrome_options.add_experimental_option("excludeSwitches", ["enable-automation"])
     chrome_options.add_experimental_option('useAutomationExtension', False)
 
-    # Selenium 전용 프로필 사용 (쿠키 유지)
-    if use_persistent_profile:
-        import os
-        # 현재 스크립트가 있는 디렉토리에 selenium_profile 폴더 생성
+    # Selenium ?? ??? (?? ???) - remote ????? ??
+    if use_persistent_profile and not remote_url:
         script_dir = os.path.dirname(os.path.abspath(__file__))
         profile_dir = os.path.join(script_dir, 'selenium_profile')
 
-        # 디렉토리가 없으면 생성
         if not os.path.exists(profile_dir):
             os.makedirs(profile_dir)
-            print(f"✓ 새 프로필 디렉토리 생성: {profile_dir}")
+            print(f"[INIT] ? ??? ???? ??: {profile_dir}")
         else:
-            print(f"✓ 기존 프로필 사용 (쿠키 유지됨): {profile_dir}")
+            print(f"[INIT] ?? ??? ??? (?? ??): {profile_dir}")
 
         chrome_options.add_argument(f'--user-data-dir={profile_dir}')
         chrome_options.add_argument('--profile-directory=Default')
 
-    # CDP 로깅 활성화
+    # CDP ??
     chrome_options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
 
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=chrome_options)
+    if headless:
+        chrome_options.add_argument('--headless=new')
 
-    # CDP 네트워크 추적 활성화
+    if chrome_type == "chromium":
+        chromium_binary = os.getenv("CHROME_BINARY")
+        if chromium_binary:
+            chrome_options.binary_location = chromium_binary
+
+    if remote_url:
+        driver = webdriver.Remote(command_executor=remote_url, options=chrome_options)
+    else:
+        service = Service(ChromeDriverManager().install())
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+
     driver.execute_cdp_cmd('Network.enable', {})
-
     return driver
-
 
 def naver_login(driver, user_id, user_pw, phone_number=None):
     """네이버 로그인 (핸드폰 인증 포함)"""
