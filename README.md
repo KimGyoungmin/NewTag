@@ -275,8 +275,8 @@ python super_kream_crawling.py --feed-only
 
 ---
 
-## 🖇️ 와이어 프레임
-
+## 🖇️ 화면 설계서
+https://www.canva.com/design/DAG1uattvQk/fWB4eOKmCOApB0QmXWS_7g/edit
 
 
 ---
