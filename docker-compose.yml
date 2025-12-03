@@ -4,8 +4,9 @@ services:
   # Frontend Service (React)
   # Built using the Dockerfile in FrontEnd/NewTag
   frontend:
-    build:
-      context: ./FrontEnd/NewTag
+    image: pynchomo/newtag-frontend:latest
+    # build:
+    #   context: ./FrontEnd/NewTag
     container_name: newtag-frontend
     restart: unless-stopped
     networks:
@@ -14,8 +15,9 @@ services:
   # Backend Service (Spring Boot)
   # Built using the Dockerfile in BackEnd
   backend:
-    build:
-      context: ./BackEnd
+    # build:
+    #   context: ./BackEnd
+    image: pynchomo/newtag-backend:latest
     container_name: newtag-backend
     restart: unless-stopped
     # The backend requires environment variables (e.g., database credentials, JWT secret).
@@ -30,8 +32,9 @@ services:
   # Model Server (FastAPI)
   # Built using the Dockerfile in model/img_model
   model:
-    build:
-      context: ./model/img_model
+    # build:
+    #   context: ./model/img_model
+    image: pynchomo/newtag-model:latest
     container_name: newtag-model
     restart: unless-stopped
     environment:
