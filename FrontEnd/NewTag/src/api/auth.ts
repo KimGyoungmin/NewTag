@@ -1,8 +1,8 @@
 import { api } from './client';
-
 import { tokenManager } from './tokenManager';
 import type { LoginRequest, LoginResponse, SignupRequest, User, ApiResponse, AuthUser } from '../types';
 
+const DOMAIN_NAME = import.meta.env.VITE_DOMAIN_NAME || 'http://localhost';
 
 const handleAuthSuccess = (data: LoginResponse) => {
   if (data.success && data.token) {
@@ -21,7 +21,6 @@ export const authApi = {
       }
     } catch (error) {
       // ignore - user not logged in
-
     }
     tokenManager.clearSession();
     return null;
@@ -52,7 +51,6 @@ export const authApi = {
     return response.data.success;
   },
 
-
   logout: async (): Promise<void> => {
     try {
       await api.post('/logout');
@@ -69,26 +67,18 @@ export const authApi = {
     return !!tokenManager.getAccessToken();
   },
 
-  /**
-   * 移댁뭅??濡쒓렇??- ?몄쬆 URL濡?由щ떎?대젆??
-   */
   loginWithKakao: (): void => {
-    // @ts-ignore - Vite env
     const KAKAO_CLIENT_ID = import.meta.env.VITE_KAKAO_CLIENT_ID;
-    const REDIRECT_URI = `http://localhost/auth/kakao/callback`;
+    const REDIRECT_URI = `${DOMAIN_NAME}/api/v1/auth/kakao/callback`;
 
     if (!KAKAO_CLIENT_ID) {
       throw new Error('Kakao OAuth Client ID is missing.');
     }
 
-    // 移댁뭅??OAuth ?몄쬆 ?섏씠吏濡?由щ떎?대젆??
     const kakaoAuthUrl = `https://kauth.kakao.com/oauth/authorize?client_id=${KAKAO_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code`;
     window.location.href = kakaoAuthUrl;
   },
 
-  /**
-   * 移댁뭅??濡쒓렇??肄쒕갚 泥섎━ - ?몄쬆 肄붾뱶瑜?諛깆뿏?쒕줈 ?꾩넚
-   */
   handleKakaoCallback: async (code: string): Promise<LoginResponse> => {
     const response = await api.get<LoginResponse>('/auth/kakao/callback', {
       params: { code },
@@ -97,26 +87,18 @@ export const authApi = {
     return response.data;
   },
 
-  /**
-   * 援ш? 濡쒓렇??- ?몄쬆 URL濡?由щ떎?대젆??
-   */
   loginWithGoogle: (): void => {
-    // @ts-ignore - Vite env
     const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    const REDIRECT_URI = `http://localhost/auth/google/callback`;
+    const REDIRECT_URI = `${DOMAIN_NAME}/api/v1/auth/google/callback`;
 
     if (!GOOGLE_CLIENT_ID) {
-      throw new Error('援ш? ?대씪?댁뼵??ID媛 ?ㅼ젙?섏? ?딆븯?듬땲??');
+      throw new Error('Google Client ID is not configured.');
     }
 
-    // 援ш? OAuth ?몄쬆 ?섏씠吏濡?由щ떎?대젆??
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=openid%20email%20profile`;
     window.location.href = googleAuthUrl;
   },
 
-  /**
-   * 援ш? 濡쒓렇??肄쒕갚 泥섎━ - ?몄쬆 肄붾뱶瑜?諛깆뿏?쒕줈 ?꾩넚
-   */
   handleGoogleCallback: async (code: string): Promise<LoginResponse> => {
     const response = await api.get<LoginResponse>('/auth/google/callback', {
       params: { code },
@@ -125,35 +107,25 @@ export const authApi = {
     return response.data;
   },
 
-  /**
-   * ?ㅼ씠踰?濡쒓렇??- ?몄쬆 URL濡?由щ떎?대젆??
-   */
   loginWithNaver: (): void => {
-    // @ts-ignore - Vite env
     const NAVER_CLIENT_ID = import.meta.env.VITE_NAVER_CLIENT_ID;
-    const REDIRECT_URI = `http://localhost/auth/naver/callback`;
-    const STATE = Math.random().toString(36).substring(2, 15); // ?쒕뜡 state ?앹꽦
+    const REDIRECT_URI = `${DOMAIN_NAME}/api/v1/auth/naver/callback`;
+    const STATE = Math.random().toString(36).substring(2, 15);
 
     if (!NAVER_CLIENT_ID) {
-      throw new Error('?ㅼ씠踰??대씪?댁뼵??ID媛 ?ㅼ젙?섏? ?딆븯?듬땲??');
+      throw new Error('Naver Client ID is not configured.');
     }
 
-    // state瑜?sessionStorage?????(CSRF 諛⑹?)
     sessionStorage.setItem('naver_oauth_state', STATE);
 
-    // ?ㅼ씠踰?OAuth ?몄쬆 ?섏씠吏濡?由щ떎?대젆??
     const naverAuthUrl = `https://nid.naver.com/oauth2.0/authorize?response_type=code&client_id=${NAVER_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&state=${STATE}`;
     window.location.href = naverAuthUrl;
   },
 
-  /**
-   * ?ㅼ씠踰?濡쒓렇??肄쒕갚 泥섎━ - ?몄쬆 肄붾뱶瑜?諛깆뿏?쒕줈 ?꾩넚
-   */
   handleNaverCallback: async (code: string, state: string): Promise<LoginResponse> => {
-    // state 寃利?(CSRF 諛⑹?)
     const savedState = sessionStorage.getItem('naver_oauth_state');
     if (savedState !== state) {
-      throw new Error('State 媛믪씠 ?쇱튂?섏? ?딆뒿?덈떎. ?ㅼ떆 ?쒕룄?댁＜?몄슂.');
+      throw new Error('State value does not match. Please try again.');
     }
     sessionStorage.removeItem('naver_oauth_state');
 
