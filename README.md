@@ -378,6 +378,7 @@ python super_kream_crawling.py --feed-only
 ## 🖼️ ERD (Entity Relationship Diagram)
 
 ### ERD 이미지
+<img width="2000" height="1446" alt="newtag_erd_edit" src="https://github.com/user-attachments/assets/11c3b551-7772-4343-88b5-2b112fc6b02a" />
 
 
 
