@@ -27,7 +27,7 @@
 | --- | --- |
 | 이준범 |  |
 | 김경민 |  |
-| 전신혁 |  |
+| 전신혁 | Full-Stack, AI Modeling, Prompt Engineer, MLOps Engineer, Vision & Multimodal |
 | 김현수 |  |
 
 ---
