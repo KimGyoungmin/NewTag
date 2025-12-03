@@ -69,7 +69,8 @@ CREATE TABLE category
   category_nm VARCHAR(40) NOT NULL COMMENT '카테고리 이름',
   created_at  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '카테고리 생성날짜',
   updated_at  DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '카테고리 수정날짜',
-  PRIMARY KEY (id)
+  PRIMARY KEY (id),
+  UNIQUE KEY unique_category_name (category_nm)
 ) COMMENT '상품 카테고리';
 
 -- product 테이블

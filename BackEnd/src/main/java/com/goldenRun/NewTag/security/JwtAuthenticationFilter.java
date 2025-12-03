@@ -40,7 +40,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/v1/static/**", // Changed from /api/v1/static/**
             "/static/**",
             "/v1/userprofile/**", // Changed from /api/v1/userprofile/**
-
             "/v1/categories/**" // Changed from /api/v1/categories/**
 
             // "/v1/reviews/**" // Changed from /api/v1/reviews/**

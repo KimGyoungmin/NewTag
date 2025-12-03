@@ -26,19 +26,7 @@ public class UploadController {
     @PostMapping("/images")
     public ResponseEntity<Map<String, Object>> uploadImage(@RequestParam("file") MultipartFile file) {
         String path = fileStorageService.store(file);
-        String url = "/api/v1/static/" + path;
-
-        return ResponseEntity.ok(Map.of(
-                "success", true,
-                "path", path,
-                "url", url
-        ));
-    }
-
-    @PostMapping("/fetch")
-    public ResponseEntity<Map<String, Object>> fetchImage(@RequestParam("url") String imageUrl) {
-        String path = fileStorageService.storeProductImageFromUrl(imageUrl, null, false);
-        String url = "/api/v1/static/" + path;
+        String url = path;
 
         return ResponseEntity.ok(Map.of(
                 "success", true,
@@ -60,7 +48,7 @@ public class UploadController {
         String folder = (user != null && user.getId() != null) ? user.getId().toString() : userDetails.getUsername();
 
         String path = fileStorageService.storeProfileImage(file, folder);
-        String url = "/api/v1/" + path;
+        String url = path;
 
         return ResponseEntity.ok(Map.of(
                 "success", true,
@@ -76,7 +64,7 @@ public class UploadController {
     ) {
         String folder = chatRoomId != null ? "chat/" + chatRoomId : "chat/temp";
         String path = fileStorageService.storeChatImage(file, folder);
-        String url = "/api/v1/static/" + path;
+        String url = path;
 
         return ResponseEntity.ok(Map.of(
                 "success", true,
