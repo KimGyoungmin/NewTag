@@ -15,7 +15,12 @@
     }
 }
 
-:80 {
+http://newtag.store {
+    redir https://newtag.store{uri} permanent
+}
+
+
+newtag.store {
     # AI Model Server (Precise rule for API gateway)
     handle_path /api/v1/model/* {
         uri strip_prefix /api/v1/model

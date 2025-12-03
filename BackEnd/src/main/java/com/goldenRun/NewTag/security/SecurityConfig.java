@@ -28,7 +28,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    @Value("${app.cors.allowed-origins:http://localhost,https://localhost,http://localhost:*,http://127.0.0.1:*}")
+    @Value("${app.cors.allowed-origins:http://localhost,https://localhost,http://localhost:*,http://127.0.0.1:*,https://newtag.store}")
     private String allowedOriginPatterns;
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
@@ -64,7 +64,9 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.GET, "/v1/products", "/v1/products/**").permitAll()
                 // 리뷰 조회 공개 API (로그인 없이 조회 가능)
                 .requestMatchers(HttpMethod.GET, "/v1/reviews/**").permitAll()
+
                 // AI 자동 작성 공개 API (상품 상세페이지 자동 작성)
+
                 .requestMatchers("/v1/ai/**").permitAll()
                 // 찜하기 API 임시 공개 (개발용 - 나중에 인증 필요로 변경)
                 // .requestMatchers("/api/v1/favorites/**").permitAll()
