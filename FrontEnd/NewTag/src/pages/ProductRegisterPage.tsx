@@ -73,7 +73,13 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
       try {
         setLoadingCategories(true);
         const data = await categoryApi.getAllCategories();
-        setCategories(data);
+
+        // 중복 제거: ID 기준으로 유니크한 카테고리만 저장
+        const uniqueCategories = data.filter((category, index, self) =>
+          index === self.findIndex((c) => c.id === category.id)
+        );
+
+        setCategories(uniqueCategories);
       } catch (error) {
         console.error('Failed to fetch categories:', error);
         toast.error('카테고리 목록을 불러오는데 실패했습니다.');
