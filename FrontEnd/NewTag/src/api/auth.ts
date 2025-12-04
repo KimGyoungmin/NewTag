@@ -2,7 +2,12 @@ import { api } from './client';
 import { tokenManager } from './tokenManager';
 import type { LoginRequest, LoginResponse, SignupRequest, User, ApiResponse, AuthUser } from '../types';
 
-const DOMAIN_NAME = import.meta.env.VITE_DOMAIN_NAME || 'http://localhost';
+const runtimeOrigin =
+  (typeof window !== 'undefined' && window.location?.origin) ||
+  undefined;
+const domainFromEnv = import.meta.env.VITE_DOMAIN_NAME as string | undefined;
+const FRONTEND_BASE_URL = (domainFromEnv || runtimeOrigin || 'http://localhost:5173').replace(/\/$/, '');
+const buildRedirectUri = (path: string) => `${FRONTEND_BASE_URL}${path}`;
 
 const handleAuthSuccess = (data: LoginResponse) => {
   if (data.success && data.token) {
@@ -69,7 +74,7 @@ export const authApi = {
 
   loginWithKakao: (): void => {
     const KAKAO_CLIENT_ID = import.meta.env.VITE_KAKAO_CLIENT_ID;
-    const REDIRECT_URI = `${DOMAIN_NAME}/api/v1/auth/kakao/callback`;
+    const REDIRECT_URI = buildRedirectUri('/auth/kakao/callback');
 
     if (!KAKAO_CLIENT_ID) {
       throw new Error('Kakao OAuth Client ID is missing.');
@@ -89,7 +94,7 @@ export const authApi = {
 
   loginWithGoogle: (): void => {
     const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    const REDIRECT_URI = `${DOMAIN_NAME}/api/v1/auth/google/callback`;
+    const REDIRECT_URI = buildRedirectUri('/auth/google/callback');
 
     if (!GOOGLE_CLIENT_ID) {
       throw new Error('Google Client ID is not configured.');
@@ -109,7 +114,7 @@ export const authApi = {
 
   loginWithNaver: (): void => {
     const NAVER_CLIENT_ID = import.meta.env.VITE_NAVER_CLIENT_ID;
-    const REDIRECT_URI = `${DOMAIN_NAME}/api/v1/auth/naver/callback`;
+    const REDIRECT_URI = buildRedirectUri('/auth/naver/callback');
     const STATE = Math.random().toString(36).substring(2, 15);
 
     if (!NAVER_CLIENT_ID) {

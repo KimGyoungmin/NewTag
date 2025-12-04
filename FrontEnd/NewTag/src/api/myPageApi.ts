@@ -30,7 +30,7 @@ export const myPageApi = {
     const validProducts = products.filter(Boolean);
 
     if (validProducts.length === 0) {
-        return [];
+      return [];
     }
 
     const chatCounts = await chatRoomsApi.getChatRoomCountsByProducts(
@@ -69,21 +69,35 @@ export const myPageApi = {
     const productIds = listItems.map((item) => item.id);
     const chatCounts = await chatRoomsApi.getChatRoomCountsByProducts(productIds);
 
-    const products = listItems.map((item) => {
-      const image = item.thumbnailImage ?? item.mainImage;
-      return {
-        id: String(item.id),
-        image: resolveImageUrl(image),
-        title: item.title ?? '상품',
-        price: Number(item.price ?? 0),
-        location: item.locationNm ?? '',
-        timeAgo: item.timeAgo ?? formatTimeAgo(item.createdAt),
-        likes: Number(item.favoriteCount ?? 0),
-        chatCount: chatCounts.get(item.id) ?? 0,
-        status: toUiStatus(item.status),
-        sellerNick: item.seller?.nick,
-      } as WishlistItem;
-    });
+    const products = await Promise.all(
+      listItems.map(async (item) => {
+        const image = item.thumbnailImage ?? item.mainImage;
+        let favoriteCount = item.favoriteCount ?? (item as any).favorite_count;
+
+        if (favoriteCount === undefined) {
+          try {
+            const detail = await productApi.getById(Number(item.id));
+            favoriteCount = detail?.favoriteCount ?? 0;
+          } catch (error) {
+            console.error("Failed to fetch favorite count for product", item.id, error);
+            favoriteCount = 0;
+          }
+        }
+
+        return {
+          id: String(item.id),
+          image: resolveImageUrl(image),
+          title: item.title ?? "상품",
+          price: Number(item.price ?? 0),
+          location: item.locationNm ?? "",
+          timeAgo: item.timeAgo ?? formatTimeAgo(item.createdAt),
+          likes: Number(favoriteCount ?? 0),
+          chatCount: chatCounts.get(item.id) ?? 0,
+          status: toUiStatus(item.status),
+          sellerNick: item.seller?.nick,
+        } as WishlistItem;
+      })
+    );
 
     return products.filter((p) => p && p.id).filter((p) => p.status !== 'sold');
   },
