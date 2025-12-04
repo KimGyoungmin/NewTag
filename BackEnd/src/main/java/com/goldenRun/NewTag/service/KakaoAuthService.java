@@ -43,7 +43,7 @@ public class KakaoAuthService {
     @Value("${kakao.client-secret:}")
     private String kakaoClientSecret;
 
-    @Value("${kakao.redirect-uri:http://localhost:5173/v1/auth/kakao/callback}")
+    @Value("${kakao.redirect-uri:${app.oauth.redirect-base}/auth/kakao/callback}")
     private String kakaoRedirectUri;
 
     private static final String KAKAO_TOKEN_URL = "https://kauth.kakao.com/oauth/token";

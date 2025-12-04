@@ -4,6 +4,8 @@
 from __future__ import annotations
 
 import os
+import tempfile
+import urllib.parse
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -18,6 +20,7 @@ from process_images import (
     ensure_dir,
     process_image,
 )
+import requests
 
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parent.parent
@@ -104,6 +107,10 @@ def _resolve_image_path(raw_path: str) -> Path:
     if not raw_path:
         raise ValueError("Empty image path provided.")
 
+    parsed = urllib.parse.urlparse(raw_path)
+    if parsed.scheme in {"http", "https"}:
+        return _fetch_remote_image(raw_path, parsed)
+
     normalized = raw_path.strip().lstrip("/\\")
     candidate = Path(normalized)
     if not candidate.is_absolute():
@@ -115,6 +122,18 @@ def _resolve_image_path(raw_path: str) -> Path:
     if not candidate.exists():
         raise FileNotFoundError(f"Image not found: {candidate}")
     return candidate
+
+
+def _fetch_remote_image(raw_url: str, parsed: urllib.parse.ParseResult) -> Path:
+    """Download a remote image to a temp file and return its path."""
+    resp = requests.get(raw_url, timeout=10)
+    resp.raise_for_status()
+    suffix = Path(parsed.path).suffix or ".jpg"
+    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+        tmp.write(resp.content)
+        tmp_path = Path(tmp.name)
+    logger.info(f"[AutoListing] Downloaded remote image to {tmp_path}")
+    return tmp_path
 
 
 @app.on_event("startup")

@@ -14,6 +14,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -28,6 +29,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.CollectionUtils;
 import org.springframework.util.StringUtils;
+import org.springframework.web.client.HttpStatusCodeException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestTemplate;
 
@@ -47,6 +50,41 @@ public class AiListingService {
 
     @Value("${app.upload.base-dir:uploads}")
     private String uploadBaseDir;
+
+    @Value("${aws.s3.endpoint:}")
+    private String s3Endpoint;
+
+    @Value("${aws.s3.bucket-name:}")
+    private String s3Bucket;
+
+    private Path getUploadBasePath() {
+        return Paths.get(uploadBaseDir).toAbsolutePath().normalize();
+    }
+
+    private List<String> buildEndpointCandidates() {
+        List<String> candidates = new ArrayList<>();
+
+        if (StringUtils.hasText(aiBaseUrl)) {
+            candidates.add(trimTrailingSlash(aiBaseUrl));
+        }
+        // Docker service name
+        candidates.add("http://model:8000");
+        // Local fallbacks
+        candidates.add("http://localhost:8000");
+        candidates.add("http://127.0.0.1:8000");
+        candidates.add("http://localhost:8002");
+
+        return candidates.stream()
+                .filter(StringUtils::hasText)
+                .map(this::trimTrailingSlash)
+                .distinct()
+                .toList();
+    }
+
+    private String trimTrailingSlash(String value) {
+        if (value == null) return null;
+        return value.endsWith("/") ? value.substring(0, value.length() - 1) : value;
+    }
 
         private static final List<CategoryHint> CATEGORY_HINTS =
             List.of(
@@ -99,13 +137,10 @@ public class AiListingService {
     }
 
     private AutoListingModelResponse invokeModel(List<String> absolutePaths) {
-        String endpoint = aiBaseUrl + "/auto-listing";
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        // DTO 媛앹껜 ?ъ슜 (Map ???
-        // ??? STATIC_ROOT ???? ?? ? ??? ????? relative? ??
-        java.util.List<String> modelPaths = absolutePaths.stream()
+        List<String> modelPaths = absolutePaths.stream()
                 .map(this::toModelImagePath)
                 .toList();
 
@@ -113,27 +148,48 @@ public class AiListingService {
                 .imagePaths(modelPaths)
                 .build();
 
-        log.info("[AI Listing] AI ?? ?? - endpoint: {}", endpoint);
+        List<String> endpoints = buildEndpointCandidates();
+        log.info("[AI Listing] Candidate endpoints: {}", endpoints);
         log.info("[AI Listing] ?? requestDto: {}", requestDto);
-        log.info("[AI Listing] absolutePaths ??: {}, ??: {}", absolutePaths.size(), absolutePaths);
-        log.info("[AI Listing] modelPaths ??: {}, ??: {}", modelPaths.size(), modelPaths);
+        log.info("[AI Listing] absolutePaths ?: {}, ???: {}", absolutePaths.size(), absolutePaths);
+        log.info("[AI Listing] modelPaths ?: {}, ???: {}", modelPaths.size(), modelPaths);
 
         HttpEntity<AutoListingModelRequest> requestEntity = new HttpEntity<>(requestDto, headers);
 
-        try {
-            ResponseEntity<AutoListingModelResponse> response =
-                    restTemplate.exchange(endpoint, HttpMethod.POST, requestEntity, AutoListingModelResponse.class);
-            if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-                throw new IllegalStateException("AI ?쒕쾭 ?묐떟??諛쏆? 紐삵뻽?듬땲??");
+        RestClientException lastException = null;
+
+        for (String base : endpoints) {
+            String endpoint = base + "/auto-listing";
+            try {
+                log.info("[AI Listing] Trying endpoint: {}", endpoint);
+                ResponseEntity<AutoListingModelResponse> response =
+                        restTemplate.exchange(endpoint, HttpMethod.POST, requestEntity, AutoListingModelResponse.class);
+                if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
+                    throw new IllegalStateException("AI ??? ?? ????.");
+                }
+                log.info("[AI Listing] AI ?? ?? via {}", endpoint);
+                return response.getBody();
+            } catch (HttpStatusCodeException ex) {
+                String body = ex.getResponseBodyAsString();
+                log.error("[AI Listing] AI ?? ?? - status: {}, body: {}", ex.getStatusCode(), body);
+                String message = "AI ?? ?? ??: " + ex.getStatusCode();
+                if (StringUtils.hasText(body)) {
+                    message += " - " + body;
+                }
+                throw new IllegalArgumentException(message, ex);
+            } catch (ResourceAccessException ex) {
+                lastException = ex;
+                log.warn("[AI Listing] Connection failed for {} - {}", endpoint, ex.getMessage());
+            } catch (RestClientException ex) {
+                lastException = ex;
+                log.warn("[AI Listing] Request failed for {} - {}", endpoint, ex.getMessage());
             }
-            log.info("[AI Listing] AI ?쒕쾭 ?묐떟 ?깃났");
-            return response.getBody();
-        } catch (RestClientException ex) {
-            log.error("[AI Listing] AI ?쒕쾭 ?몄텧 ?ㅽ뙣 - endpoint: {}, error: {}", endpoint, ex.getMessage());
-            log.error("[AI Listing] ?꾩넚 ?ㅽ뙣??requestDto: {}", requestDto);
-            log.error("AI ?쒕쾭 ?몄텧 ?ㅽ뙣 ?곸꽭", ex);
-            throw new IllegalStateException("AI ?먮룞 ?묒꽦 ?쒕쾭? ?듭떊???ㅽ뙣?덉뒿?덈떎.", ex);
         }
+
+        if (lastException != null) {
+            throw new IllegalStateException("AI ??? ??? ? ????. ????? ??????.", lastException);
+        }
+        throw new IllegalStateException("AI ?? ? ??? ??????.");
     }
 
     private String extractForbiddenItem(Map<String, Object> listing) {
@@ -181,7 +237,11 @@ public class AiListingService {
         log.debug("[AI Listing] uploadDir ?ㅼ젙媛? {}", uploadDir);
         log.debug("[AI Listing] uploadBaseDir ?ㅼ젙媛? {}", uploadBaseDir);
 
-        String normalized = rawPath.replace("\\", "/").strip();
+        String normalized = normalizeRemotePath(rawPath);
+        if (isUrl(normalized)) {
+            log.debug("[AI Listing] URL detected, downloading locally: {}", normalized);
+            return downloadRemoteImage(normalized);
+        }
         normalized = stripUrlPrefix(normalized);
         Path initial = Paths.get(normalized);
 
@@ -230,6 +290,40 @@ public class AiListingService {
         throw new IllegalArgumentException("?대?吏 ?뚯씪??李얠쓣 ???놁뒿?덈떎: " + candidates);
     }
 
+    private String downloadRemoteImage(String url) {
+        try {
+            byte[] bytes = restTemplate.getForObject(url, byte[].class);
+            if (bytes == null || bytes.length == 0) {
+                throw new IllegalArgumentException("원격 이미지를 불러오지 못했습니다.");
+            }
+
+            Path base = getUploadBasePath();
+            Path targetDir = base.resolve("ai-cache");
+            Files.createDirectories(targetDir);
+
+            String extension = ".jpg";
+            try {
+                java.net.URI uri = java.net.URI.create(url);
+                String fileName = Paths.get(Optional.ofNullable(uri.getPath()).orElse("image.jpg"))
+                        .getFileName()
+                        .toString();
+                int dotIdx = fileName.lastIndexOf(".");
+                if (dotIdx >= 0 && dotIdx < fileName.length() - 1) {
+                    extension = fileName.substring(dotIdx);
+                }
+            } catch (Exception ignored) {}
+
+            Path target = targetDir.resolve("ai_" + UUID.randomUUID().toString().replace("-", "") + extension)
+                    .normalize();
+            Files.write(target, bytes);
+            log.info("[AI Listing] Downloaded remote image to {}", target);
+            return target.toString();
+        } catch (Exception e) {
+            log.error("[AI Listing] Failed to download remote image: {}", url, e);
+            throw new IllegalArgumentException("이미지 다운로드에 실패했습니다.", e);
+        }
+    }
+
     private Path buildCandidate(Path baseDir, String raw) {
         if (baseDir == null) {
             return null;
@@ -245,7 +339,35 @@ public class AiListingService {
         return normalizedBase.resolve(relative).normalize();
     }
 
+    private String normalizeRemotePath(String rawPath) {
+        if (!StringUtils.hasText(rawPath)) {
+            return rawPath;
+        }
+        String normalized = rawPath.replace("\\", "/").strip();
+
+        // 이미 URL이면 그대로
+        if (isUrl(normalized)) {
+            return normalized;
+        }
+
+        // S3 경로로만 온 경우(endpoint 누락) 보정
+        if (StringUtils.hasText(s3Bucket) && normalized.contains(s3Bucket)) {
+            String cleaned = normalized.replaceFirst("^/+", "");
+            if (!cleaned.startsWith(s3Bucket)) {
+                cleaned = s3Bucket + "/" + cleaned;
+            }
+            if (StringUtils.hasText(s3Endpoint)) {
+                String base = s3Endpoint.endsWith("/") ? s3Endpoint.substring(0, s3Endpoint.length() - 1) : s3Endpoint;
+                return base + "/" + cleaned;
+            }
+        }
+        return normalized;
+    }
+
         private String toModelImagePath(String absolutePath) {
+        if (isUrl(absolutePath)) {
+            return absolutePath;
+        }
         Path path = Paths.get(absolutePath).normalize();
         Path uploadBase = Paths.get(uploadBaseDir).toAbsolutePath().normalize();
         Path upload = Paths.get(uploadDir).toAbsolutePath().normalize();
@@ -259,7 +381,7 @@ public class AiListingService {
         return path.toString().replace("\\", "/");
     }
 
-private String stripUrlPrefix(String value) {
+    private String stripUrlPrefix(String value) {
         String result = value;
         if (result.contains("://")) {
             try {
@@ -275,6 +397,10 @@ private String stripUrlPrefix(String value) {
                 .replaceFirst("^/static/", "")
                 .replaceFirst("^/uploads/", "uploads/");
         return result;
+    }
+
+    private boolean isUrl(String value) {
+        return value != null && value.matches("(?i)^[a-z][a-z0-9+.-]*://.+");
     }
 
     private static String normalize(String input) {

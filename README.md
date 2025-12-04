@@ -26,10 +26,10 @@
 
 | 이름 | 역할 |
 | --- | --- |
-|  |  |
-|  |  |
-|  |  |
-|  |  |
+| 이준범 |  |
+| 김경민 |  |
+| 전신혁 | Full-Stack, AI Modeling, Prompt Engineer, MLOps Engineer, Vision & Multimodal |
+| 김현수 |  |
 
 ---
 
@@ -227,11 +227,26 @@ SOURCE DML.sql;
 docker-compose pull
 docker-compose up -d
 
+
 # 로그 확인
 docker-compose logs -f
 
 # 서비스 중지
 docker-compose down
+```
+#### 로컬 개발 환경 (이미지 빌드)
+```bash
+# docker-compose.yml에서 build 섹션 활성화 필요
+# image: pynchomo/newtag-frontend:latest 주석 처리
+# build: context: ./FrontEnd/NewTag 주석 해제
+
+# 모든 서비스 빌드 및 실행
+docker-compose up --build -d
+
+# 특정 서비스만 재빌드
+docker-compose up --build -d frontend
+docker-compose up --build -d backend
+docker-compose up --build -d model
 ```
 
 #### 로컬 개발 환경 (이미지 빌드)
@@ -303,8 +318,8 @@ python super_kream_crawling.py --feed-only
 
 ---
 
-## 🖇️ 와이어 프레임
-
+## 🖇️ 화면 설계서
+https://www.canva.com/design/DAG1uattvQk/fWB4eOKmCOApB0QmXWS_7g/edit
 
 
 ---
@@ -406,6 +421,7 @@ python super_kream_crawling.py --feed-only
 ## 🖼️ ERD (Entity Relationship Diagram)
 
 ### ERD 이미지
+<img width="2000" height="1446" alt="newtag_erd_edit" src="https://github.com/user-attachments/assets/11c3b551-7772-4343-88b5-2b112fc6b02a" />
 
 
 
@@ -430,7 +446,7 @@ python super_kream_crawling.py --feed-only
 [사용자]
    ↓
 [newtag.store] (HTTPS/SSL)
-   ↓
+        ↓
 [Caddy Reverse Proxy :80/:443]
    ↓
    ├─ /api/v1/model/* → [AI Model Container :8000]
@@ -458,7 +474,7 @@ python super_kream_crawling.py --feed-only
 [localhost]
    ↓
 [Caddy :80] (Reverse Proxy)
-   ↓
+        ↓
    ┌────┴────┬─────────┬──────────┬─────────┐
    ↓         ↓         ↓          ↓         ↓
 [Frontend] [Backend] [AI Model] [Crawler] [Selenium]
