@@ -17,7 +17,7 @@ services:
   backend:
     build:
       context: ./BackEnd
-    image: pynchomo/newtag-backend:latest
+    image: newtag-backend:latest
     container_name: newtag-backend
     restart: unless-stopped
     # The backend requires environment variables (e.g., database credentials, JWT secret).
@@ -36,9 +36,9 @@ services:
   # Model Server (FastAPI)
   # Built using the Dockerfile in model/img_model
   model:
-    # build:
-    #   context: ./model/img_model
-    image: pynchomo/newtag-model:latest
+    build:
+      context: ./model/img_model
+    image: newtag-model:latest
     container_name: newtag-model
     restart: unless-stopped
     environment:

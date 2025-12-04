@@ -55,9 +55,9 @@ newtag.store {
     }
 }
 
-# Local development access (http/https://localhost)
-localhost {
-    tls internal
+# Local development access (http://localhost only, no HTTPS)
+http://localhost {
+    # HTTP only for local development - no TLS/HTTPS
 
     handle_path /api/v1/model/* {
         uri strip_prefix /api/v1/model
