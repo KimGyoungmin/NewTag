@@ -67,6 +67,19 @@ interface GetProductsParams {
   categoryId?: number;
 }
 
+export interface UpdateProductRequest {
+  title?: string;
+  content?: string;
+  price?: number;
+  categoryId?: number;
+  status?: ProductStatus;
+  locationNm?: string;
+  latitude?: number;
+  longitude?: number;
+  isResell?: boolean;
+  images?: Array<{ path: string; isMain?: boolean }>;
+}
+
 export const productApi = {
   getAll: async (params: GetProductsParams): Promise<PaginatedResponse<Product>> => {
     try {
@@ -116,6 +129,16 @@ export const productApi = {
     } catch (error) {
       console.error(`Failed to update product ${id}:`, error);
       return null;
+    }
+  },
+
+  update: async (id: number, payload: UpdateProductRequest): Promise<Product | null> => {
+    try {
+      const response = await apiClient.put<any>(`/products/${id}`, payload);
+      return mapProductDetail(response.data);
+    } catch (error) {
+      console.error(`Failed to update product ${id}:`, error);
+      throw error;
     }
   },
 

@@ -33,6 +33,7 @@ public class ProductDtos {
         private Double latitude;
         private Double longitude;
         private Integer categoryId;
+        private Boolean isResell;
         private List<ImageItem> images;
     }
 

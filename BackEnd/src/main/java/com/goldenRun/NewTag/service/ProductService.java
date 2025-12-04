@@ -243,6 +243,19 @@ public class ProductService {
         if (request.getCategoryId() != null) {
             product.setCategory(resolveCategory(request.getCategoryId()));
         }
+        if (request.getIsResell() != null) {
+            product.setIsResell(request.getIsResell());
+        }
+
+        if (request.getImages() != null) {
+            product.getImages().clear();
+
+            if (!CollectionUtils.isEmpty(request.getImages())) {
+                List<ProductImage> images = buildImageEntities(request.getImages(), product);
+                product.getImages().addAll(images);
+                migrateImagesToProductFolder(product);
+            }
+        }
 
         return toDetailResponse(product, seller.getId());
     }
@@ -502,6 +515,15 @@ public class ProductService {
 
     private ProductDtos.ListItem toListItem(Product product, Map<Long, Long> favoriteCountMap) {
         String mainImagePath = resolveMainImage(product);
+        long favoriteCount = 0L;
+        if (favoriteCountMap != null) {
+            favoriteCount = favoriteCountMap.containsKey(product.getId())
+                    ? favoriteCountMap.get(product.getId())
+                    : favoriteService.getFavoriteCount(product.getId());
+        } else if (product.getId() != null) {
+            favoriteCount = favoriteService.getFavoriteCount(product.getId());
+        }
+
         return ProductDtos.ListItem.builder()
                 .id(product.getId() != null ? product.getId().intValue() : null)
                 .mainImage(mainImagePath)
@@ -514,7 +536,7 @@ public class ProductService {
                 .longitude(product.getLongitude() != null ? product.getLongitude().doubleValue() : null)
                 .createdAt(product.getCreatedAt())
                 .viewCount(product.getView_count())
-                .favoriteCount(favoriteCountMap.getOrDefault(product.getId(), 0L))
+                .favoriteCount(favoriteCount)
                 .timeAgo(product.getCreatedAt() != null ? getTimeAgo(product.getCreatedAt()) : null)
                 .isResell(product.getIsResell())
                 .seller(ProductDtos.SellerInfo.builder()

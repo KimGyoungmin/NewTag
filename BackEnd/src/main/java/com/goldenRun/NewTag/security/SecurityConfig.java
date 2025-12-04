@@ -50,6 +50,10 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // 정적 리소스 (이미지 등) 접근 허용
                 .requestMatchers("/v1/static/**").permitAll()
+                .requestMatchers("/api/v1/static/**").permitAll()
+                .requestMatchers("/api/v1/ai/**").permitAll()
+                .requestMatchers(HttpMethod.GET, "/api/v1/userprofile/**").permitAll()
+                .requestMatchers("/api/v1/uploads/**").permitAll()
                 .requestMatchers("/v1/ai/**").permitAll()
                 .requestMatchers("/static/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/v1/userprofile/**").permitAll()
@@ -60,7 +64,17 @@ public class SecurityConfig {
                 // 데모용 찜 API 공개
                 .requestMatchers("/v1/favorites/**").permitAll()
                 // 공개 엔드포인트
-                .requestMatchers("/auth/**", "/health", "/test", "/encode-password", "/v1/login", "/login","/v1/signup", "/v1/emailMatch", "/v1/idMatch", "/v1/auth/refresh", "/v1/auth/kakao/callback", "/v1/auth/google/callback", "/v1/auth/naver/callback").permitAll()
+                .requestMatchers(
+                        "/auth/**",
+                        "/health", "/test", "/encode-password",
+                        "/v1/health", "/v1/test", "/v1/encode-password",
+                        "/v1/login", "/login",
+                        "/v1/signup", "/v1/emailMatch", "/v1/idMatch",
+                        "/v1/auth/refresh",
+                        "/v1/auth/kakao/callback",
+                        "/v1/auth/google/callback",
+                        "/v1/auth/naver/callback"
+                ).permitAll()
                 // 상품 관련 공개 API (로그인 없이 조회 가능)
                 .requestMatchers(HttpMethod.GET, "/v1/products", "/v1/products/**").permitAll()
                 // 리뷰 조회 공개 API (로그인 없이 조회 가능)

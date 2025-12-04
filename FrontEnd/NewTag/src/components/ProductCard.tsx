@@ -92,18 +92,19 @@ export function ProductCard({
             </Badge>
           </div>
         )}
-        {!isOwner && (
-          <Button
-            size="icon"
-            variant="ghost"
-            className="absolute top-2 right-2 h-8 w-8 rounded-full bg-white/90 hover:bg-white"
-            onClick={handleLikeClick}
-          >
-            <Heart
-              className={`h-4 w-4 ${isLiked ? "fill-red-500 text-red-500" : "text-gray-600"}`}
-            />
-          </Button>
-        )}
+        <Button
+          size="icon"
+          variant="ghost"
+          className="absolute top-2 right-2 h-8 w-8 rounded-full bg-white/90 hover:bg-white"
+          onClick={isOwner ? undefined : handleLikeClick}
+          disabled={isOwner}
+        >
+          <Heart
+            className={`h-4 w-4 ${isLiked ? "fill-red-500 text-red-500" : "text-gray-600"} ${
+              isOwner ? "opacity-60" : ""
+            }`}
+          />
+        </Button>
       </div>
 
       <div className="p-4">
@@ -127,12 +128,10 @@ export function ProductCard({
             {timeAgo}
           </div>
           <div className="flex items-center gap-3 text-sm text-muted-foreground">
-            {!isOwner && (
-              <span className="flex items-center gap-1">
-                <Heart className={`h-4 w-4 ${isLiked ? "fill-red-500 text-red-500" : ""}`} />
-                {likeCount}
-              </span>
-            )}
+            <span className="flex items-center gap-1">
+              <Heart className={`h-4 w-4 ${isLiked ? "fill-red-500 text-red-500" : ""}`} />
+              {likeCount}
+            </span>
             <span>채팅 {chatCount}</span>
           </div>
         </div>

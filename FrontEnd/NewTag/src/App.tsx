@@ -164,6 +164,7 @@ export default function App() {
     '/seller/',
     '/resell/',
     '/product/edit/',
+    '/product-edit/',
     '/product/select-buyer/',
   ];
 
@@ -176,6 +177,7 @@ export default function App() {
     '/chat/',
     '/chatroom/',
     '/product/edit/',
+    '/product-edit/',
     '/product/select-buyer/',
     '/product/register',
     '/product/location',

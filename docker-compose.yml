@@ -4,9 +4,9 @@ services:
   # Frontend Service (React)
   # Built using the Dockerfile in FrontEnd/NewTag
   frontend:
-    image: pynchomo/newtag-frontend:latest
-    # build:
-    #   context: ./FrontEnd/NewTag
+    build:
+      context: ./FrontEnd/NewTag
+    image: newtag-frontend:latest
     container_name: newtag-frontend
     restart: unless-stopped
     networks:
@@ -15,8 +15,8 @@ services:
   # Backend Service (Spring Boot)
   # Built using the Dockerfile in BackEnd
   backend:
-    # build:
-    #   context: ./BackEnd
+    build:
+      context: ./BackEnd
     image: pynchomo/newtag-backend:latest
     container_name: newtag-backend
     restart: unless-stopped
@@ -26,6 +26,10 @@ services:
       - uploads:/app/uploads
     env_file:
       - ./BackEnd/.env
+    environment:
+      # ensure backend writes/reads uploaded files from the shared volume
+      APP_UPLOAD_BASE_DIR: /app/uploads
+      APP_UPLOAD_DIR: /app/uploads
     networks:
       - newtag-network
 
