@@ -1,7 +1,8 @@
 # 🏷️ NewTag (AI 기반 중고거래 플랫폼)
 
 - **NewTag 홈페이지 : https://newtag.store**
-- **API 명세서 홈페이지 : [API 문서 추가 예정]**
+- **Container Registry : Naver Cloud Platform Container Registry**
+- **Object Storage : Naver Cloud Platform Object Storage (이미지 및 정적 파일)**
 - NewTag는 사용자 간의 안전하고 편리한 중고거래를 지원하는 **위치 기반 플랫폼**입니다. **AI 기반 자동 상품 등록**, **실시간 채팅**, **리셀 가격 예측 시스템** 등의 혁신적인 기능을 통해 더 나은 거래 경험을 제공합니다.
 
 ---
@@ -133,11 +134,15 @@
   - Requests
 
 ### Infrastructure
+- **Cloud Platform**: Naver Cloud Platform
+  - Container Registry (Docker 이미지 저장소)
+  - Object Storage (정적 파일 및 이미지 저장)
 - **Real-time Database**: Firebase Firestore 11.10.0
 - **Storage**: 백엔드 서버 파일 시스템 (이미지 최적화 지원)
-- **Reverse Proxy**: Caddy 2 Alpine
+- **Reverse Proxy**: Caddy 2 Alpine (HTTPS 자동 인증서)
 - **Containerization**: Docker, Docker Compose
 - **Browser Automation**: Selenium Standalone Chrome
+- **Domain**: newtag.store
 
 ---
 
@@ -216,15 +221,31 @@ SOURCE DML.sql;
 ```
 
 ### 4️⃣ Docker Compose로 전체 실행 (권장)
+
+#### 프로덕션 배포 (Naver Cloud Container Registry 사용)
 ```bash
-# 모든 서비스 빌드 및 실행
-docker-compose up -d
+# Naver Cloud Container Registry에서 이미지 Pull & 실행
+docker-compose pull
 
 # 로그 확인
 docker-compose logs -f
 
 # 서비스 중지
 docker-compose down
+```
+#### 로컬 개발 환경 (이미지 빌드)
+```bash
+# docker-compose.yml에서 build 섹션 활성화 필요
+# image: pynchomo/newtag-frontend:latest 주석 처리
+# build: context: ./FrontEnd/NewTag 주석 해제
+
+# 모든 서비스 빌드 및 실행
+docker-compose up --build -d
+
+# 특정 서비스만 재빌드
+docker-compose up --build -d frontend
+docker-compose up --build -d backend
+docker-compose up --build -d model
 ```
 
 ### 5️⃣ 개별 서비스 실행 (로컬 개발)
@@ -268,7 +289,13 @@ python super_kream_crawling.py --feed-only
 
 ### 6️⃣ 접속 확인
 
-- **프론트엔드**: http://localhost (Caddy) 또는 http://localhost:5173 (로컬 개발)
+#### 프로덕션 환경
+- **프론트엔드**: https://newtag.store
+- **백엔드 API**: https://newtag.store/api/v1
+- **AI 모델 API**: https://newtag.store/api/v1/model
+
+#### 로컬 개발 환경
+- **프론트엔드**: http://localhost (Caddy) 또는 http://localhost:5173 (Vite 개발 서버)
 - **백엔드 API**: http://localhost:8081
 - **AI 모델 API**: http://localhost:8000
 - **Selenium VNC**: http://localhost:7900 (비밀번호: secret)
@@ -397,10 +424,40 @@ https://www.canva.com/design/DAG1uattvQk/fWB4eOKmCOApB0QmXWS_7g/edit
 
 ## 🌍 시스템 아키텍처
 
+### 프로덕션 환경 (Naver Cloud Platform)
+
 ```
-[클라이언트 브라우저]
+[사용자]
+   ↓
+[newtag.store] (HTTPS/SSL)
         ↓
-   [Caddy :80/:443] (Reverse Proxy)
+[Caddy Reverse Proxy :80/:443]
+   ↓
+   ├─ /api/v1/model/* → [AI Model Container :8000]
+   ├─ /api/* → [Backend Container :8081]
+   └─ /* → [Frontend Container :80]
+
+[Naver Cloud Container Registry]
+   ├─ pynchomo/newtag-frontend:latest
+   ├─ pynchomo/newtag-backend:latest
+   └─ pynchomo/newtag-model:latest
+
+[Naver Cloud Object Storage]
+   └─ 정적 파일 (이미지, 업로드 파일)
+
+[External Services]
+   ├─ [Firebase Firestore] (실시간 채팅)
+   ├─ [Google Cloud Vision API] (이미지 분석)
+   ├─ [Google Gemini API] (AI 텍스트 생성)
+   └─ [Selenium Container] (크롤링)
+```
+
+### 로컬 개발 환경
+
+```
+[localhost]
+   ↓
+[Caddy :80] (Reverse Proxy)
         ↓
    ┌────┴────┬─────────┬──────────┬─────────┐
    ↓         ↓         ↓          ↓         ↓
@@ -413,20 +470,6 @@ https://www.canva.com/design/DAG1uattvQk/fWB4eOKmCOApB0QmXWS_7g/edit
    └─────uploads───────┘          │          │
                                   └──────────┘
                             (Browser Automation)
-
-[Firebase Firestore] (실시간 채팅)
-        ↕
-   [Frontend]
-
-[Google Cloud APIs]
-        ↕
-   [AI Model]
-- Vision API (이미지 분석)
-- Gemini AI (텍스트 생성)
-
-[KREAM 웹사이트]
-        ↕
-   [Crawler] ← [Selenium]
 ```
 
 ### Caddy 라우팅 규칙
@@ -441,6 +484,112 @@ https://www.canva.com/design/DAG1uattvQk/fWB4eOKmCOApB0QmXWS_7g/edit
 4. **크롤링**: Crawler → Selenium → KREAM → 데이터 저장
 5. **가격 예측**: Python 스크립트 → 크롤링 데이터 분석 → resell_auto.json 생성
 
+---
+
+## 🚀 배포 (Naver Cloud Platform)
+
+### Container Registry 설정
+
+#### 1. Docker 이미지 빌드 및 푸시
+```bash
+# 로그인
+docker login pynchomo
+
+# Frontend 이미지 빌드 & 푸시
+cd FrontEnd/NewTag
+docker build -t pynchomo/newtag-frontend:latest .
+docker push pynchomo/newtag-frontend:latest
+
+# Backend 이미지 빌드 & 푸시
+cd ../../BackEnd
+docker build -t pynchomo/newtag-backend:latest .
+docker push pynchomo/newtag-backend:latest
+
+# AI Model 이미지 빌드 & 푸시
+cd ../model/img_model
+docker build -t pynchomo/newtag-model:latest .
+docker push pynchomo/newtag-model:latest
+```
+
+#### 2. 서버에서 배포
+```bash
+# 서버 접속 후
+cd /path/to/NewTag
+
+# 최신 이미지 Pull
+docker-compose pull
+
+# 서비스 재시작
+docker-compose down
+docker-compose up -d
+
+# 로그 확인
+docker-compose logs -f
+```
+
+### Object Storage 설정
+
+#### Naver Cloud Object Storage 연동
+```bash
+# Backend 환경변수 설정 (BackEnd/.env)
+NCLOUD_OBJECT_STORAGE_ENDPOINT=https://kr.object.ncloudstorage.com
+NCLOUD_OBJECT_STORAGE_REGION=kr-standard
+NCLOUD_ACCESS_KEY=your_access_key
+NCLOUD_SECRET_KEY=your_secret_key
+NCLOUD_BUCKET_NAME=newtag-storage
+```
+
+#### 이미지 업로드 처리
+- 사용자가 업로드한 이미지는 Naver Cloud Object Storage에 저장
+- 공개 URL을 통해 이미지 접근
+- CDN 연동으로 빠른 이미지 로딩
+
+### SSL/TLS 인증서
+
+Caddy가 Let's Encrypt를 통해 자동으로 SSL 인증서 발급 및 갱신:
+```caddyfile
+# Caddyfile
+newtag.store {
+    # 자동 HTTPS 활성화
+    reverse_proxy frontend:80
+}
+```
+
+### 도메인 설정
+
+1. **DNS 설정**: newtag.store → Naver Cloud 서버 IP
+2. **A 레코드 추가**: `@` → 서버 공인 IP
+3. **CNAME 레코드** (선택): `www` → `newtag.store`
+
+### 배포 체크리스트
+
+- [x] Container Registry에 Docker 이미지 푸시
+- [x] Object Storage 버킷 생성 및 권한 설정
+- [x] 환경 변수 파일 (.env) 서버에 업로드
+- [x] 도메인 DNS 설정
+- [x] Caddy HTTPS 자동 인증서 확인
+- [x] 방화벽 규칙 설정 (80, 443 포트 개방)
+- [x] Docker Compose 서비스 실행
+- [x] 로그 모니터링 설정
+
+### 배포 모니터링
+
+```bash
+# 컨테이너 상태 확인
+docker-compose ps
+
+# 실시간 로그 확인
+docker-compose logs -f
+
+# 특정 서비스 로그
+docker-compose logs -f backend
+
+# 리소스 사용량 확인
+docker stats
+
+# 컨테이너 재시작
+docker-compose restart backend
+```
 ---
 
 ## 🔐 보안
