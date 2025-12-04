@@ -50,6 +50,7 @@ public class SecurityConfig {
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 // 정적 리소스 (이미지 등) 접근 허용
                 .requestMatchers("/v1/static/**").permitAll()
+                .requestMatchers("/v1/ai/**").permitAll()
                 .requestMatchers("/static/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/v1/userprofile/**").permitAll()
                 // 이미지 업로드 (모든 메서드 임시 허용 - 개발용)
