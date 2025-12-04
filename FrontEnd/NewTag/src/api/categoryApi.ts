@@ -26,4 +26,27 @@ export const categoryApi = {
     const response = await api.get<Category>(`/categories/${id}`);
     return response.data;
   },
+
+  /**
+   * 카테고리 생성
+   */
+  async createCategory(categoryNm: string): Promise<Category> {
+    const response = await api.post<Category>('/categories', { categoryNm });
+    return response.data;
+  },
+
+  /**
+   * 카테고리 수정
+   */
+  async updateCategory(id: number, categoryNm: string): Promise<Category> {
+    const response = await api.put<Category>(`/categories/${id}`, { categoryNm });
+    return response.data;
+  },
+
+  /**
+   * 카테고리 삭제
+   */
+  async deleteCategory(id: number): Promise<void> {
+    await api.delete(`/categories/${id}`);
+  },
 };

@@ -111,6 +111,12 @@
 			<artifactId>thumbnailator</artifactId>
 			<version>0.4.20</version>
 		</dependency>
+		<!-- AWS S3 SDK for Object Storage -->
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>s3</artifactId>
+			<version>2.25.42</version>
+		</dependency>
 	</dependencies>
 
 	<build>

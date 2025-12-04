@@ -352,40 +352,12 @@ public class ProductService {
         return "/api/v1/static/" + path.replace("\\", "/");
     }
 
-    private String resolveThumbnailPath(String path) {
-        if (path == null || path.isBlank()) {
-            return resolveImagePath(null);
-        }
-        if (path.startsWith("http")) {
-            return path;
-        }
-
-        String normalizedPath = path;
-        int staticIndex = normalizedPath.indexOf("/static/");
-        if (staticIndex >= 0) {
-            normalizedPath = normalizedPath.substring(staticIndex + "/static/".length());
-        } else if (normalizedPath.startsWith("static/")) {
-            normalizedPath = normalizedPath.substring("static/".length());
-        } else if (normalizedPath.startsWith("/static/")) {
-            normalizedPath = normalizedPath.substring("/static/".length());
-        }
-
-        String thumbnailCandidate = fileStorageService.buildThumbnailPath(normalizedPath);
-        if (thumbnailCandidate == null) {
-            return resolveImagePath(path);
-        }
-
-        boolean isRelativePath = !thumbnailCandidate.startsWith("/") && !thumbnailCandidate.startsWith("http");
-        boolean thumbnailExists = isRelativePath && fileStorageService.thumbnailExists(normalizedPath);
-        if (!thumbnailExists && isRelativePath) {
-            return resolveImagePath(path);
-        }
-
-        if (thumbnailCandidate.startsWith("/")) {
-            return thumbnailCandidate;
-        }
-
-        return resolveImagePath(thumbnailCandidate);
+    private String resolveThumbnailPath(String mainImagePath) {
+        // Thumbnail logic is simplified after S3 migration.
+        // For now, it returns the main image path.
+        // A more advanced implementation could involve a Lambda for thumbnailing
+        // or constructing a thumbnail URL by convention.
+        return resolveImagePath(mainImagePath);
     }
 
     /**
