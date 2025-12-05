@@ -27,6 +27,7 @@ import com.goldenRun.NewTag.service.NaverAuthService;
 import com.goldenRun.NewTag.service.UserService;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 
 @RestController
 @RequestMapping("/v1")
@@ -96,26 +97,55 @@ public class UserController {
 	 * 카카오 로그인 콜백 처리
 	 */
 	@GetMapping("/auth/kakao/callback")
-	public ResponseEntity<Map<String, Object>> kakaoCallback(@RequestParam String code) {
-		return kakaoAuthService.processKakaoLogin(code);
+	public void kakaoCallback(@RequestParam String code, HttpServletResponse response) throws Exception {
+		ResponseEntity<Map<String, Object>> result = kakaoAuthService.processKakaoLogin(code);
+		handleOAuthRedirect(result, response);
 	}
 
 	/**
 	 * 구글 로그인 콜백 처리
 	 */
 	@GetMapping("/auth/google/callback")
-	public ResponseEntity<Map<String, Object>> googleCallback(@RequestParam String code) {
-		return googleAuthService.processGoogleLogin(code);
+	public void googleCallback(@RequestParam String code, HttpServletResponse response) throws Exception {
+		ResponseEntity<Map<String, Object>> result = googleAuthService.processGoogleLogin(code);
+		handleOAuthRedirect(result, response);
 	}
 
 	/**
 	 * 네이버 로그인 콜백 처리
 	 */
 	@GetMapping("/auth/naver/callback")
-	public ResponseEntity<Map<String, Object>> naverCallback(
+	public void naverCallback(
 			@RequestParam String code,
-			@RequestParam String state) {
-		return naverAuthService.processNaverLogin(code, state);
+			@RequestParam String state,
+			HttpServletResponse response) throws Exception {
+		ResponseEntity<Map<String, Object>> result = naverAuthService.processNaverLogin(code, state);
+		handleOAuthRedirect(result, response);
+	}
+
+	/**
+	 * OAuth 로그인 결과를 프론트엔드로 리다이렉트
+	 */
+	private void handleOAuthRedirect(ResponseEntity<Map<String, Object>> result, HttpServletResponse response) throws Exception {
+		Map<String, Object> body = result.getBody();
+
+		if (body != null && Boolean.TRUE.equals(body.get("success"))) {
+			// 로그인 성공: refresh_token 쿠키 설정 및 프론트엔드로 리다이렉트
+			String setCookieHeader = result.getHeaders().getFirst(org.springframework.http.HttpHeaders.SET_COOKIE);
+			if (setCookieHeader != null) {
+				response.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, setCookieHeader);
+			}
+
+			// 액세스 토큰을 쿼리 파라미터로 전달하여 프론트엔드로 리다이렉트
+			String accessToken = (String) body.get("token");
+			String redirectUrl = "/?token=" + accessToken + "&login=success";
+			response.sendRedirect(redirectUrl);
+		} else {
+			// 로그인 실패: 에러 메시지와 함께 로그인 페이지로 리다이렉트
+			String errorMessage = body != null ? (String) body.get("message") : "로그인에 실패했습니다.";
+			String redirectUrl = "/login?error=" + java.net.URLEncoder.encode(errorMessage, "UTF-8");
+			response.sendRedirect(redirectUrl);
+		}
 	}
 
 	@GetMapping("/sellers/{sellerId}")
