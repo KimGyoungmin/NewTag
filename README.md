@@ -769,6 +769,200 @@ CREATE INDEX idx_product_created_at ON product(created_at DESC) WHERE is_delete 
 public Page<ProductDtos.ListItem> getProductList(...) { }
 ```
 
+### 11. 소셜 로그인 Redirect URI 환경 불일치 문제 (2025-12-05)
+
+#### 11.1. 문제 상황
+- **증상**: 3개 소셜 로그인(카카오, 구글, 네이버) 모두 작동하지 않음
+- **에러 메시지**:
+  - `"error":"invalid_grant","error_description":"Redirect URI mismatch.","error_code":"KOE303"`
+  - JSON 데이터가 브라우저 화면에 그대로 표시됨
+- **발생 환경**: 로컬 개발 환경 (`http://localhost`)
+
+#### 11.2. 근본 원인 분석
+
+**문제 1: 프론트엔드 Redirect URI 하드코딩**
+- **위치**: `FrontEnd/NewTag/src/api/auth.ts` (77, 105, 133번째 줄)
+- **원인**: OAuth redirect URI가 `http://localhost`로 하드코딩되어 환경 변수 미사용
+```typescript
+// 문제 코드
+const REDIRECT_URI = 'http://localhost/api/v1/auth/kakao/callback';
+```
+- **영향**: 환경에 따라 redirect URI를 동적으로 변경할 수 없음
+
+**문제 2: 백엔드 환경 변수 미설정**
+- **위치**: `BackEnd/.env`
+- **원인**: `OAUTH_REDIRECT_BASE` 환경 변수가 설정되지 않음
+- **결과**: `application.properties`의 기본값인 `https://newtag.store` 사용
+```properties
+# application.properties
+app.oauth.redirect-base=${OAUTH_REDIRECT_BASE:https://newtag.store}
+```
+- **문제점**:
+  - 프론트엔드는 `http://localhost`로 OAuth 요청
+  - 백엔드는 `https://newtag.store`로 토큰 교환 시도
+  - → Redirect URI 불일치로 OAuth 실패
+
+**문제 3: JSON 응답이 브라우저에 직접 표시**
+- **위치**: `BackEnd/src/main/java/com/goldenRun/NewTag/controller/UserController.java`
+- **원인**: OAuth 콜백 엔드포인트가 JSON 응답 반환
+```java
+// 문제 코드
+@GetMapping("/auth/kakao/callback")
+public ResponseEntity<Map<String, Object>> kakaoCallback(@RequestParam String code) {
+    return kakaoAuthService.processKakaoLogin(code);
+}
+```
+- **문제점**:
+  - OAuth 제공자가 사용자를 `http://localhost/api/v1/auth/kakao/callback?code=...`로 리다이렉트
+  - 백엔드가 JSON 응답 반환 → 브라우저에 JSON 데이터 표시
+  - React 앱이 로드되지 않아 OAuth 콜백 처리 불가
+
+#### 11.3. 해결 방법
+
+**해결 1: 프론트엔드 환경 변수 사용**
+
+`FrontEnd/NewTag/src/api/auth.ts` 수정:
+```typescript
+// 수정 전
+const REDIRECT_URI = 'http://localhost/api/v1/auth/kakao/callback';
+
+// 수정 후
+const DOMAIN_NAME = import.meta.env.VITE_DOMAIN_NAME || 'http://localhost';
+const REDIRECT_URI = `${DOMAIN_NAME}/api/v1/auth/kakao/callback`;
+```
+
+프론트엔드 재빌드:
+```bash
+docker-compose build --no-cache frontend
+docker-compose up -d frontend
+```
+
+**해결 2: 백엔드 환경 변수 추가**
+
+`BackEnd/.env`에 환경별 설정 추가:
+```properties
+# 로컬 테스트용
+OAUTH_REDIRECT_BASE=http://localhost
+
+# 프로덕션 배포 시
+# OAUTH_REDIRECT_BASE=https://newtag.store
+```
+
+백엔드 재빌드:
+```bash
+docker-compose up -d --build backend
+```
+
+**해결 3: OAuth 콜백 리다이렉트 방식으로 변경**
+
+`UserController.java`의 OAuth 콜백 메서드를 JSON 응답에서 HTML 리다이렉트로 변경:
+
+```java
+// import 추가
+import jakarta.servlet.http.HttpServletResponse;
+
+// 수정된 콜백 메서드
+@GetMapping("/auth/kakao/callback")
+public void kakaoCallback(@RequestParam String code, HttpServletResponse response) throws Exception {
+    ResponseEntity<Map<String, Object>> result = kakaoAuthService.processKakaoLogin(code);
+    handleOAuthRedirect(result, response);
+}
+
+// 리다이렉트 처리 헬퍼 메서드
+private void handleOAuthRedirect(ResponseEntity<Map<String, Object>> result, HttpServletResponse response) throws Exception {
+    Map<String, Object> body = result.getBody();
+
+    if (body != null && Boolean.TRUE.equals(body.get("success"))) {
+        // 로그인 성공: refresh_token 쿠키 설정
+        String setCookieHeader = result.getHeaders().getFirst(org.springframework.http.HttpHeaders.SET_COOKIE);
+        if (setCookieHeader != null) {
+            response.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, setCookieHeader);
+        }
+
+        // 액세스 토큰을 쿼리 파라미터로 전달하여 프론트엔드로 리다이렉트
+        String accessToken = (String) body.get("token");
+        String redirectUrl = "/?token=" + accessToken + "&login=success";
+        response.sendRedirect(redirectUrl);
+    } else {
+        // 로그인 실패: 에러 메시지와 함께 로그인 페이지로 리다이렉트
+        String errorMessage = body != null ? (String) body.get("message") : "로그인에 실패했습니다.";
+        String redirectUrl = "/login?error=" + java.net.URLEncoder.encode(errorMessage, "UTF-8");
+        response.sendRedirect(redirectUrl);
+    }
+}
+```
+
+**해결 4: 프론트엔드 토큰 처리 로직 추가**
+
+`App.tsx`에 OAuth 리다이렉트 후 토큰 처리 로직 추가:
+```typescript
+// OAuth 리다이렉트 처리
+useEffect(() => {
+  const searchParams = new URLSearchParams(location.search);
+  const token = searchParams.get('token');
+  const loginSuccess = searchParams.get('login');
+
+  if (token && loginSuccess === 'success') {
+    // 토큰을 localStorage에 저장
+    localStorage.setItem('access_token', token);
+
+    // auth-change 이벤트 발생
+    window.dispatchEvent(new Event('auth-change'));
+
+    // URL에서 쿼리 파라미터 제거
+    navigate('/', { replace: true });
+  }
+}, [location.search, navigate]);
+```
+
+#### 11.4. 검증 방법
+
+1. **환경 변수 확인**:
+```bash
+# 백엔드 컨테이너 내부에서 환경 변수 확인
+docker exec newtag-backend env | grep OAUTH_REDIRECT_BASE
+
+# 출력: OAUTH_REDIRECT_BASE=http://localhost
+```
+
+2. **백엔드 로그 확인**:
+```bash
+docker logs newtag-backend --tail 50
+```
+
+로그인 성공 시 출력:
+```
+INFO: Redirect URI: http://localhost/api/v1/auth/kakao/callback
+INFO: 카카오 액세스 토큰 발급 성공
+INFO: 카카오 기존 회원 로그인: [사용자명]
+```
+
+3. **브라우저 테스트**:
+   - 로그인 페이지에서 소셜 로그인 클릭
+   - OAuth 제공자 인증 완료
+   - 자동으로 메인 페이지로 리다이렉트 (JSON 화면 표시 ❌)
+   - 로그인 상태 확인 (헤더에 프로필 표시)
+
+#### 11.5. 주요 교훈
+
+1. **환경별 설정 분리**: 개발/운영 환경에 따라 다른 값이 필요한 설정은 반드시 환경 변수로 관리
+2. **OAuth Redirect URI 일치**: OAuth 흐름에서 초기 인증 요청과 토큰 교환의 redirect_uri는 완전히 동일해야 함
+3. **컨테이너 환경 변수 적용**: Docker 환경에서 `.env` 파일 수정 후 반드시 컨테이너 재빌드 필요 (`docker-compose up -d --build`)
+4. **OAuth 콜백 UI 처리**: OAuth 콜백은 JSON API가 아닌 리다이렉트 방식으로 처리하여 사용자 경험 개선
+5. **Vite 환경 변수 빌드 타임**: Vite는 환경 변수를 빌드 타임에 임베드하므로 변경 시 재빌드 필수
+
+#### 11.6. 관련 파일
+
+**수정된 파일**:
+- `FrontEnd/NewTag/src/api/auth.ts` (환경 변수 사용)
+- `FrontEnd/NewTag/src/App.tsx` (토큰 처리 로직 추가)
+- `BackEnd/.env` (OAUTH_REDIRECT_BASE 추가)
+- `BackEnd/src/main/java/com/goldenRun/NewTag/controller/UserController.java` (리다이렉트 방식 변경)
+
+**관련 설정 파일**:
+- `BackEnd/src/main/resources/application.properties` (OAuth 설정)
+- `FrontEnd/NewTag/.env` (VITE_DOMAIN_NAME)
+
 ---
 
 ## 📚 상세 문서
@@ -800,4 +994,4 @@ This project is licensed under the MIT License.
 
 ---
 
-**마지막 업데이트**: 2025-12-02
+**마지막 업데이트**: 2025-12-05

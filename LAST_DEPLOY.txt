@@ -1,0 +1,4 @@
+배포 버전: v1.0.4
+배포 ?�간: 2025-12-05 10:23:04.88
+?��?지:
+  - newtag-frontend.kr.ncr.ntruss.com/newtag-frontend:v1.0.4

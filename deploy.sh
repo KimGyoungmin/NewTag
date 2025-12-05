@@ -1,7 +1,10 @@
 #!/bin/bash
 
 # NewTag 배포 스크립트
-# 사용법: ./deploy.sh v1.0.3
+# 사용법:
+#   전체 배포:   ./deploy.sh v1.0.3
+#   개별 배포:   ./deploy.sh v1.0.3 frontend
+#   여러 개:     ./deploy.sh v1.0.3 frontend backend
 
 set -e  # 에러 발생 시 중단
 
@@ -14,11 +17,41 @@ NC='\033[0m' # No Color
 # 버전 체크
 if [ -z "$1" ]; then
     echo -e "${RED}❌ 에러: 버전을 지정해주세요.${NC}"
-    echo "사용법: ./deploy.sh v1.0.3"
+    echo "사용법: ./deploy.sh v1.0.3 [서비스]"
+    echo ""
+    echo "예시:"
+    echo "  ./deploy.sh v1.0.3                    - 전체 배포"
+    echo "  ./deploy.sh v1.0.3 frontend           - frontend만"
+    echo "  ./deploy.sh v1.0.3 frontend backend   - frontend와 backend만"
     exit 1
 fi
 
 VERSION=$1
+DEPLOY_ALL=true
+DEPLOY_FRONTEND=false
+DEPLOY_BACKEND=false
+DEPLOY_MODEL=false
+
+# 두 번째 인자부터 서비스 이름 확인
+shift
+if [ $# -gt 0 ]; then
+    DEPLOY_ALL=false
+    for service in "$@"; do
+        case "${service,,}" in
+            frontend) DEPLOY_FRONTEND=true ;;
+            backend) DEPLOY_BACKEND=true ;;
+            model) DEPLOY_MODEL=true ;;
+            *) echo -e "${YELLOW}⚠️  알 수 없는 서비스: $service${NC}" ;;
+        esac
+    done
+fi
+
+# 전체 배포면 모든 서비스 활성화
+if [ "$DEPLOY_ALL" = true ]; then
+    DEPLOY_FRONTEND=true
+    DEPLOY_BACKEND=true
+    DEPLOY_MODEL=true
+fi
 NCR_REGISTRY="newtag-frontend.kr.ncr.ntruss.com"
 NCR_BACKEND_REGISTRY="newtag-backend.kr.ncr.ntruss.com"
 NCR_MODEL_REGISTRY="newtag-model.kr.ncr.ntruss.com"
@@ -28,7 +61,16 @@ ENV_FILE="BackEnd/.env"
 NCR_USERNAME=$(grep "^AWS_ACCESS_KEY=" "$ENV_FILE" | cut -d '=' -f2)
 NCR_PASSWORD=$(grep "^AWS_SECRET_KEY=" "$ENV_FILE" | cut -d '=' -f2)
 
-echo -e "${GREEN}🚀 NewTag 배포 시작 - 버전: ${VERSION}${NC}"
+echo -e "${GREEN}========================================${NC}"
+if [ "$DEPLOY_ALL" = true ]; then
+    echo -e "${GREEN}🚀 NewTag 전체 배포 - 버전: ${VERSION}${NC}"
+else
+    echo -e "${GREEN}🚀 NewTag 선택 배포 - 버전: ${VERSION}${NC}"
+    [ "$DEPLOY_FRONTEND" = true ] && echo "  - Frontend"
+    [ "$DEPLOY_BACKEND" = true ] && echo "  - Backend"
+    [ "$DEPLOY_MODEL" = true ] && echo "  - Model"
+fi
+echo -e "${GREEN}========================================${NC}"
 
 # ========================================
 # 1. NCR 로그인
@@ -80,15 +122,12 @@ echo -e "\n${YELLOW}🏷️  3단계: 서버용 태그 생성 중...${NC}"
 
 echo "  - Frontend 태그 생성..."
 docker tag newtag-frontend:latest ${NCR_REGISTRY}/newtag-frontend:${VERSION}
-docker tag newtag-frontend:latest ${NCR_REGISTRY}/newtag-frontend:latest
 
 echo "  - Backend 태그 생성..."
 docker tag newtag-backend:latest ${NCR_BACKEND_REGISTRY}/newtag-backend:${VERSION}
-docker tag newtag-backend:latest ${NCR_BACKEND_REGISTRY}/newtag-backend:latest
 
 echo "  - Model 태그 생성..."
 docker tag newtag-model:latest ${NCR_MODEL_REGISTRY}/newtag-model:${VERSION}
-docker tag newtag-model:latest ${NCR_MODEL_REGISTRY}/newtag-model:latest
 
 echo -e "${GREEN}✅ 태그 생성 완료${NC}"
 
@@ -99,15 +138,12 @@ echo -e "\n${YELLOW}☁️  4단계: Naver Container Registry에 푸시 중...${
 
 echo "  - Frontend 푸시..."
 docker push ${NCR_REGISTRY}/newtag-frontend:${VERSION}
-docker push ${NCR_REGISTRY}/newtag-frontend:latest
 
 echo "  - Backend 푸시..."
 docker push ${NCR_BACKEND_REGISTRY}/newtag-backend:${VERSION}
-docker push ${NCR_BACKEND_REGISTRY}/newtag-backend:latest
 
 echo "  - Model 푸시..."
 docker push ${NCR_MODEL_REGISTRY}/newtag-model:${VERSION}
-docker push ${NCR_MODEL_REGISTRY}/newtag-model:latest
 
 echo -e "${GREEN}✅ 이미지 푸시 완료${NC}"
 

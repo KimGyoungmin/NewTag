@@ -2,12 +2,6 @@ import { api } from './client';
 import { tokenManager } from './tokenManager';
 import type { LoginRequest, LoginResponse, SignupRequest, User, ApiResponse, AuthUser } from '../types';
 
-const runtimeOrigin =
-  (typeof window !== 'undefined' && window.location?.origin) ||
-  undefined;
-const domainFromEnv = import.meta.env.VITE_DOMAIN_NAME as string | undefined;
-const FRONTEND_BASE_URL = (domainFromEnv || runtimeOrigin || 'http://localhost:5173').replace(/\/$/, '');
-const buildRedirectUri = (path: string) => `${FRONTEND_BASE_URL}${path}`;
 
 const handleAuthSuccess = (data: LoginResponse) => {
   if (data.success && data.token) {
@@ -26,6 +20,7 @@ export const authApi = {
       }
     } catch (error) {
       // ignore - user not logged in
+
     }
     tokenManager.clearSession();
     return null;
@@ -56,6 +51,7 @@ export const authApi = {
     return response.data.success;
   },
 
+
   logout: async (): Promise<void> => {
     try {
       await api.post('/logout');
@@ -72,18 +68,27 @@ export const authApi = {
     return !!tokenManager.getAccessToken();
   },
 
+  /**
+   * 카카오 로그인 - 인증 URL로 리다이렉트
+   */
   loginWithKakao: (): void => {
+    // @ts-ignore - Vite env
     const KAKAO_CLIENT_ID = import.meta.env.VITE_KAKAO_CLIENT_ID;
-    const REDIRECT_URI = buildRedirectUri('/auth/kakao/callback');
+    const DOMAIN_NAME = import.meta.env.VITE_DOMAIN_NAME || 'http://localhost';
+    const REDIRECT_URI = `${DOMAIN_NAME}/api/v1/auth/kakao/callback`;
 
     if (!KAKAO_CLIENT_ID) {
       throw new Error('Kakao OAuth Client ID is missing.');
     }
 
+    // 카카오 OAuth 인증 페이지로 리다이렉트
     const kakaoAuthUrl = `https://kauth.kakao.com/oauth/authorize?client_id=${KAKAO_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code`;
     window.location.href = kakaoAuthUrl;
   },
 
+  /**
+   * 카카오 로그인 콜백 처리 - 인증 코드를 백엔드로 전송
+   */
   handleKakaoCallback: async (code: string): Promise<LoginResponse> => {
     const response = await api.get<LoginResponse>('/auth/kakao/callback', {
       params: { code },
@@ -92,18 +97,27 @@ export const authApi = {
     return response.data;
   },
 
+  /**
+   * 구글 로그인 - 인증 URL로 리다이렉트
+   */
   loginWithGoogle: (): void => {
+    // @ts-ignore - Vite env
     const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    const REDIRECT_URI = buildRedirectUri('/auth/google/callback');
+    const DOMAIN_NAME = import.meta.env.VITE_DOMAIN_NAME || 'http://localhost';
+    const REDIRECT_URI = `${DOMAIN_NAME}/api/v1/auth/google/callback`;
 
     if (!GOOGLE_CLIENT_ID) {
-      throw new Error('Google Client ID is not configured.');
+      throw new Error('구글 클라이언트 ID가 설정되지 않았습니다');
     }
 
+    // 구글 OAuth 인증 페이지로 리다이렉트
     const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${GOOGLE_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&response_type=code&scope=openid%20email%20profile`;
     window.location.href = googleAuthUrl;
   },
 
+  /**
+   * 구글 로그인 콜백 처리 - 인증 코드를 백엔드로 전송
+   */
   handleGoogleCallback: async (code: string): Promise<LoginResponse> => {
     const response = await api.get<LoginResponse>('/auth/google/callback', {
       params: { code },
@@ -112,25 +126,36 @@ export const authApi = {
     return response.data;
   },
 
+  /**
+   * 네이버 로그인 - 인증 URL로 리다이렉트
+   */
   loginWithNaver: (): void => {
+    // @ts-ignore - Vite env
     const NAVER_CLIENT_ID = import.meta.env.VITE_NAVER_CLIENT_ID;
-    const REDIRECT_URI = buildRedirectUri('/auth/naver/callback');
-    const STATE = Math.random().toString(36).substring(2, 15);
+    const DOMAIN_NAME = import.meta.env.VITE_DOMAIN_NAME || 'http://localhost';
+    const REDIRECT_URI = `${DOMAIN_NAME}/api/v1/auth/naver/callback`;
+    const STATE = Math.random().toString(36).substring(2, 15); // 랜덤 state 생성
 
     if (!NAVER_CLIENT_ID) {
-      throw new Error('Naver Client ID is not configured.');
+      throw new Error('네이버 클라이언트 ID가 설정되지 않았습니다');
     }
 
+    // state를 sessionStorage에 저장 (CSRF 방지)
     sessionStorage.setItem('naver_oauth_state', STATE);
 
+    // 네이버 OAuth 인증 페이지로 리다이렉트
     const naverAuthUrl = `https://nid.naver.com/oauth2.0/authorize?response_type=code&client_id=${NAVER_CLIENT_ID}&redirect_uri=${REDIRECT_URI}&state=${STATE}`;
     window.location.href = naverAuthUrl;
   },
 
+  /**
+   * 네이버 로그인 콜백 처리 - 인증 코드를 백엔드로 전송
+   */
   handleNaverCallback: async (code: string, state: string): Promise<LoginResponse> => {
+    // state 검증 (CSRF 방지)
     const savedState = sessionStorage.getItem('naver_oauth_state');
     if (savedState !== state) {
-      throw new Error('State value does not match. Please try again.');
+      throw new Error('State 값이 일치하지 않습니다. 다시 시도해주세요.');
     }
     sessionStorage.removeItem('naver_oauth_state');
 
@@ -141,4 +166,3 @@ export const authApi = {
     return response.data;
   },
 };
-
