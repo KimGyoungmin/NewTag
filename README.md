@@ -149,7 +149,7 @@
 
 ### 1️⃣ 저장소 클론
 ```bash
-git clone https://github.com/[your-username]/NewTag.git
+git clone https://github.com/KimGyoungmin/NewTag.git
 cd NewTag
 ```
 
