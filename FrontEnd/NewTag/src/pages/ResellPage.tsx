@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Search, ArrowUp, ArrowDown } from "lucide-react";
 import { Input } from "../components/ui/input";
-import { Card, CardContent } from "../components/ui/card";
+import { Card } from "../components/ui/card";
 import { ImageWithFallback } from "../components/figma/ImageWithFallback";
 import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
 import { BrandFilter } from "../components/BrandFilter";
@@ -32,6 +32,8 @@ export function ResellPage({ onNavigate, products, onProductsChange }: ResellPag
     products && products.length ? products : RESELL_PRODUCTS,
   );
   const chartAreaRef = useRef<HTMLDivElement | null>(null);
+  const resizeObserverRef = useRef<ResizeObserver | null>(null);
+  const rafRef = useRef<number>();
   const [chartSize, setChartSize] = useState<{ w: number; h: number }>({ w: 320, h: 96 });
 
   useEffect(() => {
@@ -64,22 +66,47 @@ export function ResellPage({ onNavigate, products, onProductsChange }: ResellPag
   }, [onProductsChange]);
 
   // Recharts가 0 이하 크기를 읽지 않도록 컨테이너 사이즈를 관찰
-  useEffect(() => {
-    const el = chartAreaRef.current;
-    if (!el) return;
+  const handleChartAreaRef = useCallback((node: HTMLDivElement | null) => {
+    chartAreaRef.current = node;
 
-    const resize = () => {
+    // 기존 옵저버 및 예약된 측정 정리
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current);
+      rafRef.current = undefined;
+    }
+    resizeObserverRef.current?.disconnect();
+
+    if (!node) {
+      resizeObserverRef.current = null;
+      return;
+    }
+
+    const measure = () => {
+      rafRef.current = undefined;
       setChartSize({
-        w: Math.max(el.clientWidth, 1),
-        h: Math.max(el.clientHeight, 96), // 최소 높이 보장
+        w: Math.max(node.clientWidth, 1),
+        h: Math.max(node.clientHeight || 96, 96), // 최소 높이 보장
       });
     };
 
-    resize();
-    const observer = new ResizeObserver(resize);
-    observer.observe(el);
-    return () => observer.disconnect();
+    // 첫 렌더에서도 실제 DOM 크기를 읽을 수 있도록 다음 프레임에서 측정
+    rafRef.current = requestAnimationFrame(measure);
+
+    const observer = new ResizeObserver(() => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = requestAnimationFrame(measure);
+    });
+    observer.observe(node);
+    resizeObserverRef.current = observer;
   }, []);
+
+  useEffect(
+    () => () => {
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      resizeObserverRef.current?.disconnect();
+    },
+    [],
+  );
 
   const pickKoreanName = (product: ResellProductRecord & Record<string, any>) => {
     const rawCandidates = [
@@ -262,7 +289,7 @@ export function ResellPage({ onNavigate, products, onProductsChange }: ResellPag
         )}
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredProducts.map((product) => {
+          {filteredProducts.map((product, index) => {
             const priceHistory = product.priceHistory.slice(0, MAX_HISTORY_LIMIT);
             const priceValues = priceHistory.map((point) => point.price);
             const hasHistory = priceValues.length > 0;
@@ -317,7 +344,7 @@ export function ResellPage({ onNavigate, products, onProductsChange }: ResellPag
                   </div>
                 </div>
 
-                <div className="h-24 min-w-0 w-full" ref={chartAreaRef}>
+                <div className="h-24 min-w-0 w-full" ref={index === 0 ? handleChartAreaRef : undefined}>
                   {hasHistory ? (
                     <ResponsiveContainer width={chartSize.w} height={chartSize.h}>
                       <LineChart data={priceHistory}>
