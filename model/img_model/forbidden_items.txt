@@ -7,8 +7,17 @@
 대마,cannabis,marijuana,weed
 니코틴액상,nicotine,vape,vaping
 주류,alcohol,liquor
-담배,cigarette,tobacco,cigar, vape
-전자담배, vape, electronic-cigratte
+담배,cigarette,tobacco,cigar,vape
+전자담배,vape,electronic-cigratte
 무기,armament
 위조지폐,counterfeit
 성인용품,adult,toy
+# E-cigarette / heated tobacco brands and terms
+iqos,iqos iluma,iqos iluma one,아이코스,아이코스 일루마,전자담배
+glo,글로
+lil,릴,릴하이브리드
+heets,히츠
+fiit,핏
+marlboro,말보로
+philip morris,필립모리스
+e-cigarette,e cigarette,e-cig,ecig,pod,pod system,니코틴,니코틴 액상,전자 담배 액상,액상담배,vape

@@ -78,3 +78,67 @@
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+@keyframes forbidden-shake {
+  0%, 100% {
+    transform: translateX(0);
+  }
+  20% {
+    transform: translateX(-7px);
+  }
+  40% {
+    transform: translateX(7px);
+  }
+  60% {
+    transform: translateX(-4px);
+  }
+  80% {
+    transform: translateX(4px);
+  }
+}
+
+@keyframes forbidden-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.35);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(255, 255, 255, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 255, 255, 0);
+  }
+}
+
+.forbidden-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 80px;
+  background: rgba(255, 71, 71, 0.08);
+  backdrop-filter: blur(1px);
+  animation: forbidden-shake 0.45s ease-in-out 1;
+  pointer-events: none;
+}
+
+.forbidden-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #ef4444, #b91c1c);
+  color: #fff;
+  box-shadow: 0 20px 45px rgba(185, 28, 28, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.forbidden-indicator {
+  width: 12px;
+  height: 12px;
+  border-radius: 9999px;
+  background: #fff;
+  animation: forbidden-pulse 1.4s ease-in-out infinite;
+}

@@ -15,6 +15,7 @@ const mapProductDetail = (data: any): Product => {
   const primaryImage = normalizedImages.find((img) => img.isMain) ?? normalizedImages[0];
   const mainImagePath = data.mainImage || primaryImage?.pImg;
   const thumbnailImagePath = data.thumbnailImage || primaryImage?.thumbnailPath || mainImagePath;
+  const likedByMe = data.likedByMe ?? data.isFavorite ?? false;
 
   return {
     id: data.id,
@@ -55,7 +56,8 @@ const mapProductDetail = (data: any): Product => {
         }
       : undefined,
     images: normalizedImages,
-    isFavorite: data.likedByMe,
+    likedByMe,
+    isFavorite: likedByMe,
     favoriteCount: data.favoriteCount || 0,
   };
 };

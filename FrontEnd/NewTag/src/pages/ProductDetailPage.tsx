@@ -89,7 +89,7 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
         if (data) {
           setProduct(data);
           // likedByMe 필드 사용 (백엔드에서 제공)
-          setIsLiked(data.likedByMe || false);
+          setIsLiked(data.likedByMe ?? data.isFavorite ?? false);
 
           // 조회수 증가 (백엔드 호출 및 프론트엔드 상태 업데이트)
           if (data.id) {
@@ -265,6 +265,8 @@ export function ProductDetailPage({ productId, onNavigate }: ProductDetailPagePr
         setProduct({
           ...product,
           favoriteCount: response.favoriteCount,
+          likedByMe: response.isFavorited,
+          isFavorite: response.isFavorited,
         });
       }
 
