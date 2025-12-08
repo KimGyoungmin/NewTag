@@ -73,7 +73,13 @@ public class SecurityConfig {
                         "/v1/auth/refresh",
                         "/v1/auth/kakao/callback",
                         "/v1/auth/google/callback",
-                        "/v1/auth/naver/callback"
+                        "/v1/auth/naver/callback",
+                        // Proxy 없이 직접 접근하는 로컬 개발 환경 호환
+                        "/api/v1/login", "/api/v1/signup", "/api/v1/emailMatch", "/api/v1/idMatch",
+                        "/api/v1/auth/refresh",
+                        "/api/v1/auth/kakao/callback",
+                        "/api/v1/auth/google/callback",
+                        "/api/v1/auth/naver/callback"
                 ).permitAll()
                 // 상품 관련 공개 API (로그인 없이 조회 가능)
                 .requestMatchers(HttpMethod.GET, "/v1/products", "/v1/products/**").permitAll()
