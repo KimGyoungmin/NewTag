@@ -60,6 +60,28 @@ export default function App() {
   const location = useLocation();
 
   // ============================================
+  // OAuth 리다이렉트 처리 (쿼리 파라미터에서 토큰 받기)
+  // ============================================
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const token = searchParams.get('token');
+    const loginSuccess = searchParams.get('login');
+
+    if (token && loginSuccess === 'success') {
+      console.log('[App] OAuth 리다이렉트 토큰 감지:', token);
+
+      // 토큰을 localStorage에 저장
+      localStorage.setItem('access_token', token);
+
+      // auth-change 이벤트 발생
+      window.dispatchEvent(new Event('auth-change'));
+
+      // URL에서 쿼리 파라미터 제거
+      navigate('/', { replace: true });
+    }
+  }, [location.search, navigate]);
+
+  // ============================================
 
   // 초기 로드 - 로그인 상태 확인
   // ============================================
@@ -85,12 +107,10 @@ export default function App() {
 
       if (isAuth) {
         // 로그인 시 홈 화면으로 이동 및 검색어 초기화
-        if (location.pathname === '/login' || location.pathname === '/signup') {
-          navigate('/');
-        }
+        navigate('/');        
 
         setSearchQuery("");
-      } else {
+      }else {
         // 로그아웃 시 로그인 화면으로 이동
         navigate('/login');
 
@@ -248,17 +268,17 @@ export default function App() {
           />
           {/* 카카오 로그인 콜백 */}
           <Route
-            path="/auth/kakao/callback"
+            path="/api/v1/auth/kakao/callback"
             element={<KakaoCallbackPage />}
           />
           {/* 구글 로그인 콜백 */}
           <Route
-            path="/auth/google/callback"
+            path="/api/v1/auth/google/callback"
             element={<GoogleCallbackPage />}
           />
           {/* 네이버 로그인 콜백 */}
           <Route
-            path="/auth/naver/callback"
+            path="/api/v1/auth/naver/callback"
             element={<NaverCallbackPage />}
           />
 

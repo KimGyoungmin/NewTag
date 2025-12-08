@@ -1,7 +1,8 @@
 # 🏷️ NewTag (AI 기반 중고거래 플랫폼)
 
 - **NewTag 홈페이지 : https://newtag.store**
-- **API 명세서 홈페이지 : [API 문서 추가 예정]**
+- **Container Registry : Naver Cloud Platform Container Registry**
+- **Object Storage : Naver Cloud Platform Object Storage (이미지 및 정적 파일)**
 - NewTag는 사용자 간의 안전하고 편리한 중고거래를 지원하는 **위치 기반 플랫폼**입니다. **AI 기반 자동 상품 등록**, **실시간 채팅**, **리셀 가격 예측 시스템** 등의 혁신적인 기능을 통해 더 나은 거래 경험을 제공합니다.
 
 ---
@@ -133,11 +134,14 @@
   - Requests
 
 ### Infrastructure
+- **Cloud Platform**: Naver Cloud Platform
+  - Container Registry (Docker 이미지 저장소)
+  - Object Storage (정적 파일 및 이미지 저장)
 - **Real-time Database**: Firebase Firestore 11.10.0
-- **Storage**: 백엔드 서버 파일 시스템 (이미지 최적화 지원)
-- **Reverse Proxy**: Caddy 2 Alpine
+- **Reverse Proxy**: Caddy 2 Alpine (HTTPS 자동 인증서)
 - **Containerization**: Docker, Docker Compose
 - **Browser Automation**: Selenium Standalone Chrome
+- **Domain**: newtag.store
 
 ---
 
@@ -145,7 +149,7 @@
 
 ### 1️⃣ 저장소 클론
 ```bash
-git clone https://github.com/[your-username]/NewTag.git
+git clone https://github.com/KimGyoungmin/NewTag.git
 cd NewTag
 ```
 
@@ -216,15 +220,48 @@ SOURCE DML.sql;
 ```
 
 ### 4️⃣ Docker Compose로 전체 실행 (권장)
+
+#### 프로덕션 배포 (Naver Cloud Container Registry 사용)
 ```bash
-# 모든 서비스 빌드 및 실행
+# Naver Cloud Container Registry에서 이미지 Pull & 실행
+docker-compose pull
 docker-compose up -d
+
 
 # 로그 확인
 docker-compose logs -f
 
 # 서비스 중지
 docker-compose down
+```
+#### 로컬 개발 환경 (이미지 빌드)
+```bash
+# docker-compose.yml에서 build 섹션 활성화 필요
+# image: pynchomo/newtag-frontend:latest 주석 처리
+# build: context: ./FrontEnd/NewTag 주석 해제
+
+# 모든 서비스 빌드 및 실행
+docker-compose up --build -d
+
+# 특정 서비스만 재빌드
+docker-compose up --build -d frontend
+docker-compose up --build -d backend
+docker-compose up --build -d model
+```
+
+#### 로컬 개발 환경 (이미지 빌드)
+```bash
+# docker-compose.yml에서 build 섹션 활성화 필요
+# image: pynchomo/newtag-frontend:latest 주석 처리
+# build: context: ./FrontEnd/NewTag 주석 해제
+
+# 모든 서비스 빌드 및 실행
+docker-compose up --build -d
+
+# 특정 서비스만 재빌드
+docker-compose up --build -d frontend
+docker-compose up --build -d backend
+docker-compose up --build -d model
 ```
 
 ### 5️⃣ 개별 서비스 실행 (로컬 개발)
@@ -268,7 +305,13 @@ python super_kream_crawling.py --feed-only
 
 ### 6️⃣ 접속 확인
 
-- **프론트엔드**: http://localhost (Caddy) 또는 http://localhost:5173 (로컬 개발)
+#### 프로덕션 환경
+- **프론트엔드**: https://newtag.store
+- **백엔드 API**: https://newtag.store/api/v1
+- **AI 모델 API**: https://newtag.store/api/v1/model
+
+#### 로컬 개발 환경
+- **프론트엔드**: http://localhost (Caddy) 또는 http://localhost:5173 (Vite 개발 서버)
 - **백엔드 API**: http://localhost:8081
 - **AI 모델 API**: http://localhost:8000
 - **Selenium VNC**: http://localhost:7900 (비밀번호: secret)
@@ -397,10 +440,40 @@ https://www.canva.com/design/DAG1uattvQk/fWB4eOKmCOApB0QmXWS_7g/edit
 
 ## 🌍 시스템 아키텍처
 
+### 프로덕션 환경 (Naver Cloud Platform)
+
 ```
-[클라이언트 브라우저]
+[사용자]
+   ↓
+[newtag.store] (HTTPS/SSL)
         ↓
-   [Caddy :80/:443] (Reverse Proxy)
+[Caddy Reverse Proxy :80/:443]
+   ↓
+   ├─ /api/v1/model/* → [AI Model Container :8000]
+   ├─ /api/* → [Backend Container :8081]
+   └─ /* → [Frontend Container :80]
+
+[Naver Cloud Container Registry]
+   ├─ pynchomo/newtag-frontend:latest
+   ├─ pynchomo/newtag-backend:latest
+   └─ pynchomo/newtag-model:latest
+
+[Naver Cloud Object Storage]
+   └─ 정적 파일 (이미지, 업로드 파일)
+
+[External Services]
+   ├─ [Firebase Firestore] (실시간 채팅)
+   ├─ [Google Cloud Vision API] (이미지 분석)
+   ├─ [Google Gemini API] (AI 텍스트 생성)
+   └─ [Selenium Container] (크롤링)
+```
+
+### 로컬 개발 환경
+
+```
+[localhost]
+   ↓
+[Caddy :80] (Reverse Proxy)
         ↓
    ┌────┴────┬─────────┬──────────┬─────────┐
    ↓         ↓         ↓          ↓         ↓
@@ -413,20 +486,6 @@ https://www.canva.com/design/DAG1uattvQk/fWB4eOKmCOApB0QmXWS_7g/edit
    └─────uploads───────┘          │          │
                                   └──────────┘
                             (Browser Automation)
-
-[Firebase Firestore] (실시간 채팅)
-        ↕
-   [Frontend]
-
-[Google Cloud APIs]
-        ↕
-   [AI Model]
-- Vision API (이미지 분석)
-- Gemini AI (텍스트 생성)
-
-[KREAM 웹사이트]
-        ↕
-   [Crawler] ← [Selenium]
 ```
 
 ### Caddy 라우팅 규칙
@@ -440,6 +499,113 @@ https://www.canva.com/design/DAG1uattvQk/fWB4eOKmCOApB0QmXWS_7g/edit
 3. **채팅**: Frontend ↔ Firebase Firestore (실시간)
 4. **크롤링**: Crawler → Selenium → KREAM → 데이터 저장
 5. **가격 예측**: Python 스크립트 → 크롤링 데이터 분석 → resell_auto.json 생성
+
+---
+
+## 🚀 배포 (Naver Cloud Platform)
+
+### Container Registry 설정
+
+#### 1. Docker 이미지 빌드 및 푸시
+```bash
+# 로그인
+docker login pynchomo
+
+# Frontend 이미지 빌드 & 푸시
+cd FrontEnd/NewTag
+docker build -t pynchomo/newtag-frontend:latest .
+docker push pynchomo/newtag-frontend:latest
+
+# Backend 이미지 빌드 & 푸시
+cd ../../BackEnd
+docker build -t pynchomo/newtag-backend:latest .
+docker push pynchomo/newtag-backend:latest
+
+# AI Model 이미지 빌드 & 푸시
+cd ../model/img_model
+docker build -t pynchomo/newtag-model:latest .
+docker push pynchomo/newtag-model:latest
+```
+
+#### 2. 서버에서 배포
+```bash
+# 서버 접속 후
+cd /path/to/NewTag
+
+# 최신 이미지 Pull
+docker-compose pull
+
+# 서비스 재시작
+docker-compose down
+docker-compose up -d
+
+# 로그 확인
+docker-compose logs -f
+```
+
+### Object Storage 설정
+
+#### Naver Cloud Object Storage 연동
+```bash
+# Backend 환경변수 설정 (BackEnd/.env)
+NCLOUD_OBJECT_STORAGE_ENDPOINT=https://kr.object.ncloudstorage.com
+NCLOUD_OBJECT_STORAGE_REGION=kr-standard
+NCLOUD_ACCESS_KEY=your_access_key
+NCLOUD_SECRET_KEY=your_secret_key
+NCLOUD_BUCKET_NAME=newtag-storage
+```
+
+#### 이미지 업로드 처리
+- 사용자가 업로드한 이미지는 Naver Cloud Object Storage에 저장
+- 공개 URL을 통해 이미지 접근
+- CDN 연동으로 빠른 이미지 로딩
+
+### SSL/TLS 인증서
+
+Caddy가 Let's Encrypt를 통해 자동으로 SSL 인증서 발급 및 갱신:
+```caddyfile
+# Caddyfile
+newtag.store {
+    # 자동 HTTPS 활성화
+    reverse_proxy frontend:80
+}
+```
+
+### 도메인 설정
+
+1. **DNS 설정**: newtag.store → Naver Cloud 서버 IP
+2. **A 레코드 추가**: `@` → 서버 공인 IP
+3. **CNAME 레코드** (선택): `www` → `newtag.store`
+
+### 배포 체크리스트
+
+- [x] Container Registry에 Docker 이미지 푸시
+- [x] Object Storage 버킷 생성 및 권한 설정
+- [x] 환경 변수 파일 (.env) 서버에 업로드
+- [x] 도메인 DNS 설정
+- [x] Caddy HTTPS 자동 인증서 확인
+- [x] 방화벽 규칙 설정 (80, 443 포트 개방)
+- [x] Docker Compose 서비스 실행
+- [x] 로그 모니터링 설정
+
+### 배포 모니터링
+
+```bash
+# 컨테이너 상태 확인
+docker-compose ps
+
+# 실시간 로그 확인
+docker-compose logs -f
+
+# 특정 서비스 로그
+docker-compose logs -f backend
+
+# 리소스 사용량 확인
+docker stats
+
+# 컨테이너 재시작
+docker-compose restart backend
+```
 
 ---
 
@@ -603,6 +769,200 @@ CREATE INDEX idx_product_created_at ON product(created_at DESC) WHERE is_delete 
 public Page<ProductDtos.ListItem> getProductList(...) { }
 ```
 
+### 11. 소셜 로그인 Redirect URI 환경 불일치 문제 (2025-12-05)
+
+#### 11.1. 문제 상황
+- **증상**: 3개 소셜 로그인(카카오, 구글, 네이버) 모두 작동하지 않음
+- **에러 메시지**:
+  - `"error":"invalid_grant","error_description":"Redirect URI mismatch.","error_code":"KOE303"`
+  - JSON 데이터가 브라우저 화면에 그대로 표시됨
+- **발생 환경**: 로컬 개발 환경 (`http://localhost`)
+
+#### 11.2. 근본 원인 분석
+
+**문제 1: 프론트엔드 Redirect URI 하드코딩**
+- **위치**: `FrontEnd/NewTag/src/api/auth.ts` (77, 105, 133번째 줄)
+- **원인**: OAuth redirect URI가 `http://localhost`로 하드코딩되어 환경 변수 미사용
+```typescript
+// 문제 코드
+const REDIRECT_URI = 'http://localhost/api/v1/auth/kakao/callback';
+```
+- **영향**: 환경에 따라 redirect URI를 동적으로 변경할 수 없음
+
+**문제 2: 백엔드 환경 변수 미설정**
+- **위치**: `BackEnd/.env`
+- **원인**: `OAUTH_REDIRECT_BASE` 환경 변수가 설정되지 않음
+- **결과**: `application.properties`의 기본값인 `https://newtag.store` 사용
+```properties
+# application.properties
+app.oauth.redirect-base=${OAUTH_REDIRECT_BASE:https://newtag.store}
+```
+- **문제점**:
+  - 프론트엔드는 `http://localhost`로 OAuth 요청
+  - 백엔드는 `https://newtag.store`로 토큰 교환 시도
+  - → Redirect URI 불일치로 OAuth 실패
+
+**문제 3: JSON 응답이 브라우저에 직접 표시**
+- **위치**: `BackEnd/src/main/java/com/goldenRun/NewTag/controller/UserController.java`
+- **원인**: OAuth 콜백 엔드포인트가 JSON 응답 반환
+```java
+// 문제 코드
+@GetMapping("/auth/kakao/callback")
+public ResponseEntity<Map<String, Object>> kakaoCallback(@RequestParam String code) {
+    return kakaoAuthService.processKakaoLogin(code);
+}
+```
+- **문제점**:
+  - OAuth 제공자가 사용자를 `http://localhost/api/v1/auth/kakao/callback?code=...`로 리다이렉트
+  - 백엔드가 JSON 응답 반환 → 브라우저에 JSON 데이터 표시
+  - React 앱이 로드되지 않아 OAuth 콜백 처리 불가
+
+#### 11.3. 해결 방법
+
+**해결 1: 프론트엔드 환경 변수 사용**
+
+`FrontEnd/NewTag/src/api/auth.ts` 수정:
+```typescript
+// 수정 전
+const REDIRECT_URI = 'http://localhost/api/v1/auth/kakao/callback';
+
+// 수정 후
+const DOMAIN_NAME = import.meta.env.VITE_DOMAIN_NAME || 'http://localhost';
+const REDIRECT_URI = `${DOMAIN_NAME}/api/v1/auth/kakao/callback`;
+```
+
+프론트엔드 재빌드:
+```bash
+docker-compose build --no-cache frontend
+docker-compose up -d frontend
+```
+
+**해결 2: 백엔드 환경 변수 추가**
+
+`BackEnd/.env`에 환경별 설정 추가:
+```properties
+# 로컬 테스트용
+OAUTH_REDIRECT_BASE=http://localhost
+
+# 프로덕션 배포 시
+# OAUTH_REDIRECT_BASE=https://newtag.store
+```
+
+백엔드 재빌드:
+```bash
+docker-compose up -d --build backend
+```
+
+**해결 3: OAuth 콜백 리다이렉트 방식으로 변경**
+
+`UserController.java`의 OAuth 콜백 메서드를 JSON 응답에서 HTML 리다이렉트로 변경:
+
+```java
+// import 추가
+import jakarta.servlet.http.HttpServletResponse;
+
+// 수정된 콜백 메서드
+@GetMapping("/auth/kakao/callback")
+public void kakaoCallback(@RequestParam String code, HttpServletResponse response) throws Exception {
+    ResponseEntity<Map<String, Object>> result = kakaoAuthService.processKakaoLogin(code);
+    handleOAuthRedirect(result, response);
+}
+
+// 리다이렉트 처리 헬퍼 메서드
+private void handleOAuthRedirect(ResponseEntity<Map<String, Object>> result, HttpServletResponse response) throws Exception {
+    Map<String, Object> body = result.getBody();
+
+    if (body != null && Boolean.TRUE.equals(body.get("success"))) {
+        // 로그인 성공: refresh_token 쿠키 설정
+        String setCookieHeader = result.getHeaders().getFirst(org.springframework.http.HttpHeaders.SET_COOKIE);
+        if (setCookieHeader != null) {
+            response.addHeader(org.springframework.http.HttpHeaders.SET_COOKIE, setCookieHeader);
+        }
+
+        // 액세스 토큰을 쿼리 파라미터로 전달하여 프론트엔드로 리다이렉트
+        String accessToken = (String) body.get("token");
+        String redirectUrl = "/?token=" + accessToken + "&login=success";
+        response.sendRedirect(redirectUrl);
+    } else {
+        // 로그인 실패: 에러 메시지와 함께 로그인 페이지로 리다이렉트
+        String errorMessage = body != null ? (String) body.get("message") : "로그인에 실패했습니다.";
+        String redirectUrl = "/login?error=" + java.net.URLEncoder.encode(errorMessage, "UTF-8");
+        response.sendRedirect(redirectUrl);
+    }
+}
+```
+
+**해결 4: 프론트엔드 토큰 처리 로직 추가**
+
+`App.tsx`에 OAuth 리다이렉트 후 토큰 처리 로직 추가:
+```typescript
+// OAuth 리다이렉트 처리
+useEffect(() => {
+  const searchParams = new URLSearchParams(location.search);
+  const token = searchParams.get('token');
+  const loginSuccess = searchParams.get('login');
+
+  if (token && loginSuccess === 'success') {
+    // 토큰을 localStorage에 저장
+    localStorage.setItem('access_token', token);
+
+    // auth-change 이벤트 발생
+    window.dispatchEvent(new Event('auth-change'));
+
+    // URL에서 쿼리 파라미터 제거
+    navigate('/', { replace: true });
+  }
+}, [location.search, navigate]);
+```
+
+#### 11.4. 검증 방법
+
+1. **환경 변수 확인**:
+```bash
+# 백엔드 컨테이너 내부에서 환경 변수 확인
+docker exec newtag-backend env | grep OAUTH_REDIRECT_BASE
+
+# 출력: OAUTH_REDIRECT_BASE=http://localhost
+```
+
+2. **백엔드 로그 확인**:
+```bash
+docker logs newtag-backend --tail 50
+```
+
+로그인 성공 시 출력:
+```
+INFO: Redirect URI: http://localhost/api/v1/auth/kakao/callback
+INFO: 카카오 액세스 토큰 발급 성공
+INFO: 카카오 기존 회원 로그인: [사용자명]
+```
+
+3. **브라우저 테스트**:
+   - 로그인 페이지에서 소셜 로그인 클릭
+   - OAuth 제공자 인증 완료
+   - 자동으로 메인 페이지로 리다이렉트 (JSON 화면 표시 ❌)
+   - 로그인 상태 확인 (헤더에 프로필 표시)
+
+#### 11.5. 주요 교훈
+
+1. **환경별 설정 분리**: 개발/운영 환경에 따라 다른 값이 필요한 설정은 반드시 환경 변수로 관리
+2. **OAuth Redirect URI 일치**: OAuth 흐름에서 초기 인증 요청과 토큰 교환의 redirect_uri는 완전히 동일해야 함
+3. **컨테이너 환경 변수 적용**: Docker 환경에서 `.env` 파일 수정 후 반드시 컨테이너 재빌드 필요 (`docker-compose up -d --build`)
+4. **OAuth 콜백 UI 처리**: OAuth 콜백은 JSON API가 아닌 리다이렉트 방식으로 처리하여 사용자 경험 개선
+5. **Vite 환경 변수 빌드 타임**: Vite는 환경 변수를 빌드 타임에 임베드하므로 변경 시 재빌드 필수
+
+#### 11.6. 관련 파일
+
+**수정된 파일**:
+- `FrontEnd/NewTag/src/api/auth.ts` (환경 변수 사용)
+- `FrontEnd/NewTag/src/App.tsx` (토큰 처리 로직 추가)
+- `BackEnd/.env` (OAUTH_REDIRECT_BASE 추가)
+- `BackEnd/src/main/java/com/goldenRun/NewTag/controller/UserController.java` (리다이렉트 방식 변경)
+
+**관련 설정 파일**:
+- `BackEnd/src/main/resources/application.properties` (OAuth 설정)
+- `FrontEnd/NewTag/.env` (VITE_DOMAIN_NAME)
+
 ---
 
 ## 📚 상세 문서
@@ -634,4 +994,4 @@ This project is licensed under the MIT License.
 
 ---
 
-**마지막 업데이트**: 2025-12-02
+**마지막 업데이트**: 2025-12-05
