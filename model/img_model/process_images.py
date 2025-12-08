@@ -113,7 +113,7 @@ def load_forbidden_items() -> List[str]:
 
 def detect_forbidden(attributes: Dict[str, Any]) -> Optional[str]:
     """Check vision attributes against forbidden keywords; return the matched keyword."""
-    forbidden = load_forbidden_items()  
+    forbidden = load_forbidden_items()
     if not forbidden:
         return None
 
@@ -149,6 +149,29 @@ def detect_forbidden(attributes: Dict[str, Any]) -> Optional[str]:
         if token and token.casefold() in haystack:
             return token
     return None
+
+
+def detect_forbidden_text(texts: Sequence[str]) -> Optional[str]:
+    """Check arbitrary text blobs for forbidden keywords."""
+    forbidden = load_forbidden_items()
+    if not forbidden:
+        return None
+    haystack = "\n".join((text or "") for text in texts).casefold()
+    for word in forbidden:
+        token = word.strip()
+        if token and token.casefold() in haystack:
+            return token
+    return None
+
+
+def build_forbidden_listing(keyword: str) -> Dict[str, Any]:
+    return {
+        "title": "금지 품목",
+        "content": f"금지 품목({keyword})은 등록할 수 없습니다.",
+        "priceKRW": 0,
+        "category": "forbidden",
+        "forbiddenItem": keyword,
+    }
 
 
 def bootstrap_env() -> None:
@@ -595,13 +618,7 @@ def process_image(
     forbidden_hit = detect_forbidden(attributes)
     if forbidden_hit:
         elapsed = time.perf_counter() - start
-        listing = {
-            "title": "금지 품목",
-            "content": f"금지 품목({forbidden_hit})은 등록할 수 없습니다.",
-            "priceKRW": 0,
-            "category": "forbidden",
-            "forbiddenItem": forbidden_hit,
-        }
+        listing = build_forbidden_listing(forbidden_hit)
         result = {
             "source_image": display_relative_path(image_path, config.base_dir),
             "resized_image": display_relative_path(resized_path, config.base_dir),
@@ -623,6 +640,12 @@ def process_image(
         forbidden_words=load_forbidden_items(),
     )
     listing = normalize_listing(listing_raw)
+
+    post_forbidden_hit = detect_forbidden_text(
+        [listing.get("title", ""), listing.get("content", "")]
+    )
+    if post_forbidden_hit:
+        listing = build_forbidden_listing(post_forbidden_hit)
 
     elapsed = time.perf_counter() - start
     result = {
