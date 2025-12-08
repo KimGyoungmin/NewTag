@@ -951,47 +951,6 @@ INFO: 카카오 기존 회원 로그인: [사용자명]
 4. **OAuth 콜백 UI 처리**: OAuth 콜백은 JSON API가 아닌 리다이렉트 방식으로 처리하여 사용자 경험 개선
 5. **Vite 환경 변수 빌드 타임**: Vite는 환경 변수를 빌드 타임에 임베드하므로 변경 시 재빌드 필수
 
-#### 11.6. 관련 파일
-
-**수정된 파일**:
-- `FrontEnd/NewTag/src/api/auth.ts` (환경 변수 사용)
-- `FrontEnd/NewTag/src/App.tsx` (토큰 처리 로직 추가)
-- `BackEnd/.env` (OAUTH_REDIRECT_BASE 추가)
-- `BackEnd/src/main/java/com/goldenRun/NewTag/controller/UserController.java` (리다이렉트 방식 변경)
-
-**관련 설정 파일**:
-- `BackEnd/src/main/resources/application.properties` (OAuth 설정)
-- `FrontEnd/NewTag/.env` (VITE_DOMAIN_NAME)
-
----
-
-## 📚 상세 문서
-
-### 구현 가이드
-- **[PROJECT_STRUCTURE.md](docs/PROJECT_STRUCTURE.md)** - 프로젝트 구조 및 아키텍처
-- **[AUTH_SYSTEM_INTEGRATION.md](docs/AUTH_SYSTEM_INTEGRATION.md)** - 소셜 로그인 및 JWT 인증
-- **[KAKAO_MAP_IMPLEMENTATION.md](docs/KAKAO_MAP_IMPLEMENTATION.md)** - 카카오 맵 API 통합
-
-### 트러블슈팅 상세
-- **[TROUBLESHOOTING_SUMMARY.md](TROUBLESHOOTING_SUMMARY.md)** - 전체 트러블슈팅 요약
-- **[docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)** - 상세 가이드 및 코드
-- **[docs/AI_AUTO_WRITE_TROUBLESHOOTING.md](docs/AI_AUTO_WRITE_TROUBLESHOOTING.md)** - AI 자동 작성 상세 분석
-- **[docs/N+1_QUERY_ANALYSIS.md](docs/N+1_QUERY_ANALYSIS.md)** - N+1 쿼리 문제 분석
-- **[docs/N+1_QUERY_OPTIMIZATION_RESULTS.md](docs/N+1_QUERY_OPTIMIZATION_RESULTS.md)** - 최적화 결과 보고서
-
----
-
-## 📞 문의
-
-- GitHub: https://github.com/KimGyoungmin/NewTag
-- Email: [이메일 주소 추가 예정]
-
----
-
-## 📄 라이센스
-
-This project is licensed under the MIT License.
-
 ---
 
 **마지막 업데이트**: 2025-12-05
