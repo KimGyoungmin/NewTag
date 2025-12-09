@@ -78,8 +78,10 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
     }
   };
 
+
   const handleCheckId = async () => {
     const trimmedId = formData.userId.trim();
+
 
     if (!trimmedId) {
       setIdCheckStatus("error");
@@ -87,10 +89,12 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
       return;
     }
 
+
     try {
       setIdCheckStatus("checking");
       setIdCheckMessage(null);
       const available = await authApi.checkNickAvailable(trimmedId);
+
 
       if (available) {
         setIdCheckStatus("available");
@@ -104,6 +108,7 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
         setIdCheckStatus("duplicate");
         setIdCheckMessage("중복되는 아이디 입니다.");
         return;
+
       }
 
       setIdCheckStatus("error");
@@ -178,7 +183,9 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
 
   const handleSocialSignup = (provider: string) => {
     console.log("Social signup:", provider);
+
     toast.info("소셜 회원가입은 준비 중이에요.");
+
   };
 
   return (
