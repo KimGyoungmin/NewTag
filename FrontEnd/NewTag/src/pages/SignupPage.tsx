@@ -10,6 +10,8 @@ import { authApi } from "../api/auth";
 import type { SignupRequest } from "../types";
 import { toast } from "sonner";
 
+type IdCheckStatus = "idle" | "checking" | "available" | "duplicate" | "error";
+
 interface SignupPageProps {
   onNavigate: (page: string) => void;
 }
@@ -17,7 +19,7 @@ interface SignupPageProps {
 export function SignupPage({ onNavigate }: SignupPageProps) {
   const [formData, setFormData] = useState({
     name: "",
-    nickname: "",
+    userId: "",
     email: "",
     phone: "",
     birthdate: "",
@@ -34,13 +36,15 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [idCheckStatus, setIdCheckStatus] = useState<IdCheckStatus>("idle");
+  const [idCheckMessage, setIdCheckMessage] = useState<string | null>(null);
+
+  const isPasswordLongEnough = formData.password.length >= 8;
+  const passwordsMatch = formData.password === formData.passwordConfirm;
 
   const getErrorMessage = (error: unknown) => {
     if (isAxiosError(error)) {
-      return (
-        error.response?.data?.message ||
-        "회원가입 중 문제가 발생했어요. 다시 시도해 주세요."
-      );
+      return error.response?.data?.message || "회원가입 중 문제가 발생했어요. 다시 시도해 주세요.";
     }
 
     if (error instanceof Error) {
@@ -50,11 +54,16 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
     return "회원가입 중 문제가 발생했어요. 다시 시도해 주세요.";
   };
 
-  const handleInputChange = (field: string, value: string) => {
+  const handleInputChange = (field: keyof typeof formData, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+
+    if (field === "userId") {
+      setIdCheckStatus("idle");
+      setIdCheckMessage(null);
+    }
   };
 
-  const handleAgreementChange = (field: string, checked: boolean) => {
+  const handleAgreementChange = (field: keyof typeof agreements, checked: boolean) => {
     if (field === "all") {
       setAgreements({
         all: checked,
@@ -64,119 +73,113 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
       });
     } else {
       const newAgreements = { ...agreements, [field]: checked };
-      newAgreements.all =
-        newAgreements.terms && newAgreements.privacy && newAgreements.marketing;
+      newAgreements.all = newAgreements.terms && newAgreements.privacy && newAgreements.marketing;
       setAgreements(newAgreements);
     }
   };
 
-  const handleSignup = async (e: React.FormEvent) => {
+  const handleCheckId = async () => {
+    const trimmedId = formData.userId.trim();
 
-    e.preventDefault();
-
-    setErrorMessage(null);
-
-
-
-    if (!agreements.terms || !agreements.privacy) {
-
-      toast.error("?? ??? ??? ???.");
-
+    if (!trimmedId) {
+      setIdCheckStatus("error");
+      setIdCheckMessage("아이디를 입력해주세요.");
       return;
-
     }
-
-
-
-    if (formData.password !== formData.passwordConfirm) {
-
-      toast.error("????? ???? ????.");
-
-      return;
-
-    }
-
-
-
-    const payload: SignupRequest = {
-
-      name: formData.name.trim(),
-
-      nick: formData.nickname.trim(),
-
-      email: formData.email.trim(),
-
-      password: formData.password,
-
-      phone: formData.phone.trim() || undefined,
-
-      birth: formData.birthdate || undefined,
-
-    };
-
-
-
-    if (!payload.nick) {
-
-      setErrorMessage("???? ??? ???.");
-
-      return;
-
-    }
-
-
 
     try {
+      setIdCheckStatus("checking");
+      setIdCheckMessage(null);
+      const available = await authApi.checkNickAvailable(trimmedId);
 
-      setIsSubmitting(true);
-
-      const response = await authApi.signup(payload);
-
-
-
-      if (response.success) {
-
-        toast.success("????? ??????! ???? ???.");
-
-        onNavigate("login");
-
+      if (available) {
+        setIdCheckStatus("available");
+        setIdCheckMessage("사용 가능한 아이디입니다.");
       } else {
-
-        const message = response.message || "????? ??????.";
-
-        setErrorMessage(message);
-
-        toast.error(message);
-
+        setIdCheckStatus("duplicate");
+        setIdCheckMessage("중복되는 아이디 입니다.");
+      }
+    } catch (error) {
+      if (isAxiosError(error) && error.response?.status === 409) {
+        setIdCheckStatus("duplicate");
+        setIdCheckMessage("중복되는 아이디 입니다.");
+        return;
       }
 
-    } catch (error) {
+      setIdCheckStatus("error");
+      setIdCheckMessage("아이디 중복 확인 중 오류가 발생했어요. 다시 시도해주세요.");
+    }
+  };
 
-      const message = getErrorMessage(error);
+  const handleSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
 
-      setErrorMessage(message);
-
-      toast.error(message);
-
-    } finally {
-
-      setIsSubmitting(false);
-
+    if (!agreements.terms || !agreements.privacy) {
+      toast.error("필수 약관에 동의해주세요.");
+      return;
     }
 
+    const trimmedId = formData.userId.trim();
+    if (!trimmedId) {
+      setErrorMessage("아이디를 입력해주세요.");
+      return;
+    }
+
+    if (!formData.name.trim()) {
+      setErrorMessage("이름을 입력해주세요.");
+      return;
+    }
+
+    if (!isPasswordLongEnough) {
+      setErrorMessage("비밀번호는 최소 8자 이상이어야 해요.");
+      return;
+    }
+
+    if (!passwordsMatch) {
+      toast.error("비밀번호가 일치하지 않습니다.");
+      return;
+    }
+
+    if (idCheckStatus === "duplicate") {
+      setErrorMessage("중복되는 아이디 입니다.");
+      return;
+    }
+
+    const payload: SignupRequest = {
+      name: formData.name.trim(),
+      nick: trimmedId,
+      email: formData.email.trim(),
+      password: formData.password,
+      phone: formData.phone.trim() || undefined,
+      birth: formData.birthdate || undefined,
+    };
+
+    try {
+      setIsSubmitting(true);
+      const response = await authApi.signup(payload);
+
+      if (response.success) {
+        toast.success("회원가입이 완료됐어요. 로그인해 주세요.");
+        onNavigate("login");
+      } else {
+        const message = response.message || "회원가입에 실패했어요.";
+        setErrorMessage(message);
+        toast.error(message);
+      }
+    } catch (error) {
+      const message = getErrorMessage(error);
+      setErrorMessage(message);
+      toast.error(message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
-
-
 
   const handleSocialSignup = (provider: string) => {
-
     console.log("Social signup:", provider);
-
-    toast.info("?? ????? ?? ?? ????.");
-
+    toast.info("소셜 회원가입은 준비 중이에요.");
   };
-
-
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 to-white">
@@ -184,11 +187,7 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
       <div className="bg-white border-b sticky top-0 z-50">
         <div className="container mx-auto max-w-md px-4 py-4">
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onNavigate("login")}
-            >
+            <Button variant="ghost" size="icon" onClick={() => onNavigate("login")}>
               <ChevronLeft className="h-6 w-6" />
             </Button>
             <h1 className="text-xl">회원가입</h1>
@@ -202,9 +201,7 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
           {/* Logo */}
           <div className="text-center mb-6">
             <h2 className="text-3xl text-teal-600 mb-2">NewTag</h2>
-            <p className="text-sm text-muted-foreground">
-              새로운 계정을 만들어보세요
-            </p>
+            <p className="text-sm text-muted-foreground">안전한 중고거래의 시작</p>
           </div>
 
           <form onSubmit={handleSignup} className="space-y-4">
@@ -216,30 +213,59 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
                 <Input
                   id="name"
                   type="text"
-                  placeholder="홍길동"
+                  placeholder="이름을 입력해주세요"
                   value={formData.name}
                   onChange={(e) => handleInputChange("name", e.target.value)}
                   className="pl-10"
                   required
+                  autoComplete="name"
                 />
               </div>
             </div>
 
-            {/* Nickname Input */}
+            {/* ID Input */}
             <div className="space-y-2">
-              <Label htmlFor="nickname">닉네임</Label>
-              <div className="relative">
-                <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                <Input
-                  id="nickname"
-                  type="text"
-                  placeholder="닉네임을 입력하세요"
-                  value={formData.nickname}
-                  onChange={(e) => handleInputChange("nickname", e.target.value)}
-                  className="pl-10"
-                  required
-                />
+              <Label htmlFor="userId">아이디</Label>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                  <Input
+                    id="userId"
+                    type="text"
+                    placeholder="아이디를 입력해주세요"
+                    value={formData.userId}
+                    onChange={(e) => handleInputChange("userId", e.target.value)}
+                    className="pl-10"
+                    required
+                    autoComplete="username"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="shrink-0"
+                  onClick={handleCheckId}
+                  disabled={idCheckStatus === "checking" || !formData.userId.trim()}
+                >
+                  {idCheckStatus === "checking" ? (
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      확인중
+                    </span>
+                  ) : (
+                    "중복확인"
+                  )}
+                </Button>
               </div>
+              {idCheckMessage && (
+                <p
+                  className={`text-sm ${
+                    idCheckStatus === "available" ? "text-green-600" : "text-red-500"
+                  }`}
+                >
+                  {idCheckMessage}
+                </p>
+              )}
             </div>
 
             {/* Email Input */}
@@ -255,13 +281,14 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
                   onChange={(e) => handleInputChange("email", e.target.value)}
                   className="pl-10"
                   required
+                  autoComplete="email"
                 />
               </div>
             </div>
 
             {/* Phone Input */}
             <div className="space-y-2">
-              <Label htmlFor="phone">전화번호</Label>
+              <Label htmlFor="phone">휴대폰 번호</Label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
@@ -272,6 +299,7 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
                   onChange={(e) => handleInputChange("phone", e.target.value)}
                   className="pl-10"
                   required
+                  autoComplete="tel"
                 />
               </div>
             </div>
@@ -300,12 +328,13 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
-                  placeholder="8자 이상 입력하세요"
+                  placeholder="비밀번호를 입력해주세요 (8자 이상)"
                   value={formData.password}
                   onChange={(e) => handleInputChange("password", e.target.value)}
                   className="pl-10 pr-10"
                   required
                   minLength={8}
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
@@ -319,6 +348,17 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
                   )}
                 </button>
               </div>
+              {formData.password.length > 0 && (
+                <p
+                  className={`text-xs ${
+                    isPasswordLongEnough ? "text-green-600" : "text-red-500"
+                  }`}
+                >
+                  {isPasswordLongEnough
+                    ? "비밀번호 길이 조건을 만족합니다."
+                    : "최소 8자 이상 입력해주세요."}
+                </p>
+              )}
             </div>
 
             {/* Password Confirm Input */}
@@ -329,13 +369,12 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
                 <Input
                   id="passwordConfirm"
                   type={showPasswordConfirm ? "text" : "password"}
-                  placeholder="비밀번호를 다시 입력하세요"
+                  placeholder="비밀번호를 다시 입력해주세요"
                   value={formData.passwordConfirm}
-                  onChange={(e) =>
-                    handleInputChange("passwordConfirm", e.target.value)
-                  }
+                  onChange={(e) => handleInputChange("passwordConfirm", e.target.value)}
                   className="pl-10 pr-10"
                   required
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
@@ -349,6 +388,17 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
                   )}
                 </button>
               </div>
+              {formData.passwordConfirm.length > 0 && (
+                <p
+                  className={`text-xs ${
+                    passwordsMatch ? "text-green-600" : "text-red-500"
+                  }`}
+                >
+                  {passwordsMatch
+                    ? "비밀번호가 일치합니다."
+                    : "비밀번호가 일치하지 않습니다."}
+                </p>
+              )}
             </div>
 
             {/* Agreements */}
@@ -362,7 +412,7 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
                   }
                 />
                 <Label htmlFor="all" className="cursor-pointer">
-                  전체 동의
+                  모두 동의
                 </Label>
               </div>
 
@@ -391,7 +441,7 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
                     }
                   />
                   <Label htmlFor="privacy" className="text-sm cursor-pointer">
-                    (필수) 개인정보 처리방침 동의
+                    (필수) 개인정보 수집 및 이용 동의
                   </Label>
                 </div>
 
@@ -424,10 +474,10 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
               {isSubmitting ? (
                 <span className="flex items-center justify-center gap-2">
                   <Loader2 className="h-5 w-5 animate-spin" />
-                  가입 중...
+                  회원가입 중...
                 </span>
               ) : (
-                "가입하기"
+                "회원가입"
               )}
             </Button>
           </form>
@@ -450,7 +500,7 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
             >
               <div className="flex items-center gap-2">
                 <div className="w-5 h-5 bg-yellow-400 rounded-full" />
-                <span>카카오로 시작하기</span>
+                <span>카카오로 계속하기</span>
               </div>
             </Button>
 
@@ -463,7 +513,7 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
             >
               <div className="flex items-center gap-2">
                 <div className="w-5 h-5 bg-green-500 rounded-full" />
-                <span>네이버로 시작하기</span>
+                <span>네이버로 계속하기</span>
               </div>
             </Button>
 
@@ -478,7 +528,7 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
                 <div className="w-5 h-5 border-2 rounded-full flex items-center justify-center text-xs">
                   G
                 </div>
-                <span>Google로 시작하기</span>
+                <span>Google로 계속하기</span>
               </div>
             </Button>
           </div>
