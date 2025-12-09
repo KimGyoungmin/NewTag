@@ -97,13 +97,13 @@ public class AiListingService {
 
     public AutoWriteResponse generateListing(AutoWriteRequest request) {
         if (request == null || CollectionUtils.isEmpty(request.imagePaths())) {
-            throw new IllegalArgumentException("理쒖냼 1媛쒖쓽 ?대?吏 寃쎈줈媛 ?꾩슂?⑸땲??");
+            throw new IllegalArgumentException("최소 1개의 이미지 경로가 필요합니다.");
         }
 
-        log.info("[AI Listing] 諛쏆? ?대?吏 寃쎈줈 媛쒖닔: {}", request.imagePaths().size());
-        log.info("[AI Listing] 諛쏆? ?대?吏 寃쎈줈 紐⑸줉: {}", request.imagePaths());
+        log.info("[AI Listing] 받은 이미지 경로 개수: {}", request.imagePaths().size());
+        log.info("[AI Listing] 받은 이미지 경로 목록: {}", request.imagePaths());
 
-        // 諛깆뿏?쒖뿉???뚯씪 議댁옱 ?щ?留?寃利앺븯怨? Python ?쒕쾭?먮뒗 ?먮낯 ?곷? 寃쎈줈 ?꾩넚
+        // 백엔드에서 파일 존재 여부만 검증하고, Python 서버로는 원본 절대 경로 전송
         List<String> resolvedPaths = new ArrayList<>();
         for (String imagePath : request.imagePaths()) {
             try {
@@ -150,9 +150,9 @@ public class AiListingService {
 
         List<String> endpoints = buildEndpointCandidates();
         log.info("[AI Listing] Candidate endpoints: {}", endpoints);
-        log.info("[AI Listing] ?? requestDto: {}", requestDto);
-        log.info("[AI Listing] absolutePaths ?: {}, ???: {}", absolutePaths.size(), absolutePaths);
-        log.info("[AI Listing] modelPaths ?: {}, ???: {}", modelPaths.size(), modelPaths);
+        log.info("[AI Listing] 보낸 requestDto: {}", requestDto);
+        log.info("[AI Listing] absolutePaths 크기: {}, 내용: {}", absolutePaths.size(), absolutePaths);
+        log.info("[AI Listing] modelPaths 크기: {}, 내용: {}", modelPaths.size(), modelPaths);
 
         HttpEntity<AutoListingModelRequest> requestEntity = new HttpEntity<>(requestDto, headers);
 
@@ -165,14 +165,14 @@ public class AiListingService {
                 ResponseEntity<AutoListingModelResponse> response =
                         restTemplate.exchange(endpoint, HttpMethod.POST, requestEntity, AutoListingModelResponse.class);
                 if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-                    throw new IllegalStateException("AI ??? ?? ????.");
+                    throw new IllegalStateException("AI 모델 호출 실패");
                 }
-                log.info("[AI Listing] AI ?? ?? via {}", endpoint);
+                log.info("[AI Listing] AI 모델 호출 성공 via {}", endpoint);
                 return response.getBody();
             } catch (HttpStatusCodeException ex) {
                 String body = ex.getResponseBodyAsString();
-                log.error("[AI Listing] AI ?? ?? - status: {}, body: {}", ex.getStatusCode(), body);
-                String message = "AI ?? ?? ??: " + ex.getStatusCode();
+                log.error("[AI Listing] AI 모델 오류 - status: {}, body: {}", ex.getStatusCode(), body);
+                String message = "AI 모델 오류 상태: " + ex.getStatusCode();
                 if (StringUtils.hasText(body)) {
                     message += " - " + body;
                 }
@@ -187,9 +187,9 @@ public class AiListingService {
         }
 
         if (lastException != null) {
-            throw new IllegalStateException("AI ??? ??? ? ????. ????? ??????.", lastException);
+            throw new IllegalStateException("AI 서버에 연결할 수 없습니다. 서버를 확인해주세요.", lastException);
         }
-        throw new IllegalStateException("AI ?? ? ??? ??????.");
+        throw new IllegalStateException("AI 모델 호출에 실패했습니다.");
     }
 
     private String extractForbiddenItem(Map<String, Object> listing) {
@@ -230,12 +230,12 @@ public class AiListingService {
 
     private String resolveAbsolutePath(String rawPath) {
         if (!StringUtils.hasText(rawPath)) {
-            throw new IllegalArgumentException("?섎せ???대?吏 寃쎈줈?낅땲??");
+            throw new IllegalArgumentException("유효하지 않은 이미지 경로입니다.");
         }
 
-        log.debug("[AI Listing] resolveAbsolutePath ?쒖옉 - rawPath: {}", rawPath);
-        log.debug("[AI Listing] uploadDir ?ㅼ젙媛? {}", uploadDir);
-        log.debug("[AI Listing] uploadBaseDir ?ㅼ젙媛? {}", uploadBaseDir);
+        log.debug("[AI Listing] resolveAbsolutePath 시작 - rawPath: {}", rawPath);
+        log.debug("[AI Listing] uploadDir 설정값: {}", uploadDir);
+        log.debug("[AI Listing] uploadBaseDir 설정값: {}", uploadBaseDir);
 
         String normalized = normalizeRemotePath(rawPath);
         if (isUrl(normalized)) {
@@ -257,10 +257,10 @@ public class AiListingService {
 
         if (initial.isAbsolute()) {
             if (!Files.exists(initial)) {
-                log.error("[AI Listing] ?덈? 寃쎈줈 ?뚯씪??議댁옱?섏? ?딆쓬: {}", initial);
-                throw new IllegalArgumentException("?대?吏 ?뚯씪??李얠쓣 ???놁뒿?덈떎: " + initial);
+                log.error("[AI Listing] 절대 경로 파일이 존재하지 않음: {}", initial);
+                throw new IllegalArgumentException("이미지 파일을 찾을 수 없습니다: " + initial);
             }
-            log.debug("[AI Listing] ?덈? 寃쎈줈 ?뚯씪 李얠쓬: {}", initial);
+            log.debug("[AI Listing] 절대 경로 파일 찾음: {}", initial);
             return initial.toString();
         }
 
@@ -268,26 +268,26 @@ public class AiListingService {
         if (StringUtils.hasText(uploadDir)) {
             Path candidate = buildCandidate(Paths.get(uploadDir), normalized);
             candidates.add(candidate);
-            log.debug("[AI Listing] uploadDir ?꾨낫 寃쎈줈: {}", candidate);
+            log.debug("[AI Listing] uploadDir 후보 경로: {}", candidate);
         }
         if (StringUtils.hasText(uploadBaseDir)) {
             Path candidate = buildCandidate(Paths.get(uploadBaseDir), normalized);
             candidates.add(candidate);
-            log.debug("[AI Listing] uploadBaseDir ?꾨낫 寃쎈줈: {}", candidate);
+            log.debug("[AI Listing] uploadBaseDir 후보 경로: {}", candidate);
         }
 
         for (Path candidate : candidates) {
             if (candidate != null) {
-                log.debug("[AI Listing] ?꾨낫 寃쎈줈 ?뺤씤 以? {} (exists: {})", candidate, Files.exists(candidate));
+                log.debug("[AI Listing] 후보 경로 확인 중: {} (exists: {})", candidate, Files.exists(candidate));
                 if (Files.exists(candidate)) {
-                    log.info("[AI Listing] ?대?吏 ?뚯씪 李얠쓬: {}", candidate);
+                    log.info("[AI Listing] 이미지 파일 찾음: {}", candidate);
                     return candidate.toString();
                 }
             }
         }
 
-        log.error("[AI Listing] 紐⑤뱺 ?꾨낫 寃쎈줈?먯꽌 ?뚯씪??李얠? 紐삵븿: {}", candidates);
-        throw new IllegalArgumentException("?대?吏 ?뚯씪??李얠쓣 ???놁뒿?덈떎: " + candidates);
+        log.error("[AI Listing] 모든 후보 경로에서 파일을 찾지 못함: {}", candidates);
+        throw new IllegalArgumentException("이미지 파일을 찾을 수 없습니다: " + candidates);
     }
 
     private String downloadRemoteImage(String url) {

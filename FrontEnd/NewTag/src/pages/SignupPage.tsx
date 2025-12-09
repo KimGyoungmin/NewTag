@@ -80,7 +80,7 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
 
     if (!agreements.terms || !agreements.privacy) {
 
-      toast.error("?? ??? ??? ???.");
+      toast.error("필수 약관에 동의해 주세요.");
 
       return;
 
@@ -90,7 +90,7 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
 
     if (formData.password !== formData.passwordConfirm) {
 
-      toast.error("????? ???? ????.");
+      toast.error("비밀번호가 일치하지 않습니다.");
 
       return;
 
@@ -118,7 +118,7 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
 
     if (!payload.nick) {
 
-      setErrorMessage("???? ??? ???.");
+      setErrorMessage("닉네임을 입력해 주세요.");
 
       return;
 
@@ -136,13 +136,13 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
 
       if (response.success) {
 
-        toast.success("????? ??????! ???? ???.");
+        toast.success("회원가입이 완료되었습니다! 로그인 해주세요.");
 
         onNavigate("login");
 
       } else {
 
-        const message = response.message || "????? ??????.";
+        const message = response.message || "회원가입에 실패했습니다.";
 
         setErrorMessage(message);
 
@@ -172,7 +172,7 @@ export function SignupPage({ onNavigate }: SignupPageProps) {
 
     console.log("Social signup:", provider);
 
-    toast.info("?? ????? ?? ?? ????.");
+    toast.info("소셜 회원가입은 준비 중입니다.");
 
   };
 
