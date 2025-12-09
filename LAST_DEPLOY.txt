@@ -1,5 +1,5 @@
-배포 버전: v1.0.5
-배포 ?�간: 2025-12-05 16:46:25.39
+배포 버전: v1.0.7
+배포 ?�간: 2025-12-09 11:06:20.96
 ?��?지:
-  - newtag-frontend.kr.ncr.ntruss.com/newtag-frontend:v1.0.5
-  - newtag-backend.kr.ncr.ntruss.com/newtag-backend:v1.0.5
+  - newtag-frontend.kr.ncr.ntruss.com/newtag-frontend:v1.0.7
+  - newtag-backend.kr.ncr.ntruss.com/newtag-backend:v1.0.7

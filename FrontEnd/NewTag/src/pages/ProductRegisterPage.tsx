@@ -49,6 +49,7 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [forbiddenReason, setForbiddenReason] = useState<string | null>(null);
+  const [forbiddenOverlayDismissed, setForbiddenOverlayDismissed] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
@@ -126,6 +127,11 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
 
   const handleImageRemove = (index: number) => {
     setImages(images.filter((_, i) => i !== index));
+  };
+
+  const markForbidden = (reason: string) => {
+    setForbiddenReason(reason);
+    setForbiddenOverlayDismissed(false);
   };
 
 
@@ -217,7 +223,9 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
           forbiddenFromModel ||
           (result.title === "금지 품목" ? "금지 품목" : null) ||
           "금지 품목으로 감지되었습니다.";
-        setForbiddenReason(reason);
+        if (reason) {
+          markForbidden(reason);
+        }
         toast.error("금지 품목으로 감지되어 작성이 차단되었습니다. 다른 이미지로 다시 시도해주세요.");
         return;
       }
@@ -272,6 +280,14 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
     }
   }, [locationState?.selectedLocation, navigate]);
 
+  useEffect(() => {
+    if (!forbiddenReason) return;
+    setForbiddenOverlayDismissed(false);
+    const handleDismiss = () => setForbiddenOverlayDismissed(true);
+    window.addEventListener("pointerdown", handleDismiss);
+    return () => window.removeEventListener("pointerdown", handleDismiss);
+  }, [forbiddenReason]);
+
   const handleLocationChange = () => {
     const formState: RegisterFormState = {
       title,
@@ -298,7 +314,21 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24">
+    <>
+      {forbiddenReason && !forbiddenOverlayDismissed && (
+        <div className="forbidden-overlay">
+          <div className="forbidden-banner" role="alert" aria-live="assertive">
+            <span className="forbidden-indicator" aria-hidden="true" />
+            <div>
+              <p className="text-base font-semibold">금지 품목 감지</p>
+              <p className="text-sm">
+                {forbiddenReason} - 다른 이미지로 다시 시도해주세요.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="min-h-screen bg-background pb-24">
       <div className="sticky top-0 z-50 flex items-center justify-between border-b bg-background px-4 h-14">
         <Button
           variant="ghost"
@@ -490,6 +520,7 @@ export function ProductRegisterPage({ onNavigate }: ProductRegisterPageProps) {
         </div>
       </div>
     </div>
+    </>
   );
 }
 

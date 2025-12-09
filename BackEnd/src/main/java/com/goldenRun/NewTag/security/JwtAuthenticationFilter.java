@@ -37,6 +37,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             "/v1/auth/kakao/callback", // Changed from /api/v1/auth/kakao/callback
             "/v1/auth/google/callback", // Changed from /api/v1/auth/google/callback
             "/v1/auth/naver/callback", // Changed from /api/v1/auth/naver/callback
+            // 로컬 개발 환경에서 /api 프리픽스를 직접 호출하는 경우 허용
+            "/api/v1/login",
+            "/api/v1/signup",
+            "/api/v1/emailMatch",
+            "/api/v1/idMatch",
+            "/api/v1/auth/refresh",
+            "/api/v1/auth/kakao/callback",
+            "/api/v1/auth/google/callback",
+            "/api/v1/auth/naver/callback",
             "/v1/static/**", // Changed from /api/v1/static/**
             "/static/**",
             "/v1/userprofile/**", // Changed from /api/v1/userprofile/**

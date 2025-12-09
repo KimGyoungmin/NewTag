@@ -30,7 +30,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 
 @RestController
-@RequestMapping("/v1")
+@RequestMapping({"/v1", "/api/v1"})
 public class UserController {
 
 	@Autowired
@@ -102,14 +102,14 @@ public class UserController {
 		handleOAuthRedirect(result, response);
 	}
 
-	/**
-	 * 구글 로그인 콜백 처리
-	 */
-	@GetMapping("/auth/google/callback")
-	public void googleCallback(@RequestParam String code, HttpServletResponse response) throws Exception {
-		ResponseEntity<Map<String, Object>> result = googleAuthService.processGoogleLogin(code);
-		handleOAuthRedirect(result, response);
-	}
+    /**
+     * 구글 로그인 콜백 처리
+     */
+    @GetMapping("/auth/google/callback")
+    public void googleCallback(@RequestParam String code, HttpServletResponse response) throws Exception {
+        ResponseEntity<Map<String, Object>> result = googleAuthService.processGoogleLogin(code);
+        handleOAuthRedirect(result, response);
+    }
 
 	/**
 	 * 네이버 로그인 콜백 처리
