@@ -27,7 +27,7 @@
 | 이름 | 역할 |
 | --- | --- |
 | 이준범 |  |
-| 김경민 |  |
+| 김경민 | 환경구축, 메인화면 구현(상품리스트 로직), 에러 유지보수, Docker 컨테이너 연결 |
 | 전신혁 | Full-Stack, AI Modeling, Prompt Engineer, MLOps Engineer, Vision & Multimodal |
 | 김현수 |  |
 
